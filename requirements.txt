@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+psutil
+aiofiles
+aiohttp
+nvidia-ml-py

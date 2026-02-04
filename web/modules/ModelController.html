@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Model Controller</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        /* =========================================
+           CORE VARIABLES (Matches Snapshot Builder)
+           ========================================= */
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-input: #1a1a1a;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.1);
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #333333;
+            --input-focus-bg: #111111;
+
+            --status-loaded: #10B981;
+            --status-loading: #F59E0B;
+            --status-error: #EF4444;
+            --status-stopped: #666;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --bg-input: #ffffff;
+            --brand-purple: #6a4ce0;
+            --brand-purple-dim: rgba(106, 76, 224, 0.1);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --input-focus-bg: #f9fafb;
+        }
+
+        /* --- THEMED SCROLLBARS --- */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px;
+            font-size: 13px;
+            overflow-y: auto;
+        }
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 16px;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section { margin-bottom: 25px; }
+        .label { font-weight: 600; display: block; margin-bottom: 8px; color: var(--text-head); font-size: 12px; }
+        .sub-label { font-size: 11px; color: var(--text-dim); margin-bottom: 5px; }
+
+        /* Form Elements */
+        select, input[type="text"], input[type="number"] {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        select:focus, input:focus { outline: none; border-color: var(--brand-purple); background: var(--input-focus-bg); }
+
+        /* Grid Layout for Params */
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .param-item { display: flex; flex-direction: column; }
+        .param-item label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+
+        /* Buttons */
+        button {
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        button.primary { background: var(--brand-purple); color: white; width: 100%; }
+        button.primary:hover { background: #6b4cdb; box-shadow: 0 0 10px rgba(124, 92, 255, 0.3); }
+
+        button.danger { background: #2a1111; color: #ff6666; border: 1px solid #552222; width: 100%; }
+        button.danger:hover { background: #441111; border-color: #ff4444; }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        /* Presets */
+        .presets-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .preset-btn:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+        .preset-btn.active { background: var(--brand-purple); color: white; border-color: var(--brand-purple); }
+
+        .save-preset-btn { width: auto; padding: 0 15px; }
+        .default-preset-btn { width: auto; padding: 0 10px; font-size: 10px; letter-spacing: 0.5px; }
+
+        /* Tooltip for Presets */
+        .preset-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #222;
+            border: 1px solid #444;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: #ccc;
+            white-space: pre;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            min-width: 150px;
+            text-align: left;
+        }
+        .preset-btn:hover .preset-tooltip { opacity: 1; }
+
+        /* Status Bar */
+        .status-bar {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'JetBrains Mono';
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+        .dot.running { background: var(--status-loaded); box-shadow: 0 0 8px var(--status-loaded); }
+        .dot.loading { background: var(--status-loading); animation: pulse 1s infinite; }
+        .dot.stopped { background: var(--status-stopped); }
+        .dot.error { background: var(--status-error); }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        /* Control Group */
+        .control-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+
+        #error-msg {
+            color: var(--status-error);
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 4px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>
+        Model Configuration
+        <span style="font-size:10px; color:var(--text-dim); font-weight:400;">v5.0</span>
+    </h2>
+
+    <!-- Status -->
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div id="status-dot" class="dot stopped"></div>
+            <span id="status-text">STOPPED</span>
+        </div>
+        <div style="font-size:11px; color:var(--text-dim);" id="pid-text">PID: -</div>
+    </div>
+
+    <div id="error-msg"></div>
+
+    <!-- Presets -->
+    <div class="section">
+        <div class="label">Presets</div>
+        <div class="presets-container" id="presets-list">
+            <!-- Generated via JS -->
+            <button class="preset-btn">1</button>
+            <button class="preset-btn">2</button>
+            <button class="preset-btn save-preset-btn">SAVE</button>
+        </div>
+    </div>
+
+    <!-- Main Config -->
+    <div class="section">
+        <div class="label">Model File</div>
+        <select id="inp-model">
+            <option value="">Select a model...</option>
+        </select>
+    </div>
+
+    <div class="section">
+        <div class="label">Parameters</div>
+        <div class="param-grid">
+            <div class="param-item">
+                <label>Context Size (n_ctx)</label>
+                <input type="number" id="inp-n_ctx" value="2048">
+            </div>
+            <div class="param-item">
+                <label>Threads (n_threads)</label>
+                <input type="number" id="inp-n_threads" value="8">
+            </div>
+            <div class="param-item">
+                <label>GPU Layers</label>
+                <input type="number" id="inp-n_gpu_layers" value="0">
+            </div>
+            <div class="param-item">
+                <label>Max Tokens</label>
+                <input type="number" id="inp-max_tokens" value="2048">
+            </div>
+            <div class="param-item">
+                <label>Temperature</label>
+                <input type="number" id="inp-temperature" value="0.7" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>Top P</label>
+                <input type="number" id="inp-top_p" value="0.95" step="0.01">
+            </div>
+            <div class="param-item">
+                <label>Top K</label>
+                <input type="number" id="inp-top_k" value="40">
+            </div>
+            <div class="param-item">
+                <label>Batch Size</label>
+                <input type="number" id="inp-n_batch" value="512">
+            </div>
+             <div class="param-item">
+                <label>Chat Format</label>
+                <input type="text" id="inp-chat_format" placeholder="(Optional)">
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="control-group">
+        <button id="btn-load" class="primary">Start System</button>
+        <button id="btn-stop" class="danger">Stop System</button>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url') || 'http://localhost:8000';
+        let authToken = localStorage.getItem('lyrn_admin_token') || null;
+        let pollInterval = null;
+        let isRunning = false;
+        let presets = {};
+
+        const els = {
+            statusDot: document.getElementById('status-dot'),
+            statusText: document.getElementById('status-text'),
+            pidText: document.getElementById('pid-text'),
+            modelSelect: document.getElementById('inp-model'),
+            btnLoad: document.getElementById('btn-load'),
+            btnStop: document.getElementById('btn-stop'),
+            errorMsg: document.getElementById('error-msg'),
+            presetsList: document.getElementById('presets-list')
+        };
+
+        const inputs = {
+            n_ctx: document.getElementById('inp-n_ctx'),
+            n_threads: document.getElementById('inp-n_threads'),
+            n_gpu_layers: document.getElementById('inp-n_gpu_layers'),
+            max_tokens: document.getElementById('inp-max_tokens'),
+            temperature: document.getElementById('inp-temperature'),
+            top_p: document.getElementById('inp-top_p'),
+            top_k: document.getElementById('inp-top_k'),
+            n_batch: document.getElementById('inp-n_batch'),
+            chat_format: document.getElementById('inp-chat_format'),
+            model_path: document.getElementById('inp-model') // Special case
+        };
+
+        // Listen for URL updates from dashboard
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+                init();
+            }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                const wasNull = !authToken;
+                authToken = e.data.token;
+                if(wasNull) init();
+            }
+            if (e.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+            }
+            if (event.data.type === 'FONT_CHANGE') {
+                document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
+            }
+        });
+
+        els.btnLoad.addEventListener('click', startWorker);
+        els.btnStop.addEventListener('click', stopWorker);
+
+        // Auto-refresh model list on click
+        els.modelSelect.addEventListener('mousedown', fetchModels);
+
+        async function init() {
+            if(!authToken) return;
+            await Promise.all([
+                fetchModels(),
+                fetchPresets(),
+                fetchActiveConfig()
+            ]);
+            startPolling();
+        }
+
+        async function fetchModels() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/models/list`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const data = await res.json();
+                els.modelSelect.innerHTML = '<option value="">Select a model...</option>';
+
+                // Compatibility check if data is array or object
+                const list = Array.isArray(data) ? data : (data.models || []);
+
+                list.forEach(item => {
+                    const name = typeof item === 'string' ? item : item.name;
+                    const opt = document.createElement('option');
+                    opt.value = `models/${name}`; // Assuming models dir is root relative
+                    opt.innerText = name;
+                    els.modelSelect.appendChild(opt);
+                });
+            } catch (e) {
+                showError("Failed to list models: " + e.message);
+            }
+        }
+
+        async function fetchPresets() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/config/presets`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                presets = await res.json();
+                renderPresets();
+            } catch (e) {
+                showError("Failed to fetch presets");
+            }
+        }
+
+        function renderPresets() {
+            els.presetsList.innerHTML = '';
+
+            // Render Default Slot
+            const defBtn = document.createElement('button');
+            defBtn.className = 'preset-btn default-preset-btn';
+            defBtn.innerText = 'DEFAULT';
+
+            const defData = presets["default"];
+            if(defData) {
+                const tip = document.createElement('div');
+                tip.className = 'preset-tooltip';
+                const name = defData.model_path ? defData.model_path.split('/').pop() : 'Unknown';
+                tip.innerText = `Model: ${name}\nCtx: ${defData.n_ctx}\nGPU: ${defData.n_gpu_layers}`;
+                defBtn.appendChild(tip);
+                defBtn.onclick = () => loadPreset("default");
+            } else {
+                defBtn.style.opacity = '0.5';
+                defBtn.onclick = () => alert("Default preset empty. Set params and click Save, then enter 'default'.");
+            }
+            els.presetsList.appendChild(defBtn);
+
+            // Render 1-5 slots
+            for(let i=1; i<=5; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'preset-btn';
+                btn.innerText = i;
+
+                const presetId = i.toString();
+                const pData = presets[presetId];
+
+                if(pData) {
+                    // Tooltip
+                    const tip = document.createElement('div');
+                    tip.className = 'preset-tooltip';
+                    const name = pData.model_path ? pData.model_path.split('/').pop() : 'Unknown';
+                    tip.innerText = `Model: ${name}\nCtx: ${pData.n_ctx}\nGPU: ${pData.n_gpu_layers}`;
+                    btn.appendChild(tip);
+
+                    btn.onclick = () => loadPreset(presetId);
+                } else {
+                    btn.style.opacity = '0.5';
+                    btn.onclick = () => alert("Preset empty. Set params and click Save.");
+                }
+
+                els.presetsList.appendChild(btn);
+            }
+
+            // Save Button
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'preset-btn save-preset-btn';
+            saveBtn.innerText = 'SAVE';
+            saveBtn.onclick = savePreset;
+            els.presetsList.appendChild(saveBtn);
+        }
+
+        function loadPreset(id) {
+            const data = presets[id];
+            if(!data) return;
+
+            // Populate fields
+            for(const [key, val] of Object.entries(data)) {
+                if(inputs[key]) {
+                    inputs[key].value = val;
+                }
+            }
+        }
+
+        async function savePreset() {
+            const input = prompt("Enter preset number (1-5) or 'default' to save:");
+            if(!input) return;
+
+            let id = input.trim().toLowerCase();
+
+            // Allow 'd' as shortcut for default
+            if(id === 'd') id = 'default';
+
+            const isNum = !isNaN(id);
+            if(isNum) {
+                if(id < 1 || id > 5) {
+                    alert("Please enter a number between 1 and 5.");
+                    return;
+                }
+            } else {
+                if(id !== 'default') {
+                    alert("Invalid input. Enter 1-5 or 'default'.");
+                    return;
+                }
+            }
+
+            const config = getConfigFromInputs();
+
+            try {
+                await fetch(`${coreUrl}/api/config/presets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
+                    body: JSON.stringify({ preset_id: id, config: config })
+                });
+                await fetchPresets(); // Refresh
+            } catch(e) {
+                showError("Error saving preset");
+            }
+        }
+
+        async function fetchActiveConfig() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/config/active`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const config = await res.json();
+                if(config && Object.keys(config).length > 0) {
+                     for(const [key, val] of Object.entries(config)) {
+                        if(inputs[key]) inputs[key].value = val;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        function getConfigFromInputs() {
+            return {
+                model_path: inputs.model_path.value,
+                n_ctx: parseInt(inputs.n_ctx.value),
+                n_threads: parseInt(inputs.n_threads.value),
+                n_gpu_layers: parseInt(inputs.n_gpu_layers.value),
+                max_tokens: parseInt(inputs.max_tokens.value),
+                temperature: parseFloat(inputs.temperature.value),
+                top_p: parseFloat(inputs.top_p.value),
+                top_k: parseInt(inputs.top_k.value),
+                n_batch: parseInt(inputs.n_batch.value),
+                chat_format: inputs.chat_format.value || null
+            };
+        }
+
+        function startPolling() {
+            if(pollInterval) clearInterval(pollInterval);
+            pollStatus();
+            pollInterval = setInterval(pollStatus, 2000);
+        }
+
+        async function pollStatus() {
+            if(!authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/system/worker_status`, {
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const data = await res.json();
+                updateUI(data);
+            } catch(e) {
+                els.statusText.innerText = "DISCONNECTED";
+                els.statusDot.className = "dot error";
+            }
+        }
+
+        function updateUI(data) {
+            isRunning = data.running;
+
+            // Status Text mapping
+            let label = "STOPPED";
+            let dotClass = "stopped";
+
+            if(data.running) {
+                if(data.llm_status === 'loading') {
+                    label = "LOADING MODEL...";
+                    dotClass = "loading";
+                } else if(data.llm_status === 'busy') {
+                    label = "GENERATING";
+                    dotClass = "running";
+                } else if(data.llm_status === 'error') {
+                    label = "MODEL ERROR";
+                    dotClass = "error";
+                } else {
+                    label = "RUNNING (IDLE)";
+                    dotClass = "running";
+                }
+            }
+
+            els.statusText.innerText = label;
+            els.statusDot.className = "dot " + dotClass;
+            els.pidText.innerText = data.pid ? `PID: ${data.pid}` : "PID: -";
+
+            els.btnLoad.disabled = data.running;
+            els.btnStop.disabled = !data.running;
+
+            // Error Message
+            if(data.llm_status === 'error' && data.error_message) {
+                showError("Error: " + data.error_message);
+            } else {
+                els.errorMsg.style.display = 'none';
+            }
+        }
+
+        async function startWorker() {
+            const config = getConfigFromInputs();
+            if(!config.model_path) {
+                alert("Please select a model first.");
+                return;
+            }
+
+            els.errorMsg.style.display = 'none';
+            els.btnLoad.disabled = true;
+
+            try {
+                // 1. Save Active Config
+                await fetch(`${coreUrl}/api/config/active`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken || ''
+                    },
+                    body: JSON.stringify({ config: config })
+                });
+
+                // 2. Start Worker
+                const res = await fetch(`${coreUrl}/api/system/start_worker`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+                const json = await res.json();
+
+                if(!json.success) throw new Error(json.message);
+
+                // UI updates via polling
+            } catch(e) {
+                showError(e.message);
+                els.btnLoad.disabled = false;
+            }
+        }
+
+        async function stopWorker() {
+            els.btnStop.disabled = true;
+            try {
+                await fetch(`${coreUrl}/api/system/stop_worker`, {
+                    method: 'POST',
+                    headers: authToken ? { 'X-Token': authToken } : {}
+                });
+            } catch(e) {
+                showError(e.message);
+            }
+        }
+
+        function showError(msg) {
+            els.errorMsg.innerText = msg;
+            els.errorMsg.style.display = 'block';
+        }
+
+        // Init
+        init();
+
+    </script>
+</body>
+</html>

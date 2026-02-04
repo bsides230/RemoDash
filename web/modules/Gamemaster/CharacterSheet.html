@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRN Character Sheet</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =========================================
+       CORE VARIABLES
+       ========================================= */
+    :root {
+      --bg-core: #050505;
+      --bg-panel: #0a0a0a;
+      --bg-input: #050505;
+      --brand-purple: #7c5cff;
+      --brand-purple-dim: rgba(124, 92, 255, 0.1);
+      --text-head: #ffffff;
+      --text-body: #b0b0b0;
+      --text-dim: #666666;
+      --border-color: #222222;
+      --input-focus-bg: #111111;
+      --grid-color: #1a1a1a;
+
+      --font-size-base: 12px;
+    }
+
+    body[data-theme="light"] {
+        --bg-core: #eef0f4;
+        --bg-panel: #ffffff;
+        --bg-input: #ffffff;
+        --brand-purple: #6a4ce0;
+        --brand-purple-dim: rgba(106, 76, 224, 0.1);
+        --text-head: #111111;
+        --text-body: #333333;
+        --text-dim: #555555;
+        --border-color: #d1d5db;
+        --input-focus-bg: #f9fafb;
+        --grid-color: #e0e0e0;
+    }
+
+    * { box-sizing: border-box; }
+
+    /* SCROLLBARS */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh; width: 100vw; overflow: hidden;
+      font-size: var(--font-size-base);
+    }
+
+    h1, h2, h3, h4 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
+
+    /* UI ELEMENTS */
+    button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(var(--font-size-base) - 1px);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border-color); color: var(--text-body); padding: 8px 12px;
+      cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+    button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); font-weight: 600; }
+    button.btn-primary:hover { background: #6a4ce0; }
+    button.btn-active { background: var(--brand-purple-dim); border-color: var(--brand-purple); color: var(--brand-purple); }
+
+    .btn-group { display: flex; align-items: center; gap: 8px; }
+    .btn-square { width: 32px; height: 32px; padding: 0; font-size: 16px; }
+
+    .hidden { display: none !important; }
+
+    /* LAYOUT */
+    .app-wrapper {
+      display: flex; flex-direction: column; height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color); padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+
+    .meta-label { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block; }
+    .panel-title { font-size: 14px; font-weight: 600; }
+
+    /* TABS */
+    .tabs-bar {
+        display: flex; gap: 20px; padding: 0 16px; border-bottom: 1px solid var(--border-color);
+        background: var(--bg-core); flex-shrink: 0; overflow-x: auto;
+    }
+    .tab-btn {
+        background: transparent; border: none; border-bottom: 2px solid transparent;
+        color: var(--text-dim); padding: 12px 4px; font-family: 'JetBrains Mono';
+        font-size: 11px; cursor: pointer; border-radius: 0;
+    }
+    .tab-btn:hover { color: var(--text-head); }
+    .tab-btn.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); }
+
+    /* CANVAS AREA */
+    .content-area {
+        flex: 1; overflow: auto; position: relative;
+        background-color: var(--bg-core);
+        /* Grid Pattern */
+        background-image:
+            linear-gradient(var(--grid-color) 1px, transparent 1px),
+            linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+        background-size: 20px 20px;
+        background-position: -1px -1px;
+    }
+
+    .sheet-canvas {
+        width: 1200px; height: 1600px; /* Large canvas */
+        position: relative;
+        margin: 0;
+    }
+
+    /* FIELDS */
+    .field-box {
+        position: absolute;
+        display: flex; flex-direction: column;
+        background: var(--bg-panel);
+        border: 1px solid transparent;
+        border-radius: 4px;
+        padding: 4px;
+        transition: border-color 0.2s;
+    }
+    .field-box.editing {
+        border: 1px dashed var(--text-dim);
+        cursor: move;
+        background: rgba(124, 92, 255, 0.05);
+    }
+    .field-box.editing:hover {
+        border-color: var(--brand-purple);
+        z-index: 100;
+    }
+    .field-box.selected {
+        border: 1px solid var(--brand-purple);
+        z-index: 101;
+    }
+
+    .field-label {
+        font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim);
+        margin-bottom: 4px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        user-select: none;
+    }
+
+    .field-input {
+        flex: 1;
+        background: var(--bg-input); border: 1px solid var(--border-color);
+        color: var(--text-head); font-family: 'Inter'; font-size: 12px;
+        padding: 4px 8px; border-radius: 2px; width: 100%; resize: none;
+    }
+    .field-input:focus { outline: none; border-color: var(--brand-purple); background: var(--input-focus-bg); }
+
+    /* Checkbox Style */
+    .field-checkbox-row {
+        display: flex; align-items: center; justify-content: space-between; height: 100%;
+        padding: 0 4px;
+    }
+    .field-checkbox { width: 16px; height: 16px; accent-color: var(--brand-purple); cursor: pointer; }
+
+    /* Controls on selected field in Edit Mode */
+    .field-controls {
+        position: absolute; top: -20px; right: 0;
+        display: none; gap: 4px;
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        padding: 2px; border-radius: 4px;
+    }
+    .field-box.selected .field-controls { display: flex; }
+    .mini-btn { font-size: 10px; padding: 2px 6px; height: auto; }
+    .btn-danger { color: #EF4444; border-color: #EF4444; }
+
+    /* MODAL */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(2px);
+        z-index: 10000; display: flex; justify-content: center; align-items: center;
+    }
+    .modal-box {
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 400px;
+        display: flex; flex-direction: column; border-radius: 8px;
+    }
+    .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; }
+
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
+    .form-input { width: 100%; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head); font-family: 'JetBrains Mono'; font-size: 12px; border-radius: 4px; }
+    .form-select { width: 100%; padding: 8px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head); font-family: 'JetBrains Mono'; font-size: 12px; border-radius: 4px; }
+
+    /* FOOTER */
+    .footer-bar { padding: 8px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); font-size: 10px; font-family: 'JetBrains Mono'; color: var(--text-dim); flex-shrink: 0; }
+
+    /* TOAST */
+    #toast {
+        position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+        background: var(--bg-panel); border: 1px solid var(--brand-purple);
+        color: var(--text-head); padding: 10px 20px; border-radius: 4px;
+        font-family: 'JetBrains Mono'; font-size: 12px;
+        opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 11000;
+    }
+    #toast.show { opacity: 1; }
+
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+    <header>
+        <div>
+            <div class="meta-label">LYRN MODULE</div>
+            <h1 class="panel-title">Character Sheet</h1>
+        </div>
+        <div class="btn-group">
+            <button id="btn-edit-mode" onclick="toggleEditMode()" title="Toggle Edit Mode">✎ EDIT LAYOUT</button>
+            <button class="btn-square" onclick="openSettings()" title="Add Field">+</button>
+            <button class="btn-square" onclick="downloadSheet()" title="Save / Download">💾</button>
+            <button class="btn-square" onclick="triggerUpload()" title="Load / Upload">📂</button>
+            <input type="file" id="file-upload" class="hidden" accept=".json" onchange="uploadSheet(this)">
+        </div>
+    </header>
+
+    <div class="tabs-bar">
+        <button class="tab-btn active" onclick="switchTab('core')">CORE IDENTITY</button>
+        <button class="tab-btn" onclick="switchTab('stats')">STATS & DERIVED</button>
+        <button class="tab-btn" onclick="switchTab('skills')">SKILLS</button>
+        <button class="tab-btn" onclick="switchTab('combat')">COMBAT & EQUIP</button>
+        <button class="tab-btn" onclick="switchTab('narrative')">NARRATIVE & TRAITS</button>
+    </div>
+
+    <div class="content-area" id="scroll-area">
+        <div class="sheet-canvas" id="canvas">
+            <!-- Fields Render Here -->
+        </div>
+    </div>
+
+    <div class="footer-bar">
+         <span>CHARACTER SHEET BUILDER // V1.0</span>
+         <span id="status-bar">READY</span>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">Operation Successful</div>
+
+<!-- ADD FIELD MODAL -->
+<div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 class="panel-title">Add New Field</h3>
+            <button onclick="closeSettings()" style="border:none; background:transparent;">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Field Label</label>
+                <input type="text" id="new-field-label" class="form-input" placeholder="e.g. Strength">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Type</label>
+                <select id="new-field-type" class="form-select">
+                    <option value="text">Text Input</option>
+                    <option value="number">Number Input</option>
+                    <option value="textarea">Text Area (Multi-line)</option>
+                    <option value="checkbox">Checkbox</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Tab</label>
+                <select id="new-field-tab" class="form-select">
+                    <option value="core">Core Identity</option>
+                    <option value="stats">Stats & Derived</option>
+                    <option value="skills">Skills</option>
+                    <option value="combat">Combat & Equip</option>
+                    <option value="narrative">Narrative & Traits</option>
+                </select>
+            </div>
+            <button class="btn-primary" style="width:100%" onclick="addNewField()">ADD FIELD</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* =========================================
+       STATE & CONSTANTS
+       ========================================= */
+    const GRID_SIZE = 10;
+
+    let STATE = {
+        editMode: false,
+        currentTab: 'core',
+        fields: [],
+        drag: {
+            active: false,
+            fieldId: null,
+            startX: 0,
+            startY: 0,
+            initialLeft: 0,
+            initialTop: 0
+        }
+    };
+
+    // Pre-populated Layout
+    const INITIAL_FIELDS = [
+        // CORE IDENTITY
+        { id: 'c1', tab: 'core', type: 'text', label: 'Character Name', x: 20, y: 20, width: 300, height: 60, value: '' },
+        { id: 'c2', tab: 'core', type: 'text', label: 'Player / Owner', x: 340, y: 20, width: 200, height: 60, value: '' },
+        { id: 'c3', tab: 'core', type: 'text', label: 'Species / Race', x: 20, y: 90, width: 200, height: 60, value: '' },
+        { id: 'c4', tab: 'core', type: 'text', label: 'Class / Archetype', x: 240, y: 90, width: 200, height: 60, value: '' },
+        { id: 'c5', tab: 'core', type: 'text', label: 'Background', x: 460, y: 90, width: 200, height: 60, value: '' },
+        { id: 'c6', tab: 'core', type: 'text', label: 'Alignment', x: 680, y: 90, width: 150, height: 60, value: '' },
+        { id: 'c7', tab: 'core', type: 'number', label: 'Level', x: 20, y: 160, width: 100, height: 60, value: '1' },
+        { id: 'c8', tab: 'core', type: 'number', label: 'XP', x: 140, y: 160, width: 150, height: 60, value: '0' },
+
+        // STATS
+        { id: 's1', tab: 'stats', type: 'number', label: 'Strength', x: 20, y: 20, width: 100, height: 60, value: '10' },
+        { id: 's2', tab: 'stats', type: 'number', label: 'Dexterity', x: 140, y: 20, width: 100, height: 60, value: '10' },
+        { id: 's3', tab: 'stats', type: 'number', label: 'Constitution', x: 260, y: 20, width: 100, height: 60, value: '10' },
+        { id: 's4', tab: 'stats', type: 'number', label: 'Intelligence', x: 380, y: 20, width: 100, height: 60, value: '10' },
+        { id: 's5', tab: 'stats', type: 'number', label: 'Wisdom', x: 500, y: 20, width: 100, height: 60, value: '10' },
+        { id: 's6', tab: 'stats', type: 'number', label: 'Charisma', x: 620, y: 20, width: 100, height: 60, value: '10' },
+
+        { id: 's7', tab: 'stats', type: 'number', label: 'Max HP', x: 20, y: 100, width: 120, height: 60, value: '' },
+        { id: 's8', tab: 'stats', type: 'number', label: 'Current HP', x: 160, y: 100, width: 120, height: 60, value: '' },
+        { id: 's9', tab: 'stats', type: 'number', label: 'Max Stamina', x: 300, y: 100, width: 120, height: 60, value: '' },
+        { id: 's10', tab: 'stats', type: 'number', label: 'Curr Stamina', x: 440, y: 100, width: 120, height: 60, value: '' },
+
+        { id: 's11', tab: 'stats', type: 'number', label: 'Defense / AC', x: 20, y: 180, width: 100, height: 60, value: '' },
+        { id: 's12', tab: 'stats', type: 'number', label: 'Initiative', x: 140, y: 180, width: 100, height: 60, value: '' },
+        { id: 's13', tab: 'stats', type: 'text', label: 'Speed', x: 260, y: 180, width: 100, height: 60, value: '30ft' },
+
+        // COMBAT
+        { id: 'w1', tab: 'combat', type: 'text', label: 'Weapon Name', x: 20, y: 20, width: 200, height: 60, value: '' },
+        { id: 'w2', tab: 'combat', type: 'text', label: 'Attack Bonus', x: 240, y: 20, width: 100, height: 60, value: '' },
+        { id: 'w3', tab: 'combat', type: 'text', label: 'Damage', x: 360, y: 20, width: 150, height: 60, value: '' },
+        { id: 'w4', tab: 'combat', type: 'textarea', label: 'Special / Crit', x: 530, y: 20, width: 200, height: 60, value: '' },
+
+        { id: 'eq1', tab: 'combat', type: 'textarea', label: 'Armor', x: 20, y: 100, width: 300, height: 100, value: '' },
+        { id: 'eq2', tab: 'combat', type: 'textarea', label: 'Equipment List', x: 340, y: 100, width: 400, height: 200, value: '' },
+
+        // SKILLS (Just a few samples, user can add more)
+        { id: 'k1', tab: 'skills', type: 'number', label: 'Athletics', x: 20, y: 20, width: 200, height: 50, value: '' },
+        { id: 'k2', tab: 'skills', type: 'number', label: 'Acrobatics', x: 20, y: 80, width: 200, height: 50, value: '' },
+        { id: 'k3', tab: 'skills', type: 'number', label: 'Stealth', x: 20, y: 140, width: 200, height: 50, value: '' },
+        { id: 'k4', tab: 'skills', type: 'number', label: 'Perception', x: 240, y: 20, width: 200, height: 50, value: '' },
+        { id: 'k5', tab: 'skills', type: 'number', label: 'Insight', x: 240, y: 80, width: 200, height: 50, value: '' },
+
+        // NARRATIVE
+        { id: 'n1', tab: 'narrative', type: 'textarea', label: 'Traits & Abilities', x: 20, y: 20, width: 350, height: 300, value: '' },
+        { id: 'n2', tab: 'narrative', type: 'textarea', label: 'Backstory', x: 400, y: 20, width: 350, height: 300, value: '' },
+        { id: 'n3', tab: 'narrative', type: 'textarea', label: 'Personality Notes', x: 20, y: 340, width: 350, height: 150, value: '' },
+        { id: 'n4', tab: 'narrative', type: 'textarea', label: 'GM Notes', x: 400, y: 340, width: 350, height: 150, value: '' },
+    ];
+
+    /* =========================================
+       INITIALIZATION
+       ========================================= */
+    document.addEventListener('DOMContentLoaded', () => {
+        STATE.fields = JSON.parse(JSON.stringify(INITIAL_FIELDS));
+        renderSheet();
+
+        // Global Mouse Listeners for Dragging
+        window.addEventListener('mousemove', onDrag);
+        window.addEventListener('mouseup', endDrag);
+    });
+
+    /* =========================================
+       RENDER LOGIC
+       ========================================= */
+    function renderSheet() {
+        const canvas = document.getElementById('canvas');
+        canvas.innerHTML = ''; // Clear
+
+        const activeFields = STATE.fields.filter(f => f.tab === STATE.currentTab);
+
+        activeFields.forEach(field => {
+            const el = document.createElement('div');
+            el.className = `field-box ${STATE.editMode ? 'editing' : ''}`;
+            el.style.left = field.x + 'px';
+            el.style.top = field.y + 'px';
+            el.style.width = field.width + 'px';
+            el.style.height = field.height + 'px';
+            el.dataset.id = field.id;
+
+            // Header/Label
+            const label = document.createElement('div');
+            label.className = 'field-label';
+            label.innerText = field.label;
+            el.appendChild(label);
+
+            // Input Element
+            let input;
+            if (field.type === 'textarea') {
+                input = document.createElement('textarea');
+                input.className = 'field-input';
+            } else if (field.type === 'checkbox') {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'field-checkbox-row';
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.className = 'field-checkbox';
+                input.checked = field.value === true;
+                wrapper.appendChild(input);
+                el.appendChild(wrapper);
+            } else {
+                input = document.createElement('input');
+                input.type = field.type;
+                input.className = 'field-input';
+            }
+
+            if (field.type !== 'checkbox') {
+                input.value = field.value || '';
+                // Update State on Input
+                input.oninput = (e) => {
+                    field.value = e.target.value;
+                };
+                el.appendChild(input);
+            } else {
+                input.onchange = (e) => {
+                    field.value = e.target.checked;
+                };
+            }
+
+            // Edit Mode Events
+            if (STATE.editMode) {
+                // Disable inputs in edit mode so we can drag
+                if(input) input.style.pointerEvents = 'none';
+
+                el.onmousedown = (e) => startDrag(e, field.id);
+
+                // Controls (Delete)
+                const controls = document.createElement('div');
+                controls.className = 'field-controls';
+                controls.innerHTML = `
+                    <button class="mini-btn btn-danger" onclick="deleteField('${field.id}')">✕</button>
+                `;
+                el.appendChild(controls);
+
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.field-box').forEach(b => b.classList.remove('selected'));
+                    el.classList.add('selected');
+                }
+            }
+
+            canvas.appendChild(el);
+        });
+    }
+
+    /* =========================================
+       INTERACTION
+       ========================================= */
+    function switchTab(tab) {
+        STATE.currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+        renderSheet();
+    }
+
+    function toggleEditMode() {
+        STATE.editMode = !STATE.editMode;
+        const btn = document.getElementById('btn-edit-mode');
+        if (STATE.editMode) {
+            btn.classList.add('btn-active');
+            btn.innerText = "✓ DONE EDITING";
+            showToast("Edit Mode: Drag fields to move");
+        } else {
+            btn.classList.remove('btn-active');
+            btn.innerText = "✎ EDIT LAYOUT";
+        }
+        renderSheet();
+    }
+
+    /* =========================================
+       DRAG AND DROP
+       ========================================= */
+    function startDrag(e, id) {
+        if (!STATE.editMode) return;
+        // Don't drag if clicking controls
+        if (e.target.tagName === 'BUTTON') return;
+
+        const el = document.querySelector(`.field-box[data-id="${id}"]`);
+        STATE.drag.active = true;
+        STATE.drag.fieldId = id;
+        STATE.drag.startX = e.clientX;
+        STATE.drag.startY = e.clientY;
+        STATE.drag.initialLeft = parseInt(el.style.left || 0);
+        STATE.drag.initialTop = parseInt(el.style.top || 0);
+
+        document.querySelectorAll('.field-box').forEach(b => b.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+
+    function onDrag(e) {
+        if (!STATE.drag.active) return;
+        e.preventDefault();
+
+        const dx = e.clientX - STATE.drag.startX;
+        const dy = e.clientY - STATE.drag.startY;
+
+        let newX = STATE.drag.initialLeft + dx;
+        let newY = STATE.drag.initialTop + dy;
+
+        // Snap to Grid
+        newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+        newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+
+        if (newX < 0) newX = 0;
+        if (newY < 0) newY = 0;
+
+        const el = document.querySelector(`.field-box[data-id="${STATE.drag.fieldId}"]`);
+        if (el) {
+            el.style.left = newX + 'px';
+            el.style.top = newY + 'px';
+        }
+    }
+
+    function endDrag() {
+        if (!STATE.drag.active) return;
+
+        // Save new position
+        const field = STATE.fields.find(f => f.id === STATE.drag.fieldId);
+        const el = document.querySelector(`.field-box[data-id="${STATE.drag.fieldId}"]`);
+        if (field && el) {
+            field.x = parseInt(el.style.left);
+            field.y = parseInt(el.style.top);
+        }
+
+        STATE.drag.active = false;
+        STATE.drag.fieldId = null;
+    }
+
+    /* =========================================
+       CRUD
+       ========================================= */
+    function openSettings() {
+        document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettings() {
+        document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function addNewField() {
+        const label = document.getElementById('new-field-label').value;
+        const type = document.getElementById('new-field-type').value;
+        const tab = document.getElementById('new-field-tab').value;
+
+        if (!label) return alert("Label is required");
+
+        const newField = {
+            id: 'custom-' + Date.now(),
+            tab: tab,
+            type: type,
+            label: label,
+            x: 20,
+            y: 20, // Default Pos
+            width: type === 'checkbox' ? 100 : 200,
+            height: type === 'textarea' ? 100 : 60,
+            value: type === 'checkbox' ? false : ''
+        };
+
+        STATE.fields.push(newField);
+        closeSettings();
+
+        // Switch to that tab
+        if (STATE.currentTab !== tab) switchTab(tab);
+        else renderSheet();
+
+        showToast("Field Added");
+    }
+
+    function deleteField(id) {
+        if (confirm("Delete this field?")) {
+            STATE.fields = STATE.fields.filter(f => f.id !== id);
+            renderSheet();
+        }
+    }
+
+    /* =========================================
+       PERSISTENCE
+       ========================================= */
+    function downloadSheet() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(STATE.fields, null, 2));
+        const anchorNode = document.createElement('a');
+        anchorNode.setAttribute("href", dataStr);
+        anchorNode.setAttribute("download", "character_sheet.json");
+        document.body.appendChild(anchorNode);
+        anchorNode.click();
+        anchorNode.remove();
+        showToast("Sheet Downloaded");
+    }
+
+    function triggerUpload() {
+        document.getElementById('file-upload').click();
+    }
+
+    function uploadSheet(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (Array.isArray(data)) {
+                    STATE.fields = data;
+                    renderSheet();
+                    showToast("Sheet Loaded Successfully");
+                    document.getElementById('status-bar').innerText = "LOADED: " + file.name;
+                } else {
+                    alert("Invalid file format");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error parsing JSON");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+</script>
+</body>
+</html>

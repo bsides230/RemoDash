@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRN Inventory (Module)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* [ ... CORE VARIABLES ... ] */
+    :root {
+      --bg-core: #050505;
+      --bg-panel: #0a0a0a;
+      --bg-input: #050505;
+      --brand-purple: #7c5cff;
+      --brand-purple-dim: rgba(124, 92, 255, 0.1);
+      --text-head: #ffffff;
+      --text-body: #b0b0b0;
+      --text-dim: #666666;
+      --border-color: #222222;
+      --input-focus-bg: #111111;
+      --success-color: #10B981;
+      --error-color: #EF4444;
+
+      --btn-text: #e0e0e0;
+      --btn-border: #444444;
+      --btn-bg: rgba(255,255,255,0.03);
+
+      /* TYPOGRAPHY */
+      --font-size-base: 12px;
+    }
+
+    body[data-theme="light"] {
+        --bg-core: #eef0f4;
+        --bg-panel: #ffffff;
+        --bg-input: #ffffff;
+        --brand-purple: #6a4ce0;
+        --brand-purple-dim: rgba(106, 76, 224, 0.1);
+        --text-head: #111111;
+        --text-body: #333333;
+        --text-dim: #555555;
+        --border-color: #d1d5db;
+        --input-focus-bg: #f9fafb;
+        --btn-text: #333;
+        --btn-border: #ccc;
+        --btn-bg: rgba(0,0,0,0.03);
+    }
+
+    * { box-sizing: border-box; }
+
+    /* --- THEMED SCROLLBARS --- */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh; width: 100vw; overflow: hidden;
+      font-size: var(--font-size-base);
+    }
+
+    h1, h2, h3, h4 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
+
+    /* UI ELEMENTS */
+    button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(var(--font-size-base) - 1px);
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border); color: var(--btn-text); padding: 8px 12px;
+      cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease; border-radius: 4px;
+      white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+    button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); font-weight: 600; }
+    button.btn-primary:hover { background: #6a4ce0; }
+    .btn-group { display: flex; align-items: center; gap: 8px; }
+    .btn-square { width: 32px; height: 32px; padding: 0; font-size: calc(var(--font-size-base) + 4px); }
+
+    .hidden { display: none !important; }
+
+    /* LAYOUT */
+    .app-wrapper {
+      background: var(--bg-core);
+      height: 100vh; width: 100%;
+      display: flex; flex-direction: column; position: relative;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color); padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+
+    .meta-label { font-family: 'JetBrains Mono'; font-size: calc(var(--font-size-base) - 2px); color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block; }
+    .panel-title { font-size: calc(var(--font-size-base) + 2px); font-weight: 600; }
+
+    /* TABS */
+    .tabs-bar {
+        display: flex; gap: 20px; padding: 0 16px; border-bottom: 1px solid var(--border-color);
+        background: var(--bg-core); flex-shrink: 0;
+    }
+    .tab-btn {
+        background: transparent; border: none; border-bottom: 2px solid transparent;
+        color: var(--text-dim); padding: 12px 4px; font-family: 'JetBrains Mono';
+        font-size: calc(var(--font-size-base) - 1px); cursor: pointer; border-radius: 0;
+    }
+    .tab-btn:hover { color: var(--text-head); }
+    .tab-btn.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); }
+
+    /* SPLIT GRID */
+    .content-area { flex: 1; overflow: hidden; position: relative; }
+    .split-grid { display: grid; grid-template-columns: 1fr 300px; height: 100%; }
+
+    /* INVENTORY GRID */
+    .grid-panel {
+        padding: 20px; overflow-y: auto;
+        background: rgba(0,0,0,0.02);
+    }
+    .inventory-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 10px;
+    }
+    .item-card {
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        border-radius: 4px; padding: 10px; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        transition: all 0.2s; position: relative;
+    }
+    .item-card:hover { border-color: var(--brand-purple); transform: translateY(-2px); }
+    .item-card.selected { border-color: var(--brand-purple); background: var(--brand-purple-dim); }
+
+    .item-icon {
+        width: 40px; height: 40px; background: var(--bg-core);
+        border-radius: 4px; display: flex; align-items: center; justify-content: center;
+        font-size: 20px;
+    }
+    .item-name {
+        font-family: 'JetBrains Mono'; font-size: calc(var(--font-size-base) - 2px);
+        text-align: center; color: var(--text-head);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+    }
+    .item-qty {
+        position: absolute; top: 4px; right: 4px;
+        font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono';
+    }
+    .equipped-indicator {
+        position: absolute; top: 4px; left: 4px;
+        width: 8px; height: 8px; background: var(--success-color); border-radius: 50%;
+        box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+    }
+
+    /* DETAILS PANEL */
+    .details-panel {
+        border-left: 1px solid var(--border-color); background: var(--bg-panel);
+        display: flex; flex-direction: column;
+    }
+    .details-header { padding: 15px; border-bottom: 1px solid var(--border-color); }
+    .details-body { padding: 20px; flex: 1; overflow-y: auto; }
+
+    .detail-row { margin-bottom: 15px; }
+    .detail-label { display: block; font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; }
+    .detail-value { color: var(--text-body); line-height: 1.5; }
+    .detail-value.highlight { color: var(--text-head); font-weight: 500; }
+
+    .details-actions { padding: 15px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; flex-direction: column; }
+
+    /* MODAL */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(2px);
+        z-index: 10000; display: flex; justify-content: center; align-items: center;
+    }
+    .modal-box {
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 400px;
+        display: flex; flex-direction: column; border-radius: 8px;
+    }
+    .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; }
+
+    input[type="text"], input[type="number"] {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-head); padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base); border-radius: 4px;
+    }
+    input:focus { border-color: var(--brand-purple); outline: none; background: var(--input-focus-bg); }
+
+    /* TOAST */
+    #toast {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background: var(--bg-panel); border: 1px solid var(--brand-purple);
+        color: var(--text-head); padding: 10px 20px; border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-base);
+        opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 11000;
+    }
+    #toast.show { opacity: 1; }
+
+    /* FOOTER */
+    .footer-bar { padding: 8px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); font-size: calc(var(--font-size-base) - 2px); font-family: 'JetBrains Mono'; color: var(--text-dim); flex-shrink: 0; }
+
+    @media (max-width: 768px) {
+        .split-grid { grid-template-columns: 1fr; grid-template-rows: 1fr 300px; }
+        .details-panel { border-left: none; border-top: 1px solid var(--border-color); }
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="app-wrapper">
+    <header>
+        <div>
+            <div class="meta-label">LYRN SYSTEM MODULE</div>
+            <h1 class="panel-title">Inventory</h1>
+        </div>
+        <div class="btn-group">
+            <button class="btn-square" onclick="openSettings()" title="Settings">⚙️</button>
+        </div>
+    </header>
+
+    <div class="tabs-bar">
+        <button class="tab-btn active" onclick="switchTab('all')">ALL ITEMS</button>
+        <button class="tab-btn" onclick="switchTab('equipped')">EQUIPPED</button>
+    </div>
+
+    <div class="content-area">
+        <div class="split-grid">
+            <!-- LEFT: GRID -->
+            <div class="grid-panel">
+                <div id="inventory-grid" class="inventory-grid">
+                    <!-- Items go here -->
+                </div>
+            </div>
+
+            <!-- RIGHT: DETAILS -->
+            <div class="details-panel">
+                <div class="details-header">
+                    <h3 class="panel-title">Details</h3>
+                </div>
+                <div id="details-content" class="details-body">
+                    <p style="color: var(--text-dim); text-align: center; margin-top: 40px;">Select an item to view details.</p>
+                </div>
+                <div id="details-actions" class="details-actions hidden">
+                    <button id="btn-equip" class="btn-primary" onclick="toggleEquip()">EQUIP</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-bar">
+         <span>INVENTORY MANAGER // V1.0</span>
+         <span id="status-bar">READY</span>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast">Operation Successful</div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 class="panel-title">Settings</h3>
+            <button onclick="closeSettings()" style="border:none; background:transparent; font-size:16px; color:var(--text-dim); cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom: 15px;">
+                <label class="detail-label">API ENDPOINT</label>
+                <input type="text" id="setting-api-url" placeholder="http://localhost:8000">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" style="flex:1" onclick="saveSettings()">SAVE</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <script>
+    /* =========================================
+       GLOBAL STATE
+       ========================================= */
+    let STATE = {
+        items: [],
+        selectedId: null,
+        currentTab: 'all', // 'all' or 'equipped'
+        config: {
+            apiUrl: "http://localhost:8000"
+        }
+    };
+
+    // TEMPLATE DEFINITIONS (Based on Templates.txt)
+    const TEMPLATES = {
+        'default': [ // t61 item
+            { id: 'type', label: 'Type' },
+            { id: 'condition', label: 'Condition' },
+            { id: 'material', label: 'Material' },
+            { id: 'weight', label: 'Weight' },
+            { id: 'value', label: 'Value' },
+            { id: 'traits', label: 'Traits', fullWidth: true },
+            { id: 'description', label: 'Description', fullWidth: true }
+        ],
+        'Consumable': [ // t21
+            { id: 'type', label: 'Type' },
+            { id: 'effects', label: 'Effects', fullWidth: true },
+            { id: 'duration', label: 'Duration' },
+            { id: 'expiry', label: 'Expiry' },
+            { id: 'ingredients', label: 'Ingredients', fullWidth: true },
+            { id: 'weight', label: 'Weight' },
+            { id: 'description', label: 'Description', fullWidth: true }
+        ],
+        'Weapon': [ // t63
+            { id: 'type', label: 'Type' },
+            { id: 'subtype', label: 'Subtype' },
+            { id: 'damage_value', label: 'Damage' },
+            { id: 'damage_type', label: 'Dmg Type' },
+            { id: 'condition', label: 'Condition' },
+            { id: 'weight', label: 'Weight' },
+            { id: 'traits', label: 'Traits', fullWidth: true },
+            { id: 'notes', label: 'Notes', fullWidth: true }
+        ],
+        'Armor': [ // t62 clothing
+            { id: 'type', label: 'Type' },
+            { id: 'material', label: 'Material' },
+            { id: 'armor_value', label: 'Armor Rating' },
+            { id: 'warmth_rating', label: 'Warmth' },
+            { id: 'size', label: 'Size' },
+            { id: 'condition', label: 'Condition' },
+            { id: 'pockets', label: 'Pockets' },
+            { id: 'notes', label: 'Notes', fullWidth: true }
+        ]
+    };
+
+    // MOCK DATA FOR DEMO/DEV WITHOUT BACKEND
+    const MOCK_DATA = [
+        {
+            id: "uuid-1", name: "Rusty Sword", qty: 1, equipped: true, icon: "⚔️", category: "Weapon",
+            type: "Melee", subtype: "Sword", damage_value: "1d6", damage_type: "Slashing", condition: "Poor", weight: "3.0", traits: "Rusty"
+        },
+        {
+            id: "uuid-2", name: "Health Potion", qty: 5, equipped: false, icon: "🧪", category: "Consumable",
+            type: "Potion", effects: "Restores 2d4+2 HP", duration: "Instant", expiry: "None", ingredients: "Red Herb, Water", weight: "0.5", description: "A standard healing potion."
+        },
+        {
+            id: "uuid-3", name: "Iron Shield", qty: 1, equipped: true, icon: "🛡️", category: "Armor",
+            type: "Shield", material: "Iron", armor_value: "+2 AC", warmth_rating: "0", size: "Medium", condition: "Good", weight: "6.0"
+        },
+        {
+            id: "uuid-4", name: "Map of Realm", qty: 1, equipped: false, icon: "🗺️", category: "Key Item",
+            description: "A tattered map of the known world.", weight: "0.1", value: "50g"
+        },
+        {
+            id: "uuid-5", name: "Gold Coin", qty: 150, equipped: false, icon: "💰", category: "Currency",
+            value: "1g", weight: "0.02"
+        }
+    ];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadConfig();
+        fetchInventory(); // Initial Load
+
+        // Theme Sync
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', event.data.theme);
+            }
+            if (event.data.type === 'FONT_CHANGE') {
+                document.documentElement.style.setProperty('--font-size-base', event.data.fontSize + 'px');
+            }
+        });
+    });
+
+    /* =========================================
+       API & DATA
+       ========================================= */
+    function loadConfig() {
+        const stored = localStorage.getItem('lyrn_inventory_config');
+        if (stored) {
+            try {
+                STATE.config = JSON.parse(stored);
+            } catch(e) { console.error("Config load error", e); }
+        }
+    }
+
+    async function fetchInventory() {
+        document.getElementById('status-bar').innerText = "FETCHING...";
+        try {
+            // TRY TO FETCH FROM API
+            const res = await fetch(`${STATE.config.apiUrl}/api/inventory`);
+            if (!res.ok) throw new Error("API Unreachable");
+            const data = await res.json();
+            STATE.items = data.items || [];
+            document.getElementById('status-bar').innerText = "CONNECTED";
+        } catch (err) {
+            // FALLBACK TO MOCK DATA IF API FAILS
+            console.warn("API Error, using mock data:", err);
+            STATE.items = [...MOCK_DATA]; // Clone mock data
+            document.getElementById('status-bar').innerText = "OFFLINE MODE";
+        }
+        renderGrid();
+    }
+
+    async function fetchItemDetails(id) {
+        try {
+            const res = await fetch(`${STATE.config.apiUrl}/api/item/details`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            if (!res.ok) throw new Error("API Error");
+            return await res.json();
+        } catch (err) {
+            // MOCK DETAILS (Return the item itself from STATE for simplicity in this demo)
+            const item = STATE.items.find(i => i.id === id);
+            return item || {};
+        }
+    }
+
+    async function toggleEquipState(id, isEquipping) {
+         try {
+            const res = await fetch(`${STATE.config.apiUrl}/api/equip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, action: isEquipping ? 'equip' : 'unequip' })
+            });
+            if (!res.ok) throw new Error("API Error");
+            // Assume success
+            return true;
+        } catch (err) {
+            // Mock Success
+            const item = STATE.items.find(i => i.id === id);
+            if(item) item.equipped = isEquipping;
+            return true;
+        }
+    }
+
+    /* =========================================
+       UI LOGIC
+       ========================================= */
+    function switchTab(tab) {
+        STATE.currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const container = document.getElementById('inventory-grid');
+        container.innerHTML = '';
+
+        let displayItems = STATE.items;
+        if (STATE.currentTab === 'equipped') {
+            displayItems = STATE.items.filter(i => i.equipped);
+        }
+
+        if (displayItems.length === 0) {
+            container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-dim); margin-top: 20px;">No items found.</p>';
+            return;
+        }
+
+        displayItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = `item-card ${STATE.selectedId === item.id ? 'selected' : ''}`;
+            card.onclick = () => selectItem(item.id);
+
+            let html = `
+                <div class="item-icon">${item.icon || '📦'}</div>
+                <div class="item-name">${item.name}</div>
+            `;
+            if (item.qty > 1) {
+                html += `<div class="item-qty">x${item.qty}</div>`;
+            }
+            if (item.equipped) {
+                html += `<div class="equipped-indicator" title="Equipped"></div>`;
+            }
+
+            card.innerHTML = html;
+            container.appendChild(card);
+        });
+    }
+
+    async function selectItem(id) {
+        STATE.selectedId = id;
+        renderGrid(); // To update selection highlight
+
+        const item = STATE.items.find(i => i.id === id);
+        if (!item) return;
+
+        const content = document.getElementById('details-content');
+        const actions = document.getElementById('details-actions');
+
+        // Show Loading
+        content.innerHTML = '<p style="color:var(--text-dim); text-align:center;">Loading details...</p>';
+        actions.classList.add('hidden');
+
+        // Fetch Details (or use local mock)
+        const details = await fetchItemDetails(id);
+
+        // Merge item list data with detailed data
+        const fullItem = { ...item, ...details };
+
+        // Determine Template
+        const template = TEMPLATES[fullItem.category] || TEMPLATES['default'];
+
+        // Header
+        let html = `
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px;">
+                <div style="font-size:40px; background:var(--bg-core); width:60px; height:60px; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid var(--border-color);">${fullItem.icon || '📦'}</div>
+                <div>
+                    <h2 style="font-size:16px;">${fullItem.name}</h2>
+                    <span style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">${fullItem.category || 'Item'}</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <span class="detail-label">Quantity</span>
+                <span class="detail-value highlight" style="font-size:14px;">x${fullItem.qty}</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        `;
+
+        // Render Fields based on Template
+        template.forEach(field => {
+            const val = fullItem[field.id];
+            if (!val && val !== 0) return; // Skip empty fields
+
+            const style = field.fullWidth ? 'grid-column: 1 / -1;' : '';
+            html += `
+                <div class="detail-row" style="${style}">
+                    <span class="detail-label">${field.label}</span>
+                    <span class="detail-value">${val}</span>
+                </div>
+            `;
+        });
+
+        html += `</div>`; // Close grid
+
+        content.innerHTML = html;
+
+        // Actions
+        const btn = document.getElementById('btn-equip');
+        if (item.equipped) {
+            btn.innerText = "UNEQUIP";
+            btn.style.borderColor = "var(--border-color)";
+            btn.style.color = "var(--text-dim)";
+        } else {
+            btn.innerText = "EQUIP";
+            btn.style.borderColor = "var(--brand-purple)";
+            btn.style.color = "#fff";
+        }
+
+        actions.classList.remove('hidden');
+    }
+
+    async function toggleEquip() {
+        if (!STATE.selectedId) return;
+        const item = STATE.items.find(i => i.id === STATE.selectedId);
+        if (!item) return;
+
+        const newStatus = !item.equipped;
+        await toggleEquipState(item.id, newStatus);
+
+        // Update UI
+        item.equipped = newStatus;
+        showToast(newStatus ? "Item Equipped" : "Item Unequipped");
+        renderGrid();
+        selectItem(item.id); // Refresh button
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    /* =========================================
+       SETTINGS
+       ========================================= */
+    function openSettings() {
+        document.getElementById('setting-api-url').value = STATE.config.apiUrl;
+        document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettings() {
+        document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function saveSettings() {
+        const url = document.getElementById('setting-api-url').value.replace(/\/$/, ""); // trim trailing slash
+        STATE.config.apiUrl = url;
+        localStorage.setItem('lyrn_inventory_config', JSON.stringify(STATE.config));
+        closeSettings();
+        showToast("Settings Saved");
+        fetchInventory(); // Reload with new API
+    }
+
+  </script>
+</body>
+</html>

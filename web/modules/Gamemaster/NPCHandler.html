@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRN NPC Handler</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* =========================================
+       CORE VARIABLES (From LYRN Style Guide)
+       ========================================= */
+    :root {
+      --bg-core: #050505;
+      --bg-panel: #0a0a0a;
+      --bg-input: #050505;
+      --brand-purple: #7c5cff;
+      --brand-purple-dim: rgba(124, 92, 255, 0.1);
+      --text-head: #ffffff;
+      --text-body: #b0b0b0;
+      --text-dim: #666666;
+      --border-color: #222222;
+      --input-focus-bg: #111111;
+      --grid-color: #1a1a1a;
+      --success-color: #10B981;
+      --error-color: #EF4444;
+
+      --btn-text: #e0e0e0;
+      --btn-border: #444444;
+      --btn-bg: rgba(255,255,255,0.03);
+
+      --font-size-base: 12px;
+    }
+
+    body[data-theme="light"] {
+        --bg-core: #eef0f4;
+        --bg-panel: #ffffff;
+        --bg-input: #ffffff;
+        --brand-purple: #6a4ce0;
+        --brand-purple-dim: rgba(106, 76, 224, 0.1);
+        --text-head: #111111;
+        --text-body: #333333;
+        --text-dim: #555555;
+        --border-color: #d1d5db;
+        --input-focus-bg: #f9fafb;
+        --grid-color: #e0e0e0;
+        --btn-text: #333;
+        --btn-border: #ccc;
+        --btn-bg: rgba(0,0,0,0.03);
+    }
+
+    * { box-sizing: border-box; }
+
+    /* SCROLLBARS */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+
+    body {
+      margin: 0; padding: 0;
+      background-color: var(--bg-core); color: var(--text-body);
+      font-family: 'Inter', system-ui, sans-serif;
+      height: 100vh; width: 100vw; overflow: hidden;
+      font-size: var(--font-size-base);
+    }
+
+    h1, h2, h3, h4 { font-family: 'JetBrains Mono', monospace; color: var(--text-head); margin: 0; }
+
+    /* UI ELEMENTS */
+    button {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: calc(var(--font-size-base) - 1px);
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border); color: var(--btn-text); padding: 8px 12px;
+      cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em; transition: all 0.2s ease; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+    button.btn-primary { background: var(--brand-purple); color: #ffffff; border-color: var(--brand-purple); font-weight: 600; }
+    button.btn-primary:hover { background: #6a4ce0; }
+    button.btn-active { background: var(--brand-purple-dim); border-color: var(--brand-purple); color: var(--brand-purple); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    input, select, textarea {
+        background: var(--bg-input); border: 1px solid var(--border-color);
+        color: var(--text-head); font-family: 'JetBrains Mono', monospace;
+        font-size: var(--font-size-base); border-radius: 4px; padding: 8px;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--brand-purple); outline: none; background: var(--input-focus-bg); }
+
+    .hidden { display: none !important; }
+
+    /* LAYOUT */
+    .app-wrapper {
+      display: flex; flex-direction: column; height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border-color); padding: 12px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-panel); flex-shrink: 0;
+    }
+
+    .meta-label { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; display: block; }
+    .panel-title { font-size: 14px; font-weight: 600; }
+
+    /* SPLIT VIEW */
+    .content-area { flex: 1; overflow: hidden; display: grid; grid-template-columns: 320px 1fr; height: 100%; }
+
+    /* LEFT PANEL (LIST) */
+    .list-panel {
+        background: var(--bg-panel); border-right: 1px solid var(--border-color);
+        display: flex; flex-direction: column;
+    }
+    .list-controls { padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; }
+    .search-box { width: 100%; }
+    .filter-row { display: flex; gap: 8px; }
+    .filter-row select { flex: 1; font-size: 10px; }
+
+    .npc-list { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+    .npc-card {
+        background: var(--bg-core); border: 1px solid var(--border-color);
+        border-radius: 4px; padding: 10px; cursor: pointer;
+        display: flex; flex-direction: column; gap: 4px;
+        transition: all 0.2s;
+    }
+    .npc-card:hover { border-color: var(--brand-purple); }
+    .npc-card.selected { border-color: var(--brand-purple); background: var(--brand-purple-dim); }
+
+    .npc-name { font-weight: 600; color: var(--text-head); font-family: 'JetBrains Mono'; font-size: 13px; }
+    .npc-meta { font-size: 10px; color: var(--text-dim); display: flex; justify-content: space-between; }
+    .status-badge {
+        padding: 2px 6px; border-radius: 2px; font-size: 9px; text-transform: uppercase;
+        background: rgba(255,255,255,0.05); color: var(--text-dim);
+    }
+
+    /* RIGHT PANEL (CANVAS) */
+    .canvas-container {
+        position: relative; overflow: auto;
+        background-color: var(--bg-core);
+        /* Grid Pattern */
+        background-image:
+            linear-gradient(var(--grid-color) 1px, transparent 1px),
+            linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+        background-size: 20px 20px;
+        background-position: -1px -1px;
+        display: flex; justify-content: center; padding: 40px;
+    }
+
+    .sheet-canvas {
+        width: 800px; height: 1200px;
+        background: var(--bg-panel); /* Slight contrast against grid */
+        border: 1px solid var(--border-color);
+        position: relative;
+        flex-shrink: 0;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    /* Hide canvas if no selection */
+    .sheet-canvas.empty { display: none; }
+    .empty-state { color: var(--text-dim); align-self: center; text-align: center; }
+
+    /* FIELDS ON CANVAS */
+    .field-box {
+        position: absolute;
+        display: flex; flex-direction: column;
+        background: transparent;
+        border: 1px solid transparent;
+        padding: 2px;
+        transition: border-color 0.2s;
+    }
+    .field-box.editing {
+        border: 1px dashed var(--text-dim);
+        cursor: move;
+        background: rgba(124, 92, 255, 0.05);
+    }
+    .field-box.editing:hover { border-color: var(--brand-purple); z-index: 100; }
+    .field-box.selected { border: 1px solid var(--brand-purple); z-index: 101; }
+
+    .field-label {
+        font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim);
+        margin-bottom: 4px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        user-select: none;
+    }
+
+    .field-input {
+        width: 100%; height: 100%;
+        background: var(--bg-input); border: 1px solid var(--border-color);
+        color: var(--text-head); font-family: 'Inter'; font-size: 12px;
+        padding: 4px 8px; border-radius: 2px; resize: none;
+    }
+    .field-input:focus { outline: none; border-color: var(--brand-purple); background: var(--input-focus-bg); }
+
+    /* Controls in Edit Mode */
+    .field-controls {
+        position: absolute; top: -20px; right: 0;
+        display: none; gap: 4px;
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        padding: 2px; border-radius: 4px;
+    }
+    .field-box.selected .field-controls { display: flex; }
+    .mini-btn { font-size: 10px; padding: 2px 6px; height: auto; }
+    .btn-danger { color: var(--error-color); border-color: var(--error-color); }
+
+    /* SETTINGS MODAL */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(2px);
+        z-index: 10000; display: flex; justify-content: center; align-items: center;
+    }
+    .modal-box {
+        background: var(--bg-panel); border: 1px solid var(--border-color);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 500px;
+        display: flex; flex-direction: column; border-radius: 8px; max-height: 85vh;
+    }
+    .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+
+    .settings-section { display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+    .settings-section:last-child { border-bottom: none; }
+    .section-title { font-size: 11px; font-family: 'JetBrains Mono'; color: var(--brand-purple); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+
+    .setting-row { display: flex; justify-content: space-between; align-items: center; }
+    .setting-desc { font-size: 11px; color: var(--text-dim); }
+
+    /* FOOTER */
+    .footer-bar { padding: 8px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); font-size: 10px; font-family: 'JetBrains Mono'; color: var(--text-dim); flex-shrink: 0; }
+
+    /* TOAST */
+    #toast {
+        position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+        background: var(--bg-panel); border: 1px solid var(--brand-purple);
+        color: var(--text-head); padding: 10px 20px; border-radius: 4px;
+        font-family: 'JetBrains Mono'; font-size: 12px;
+        opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 11000;
+    }
+    #toast.show { opacity: 1; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+        .content-area { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
+        .list-panel { border-right: none; border-bottom: 1px solid var(--border-color); }
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+    <!-- HEADER -->
+    <header>
+        <div>
+            <div class="meta-label">LYRN MODULE</div>
+            <h1 class="panel-title">NPC Handler</h1>
+        </div>
+        <div>
+            <button class="btn-square" onclick="openSettings()" title="Settings">⚙️</button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="content-area">
+        <!-- LEFT: LIST PANEL -->
+        <div class="list-panel">
+            <div class="list-controls">
+                <input type="text" id="search-input" class="search-box" placeholder="Search NPCs..." oninput="renderList()">
+                <div class="filter-row">
+                    <select id="filter-location" onchange="renderList()">
+                        <option value="">All Locations</option>
+                    </select>
+                    <select id="filter-rel" onchange="renderList()">
+                        <option value="">All Relations</option>
+                        <option value="Neutral">Neutral</option>
+                        <option value="Friendly">Friendly</option>
+                        <option value="Hostile">Hostile</option>
+                        <option value="Unknown">Unknown</option>
+                    </select>
+                </div>
+            </div>
+            <div id="npc-list-container" class="npc-list">
+                <!-- NPCs rendered here -->
+            </div>
+        </div>
+
+        <!-- RIGHT: CANVAS PANEL -->
+        <div class="canvas-container">
+            <div id="empty-state" class="empty-state">
+                <p>Select an NPC to view details.</p>
+            </div>
+            <div id="sheet-canvas" class="sheet-canvas empty">
+                <!-- Fields rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer-bar">
+         <span>NPC DATABASE // V1.0</span>
+         <span id="status-bar">READY</span>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast">Operation Successful</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 class="panel-title">Settings & Management</h3>
+            <button onclick="closeSettings()" style="border:none; background:transparent; font-size:16px; color:var(--text-dim); cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-body">
+
+            <!-- SECTION: NPC ACTIONS -->
+            <div class="settings-section">
+                <div class="section-title">NPC Management</div>
+                <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                    <input type="text" id="new-npc-name" placeholder="New NPC Name" style="flex:1">
+                    <button class="btn-primary" onclick="createNewNPC()">CREATE</button>
+                </div>
+                <button id="btn-save-current" onclick="downloadCurrentNPC()" disabled>Download Current NPC (JSON)</button>
+            </div>
+
+            <!-- SECTION: DATA MANAGEMENT -->
+            <div class="settings-section">
+                <div class="section-title">Database</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <button onclick="exportAllNPCs()">Export DB</button>
+                    <button onclick="triggerImport('db')">Import DB</button>
+                </div>
+            </div>
+
+            <!-- SECTION: LAYOUT / TEMPLATE -->
+            <div class="settings-section">
+                <div class="section-title">Layout & Template</div>
+                <div class="setting-row" style="margin-bottom:10px;">
+                    <span class="setting-desc">Toggle Layout Editor</span>
+                    <button id="btn-toggle-edit" onclick="toggleEditMode()">EDIT LAYOUT</button>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <button onclick="exportTemplate()">Export Tpl</button>
+                    <button onclick="triggerImport('tpl')">Import Tpl</button>
+                </div>
+                <div id="edit-tools" class="hidden" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);">
+                     <div class="section-title" style="color:var(--text-dim)">Editor Tools</div>
+                     <button class="mini-btn" onclick="addFieldToTemplate()">+ Add New Field</button>
+                </div>
+            </div>
+
+             <!-- SECTION: GLOBAL CONFIG -->
+             <div class="settings-section">
+                <div class="section-title">System</div>
+                <div class="setting-row">
+                    <div>
+                        <div style="color:var(--text-head); font-size:12px;">Developer Mode</div>
+                        <div class="setting-desc">Show 'Unmet' NPCs in list</div>
+                    </div>
+                    <input type="checkbox" id="chk-dev-mode" onchange="toggleDevMode()" style="width:auto;">
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- HIDDEN FILE INPUTS -->
+<input type="file" id="file-import-db" class="hidden" accept=".json" onchange="importAllNPCs(this)">
+<input type="file" id="file-import-tpl" class="hidden" accept=".json" onchange="importTemplate(this)">
+
+<script>
+    /* =========================================
+       STATE & CONSTANTS
+       ========================================= */
+    const GRID_SIZE = 10;
+    const STORAGE_KEY = 'lyrn_npc_data';
+
+    // Default Template (System fields like sys_name are special)
+    // Based on t55 npc: name|age|sex|health|occupation|personality|home|description|inventory|skills|chat|calls|texts|contact_info|movement_speed|notes
+    const DEFAULT_TEMPLATE = [
+        // ROW 1: Basics
+        { id: 'name', label: 'Name', type: 'text', x: 20, y: 20, width: 300, height: 60, system: true },
+        { id: 'home', label: 'Home / Location', type: 'text', x: 340, y: 20, width: 240, height: 60, system: true },
+        { id: 'occupation', label: 'Occupation', type: 'text', x: 600, y: 20, width: 180, height: 60 },
+
+        // ROW 2: Demographics
+        { id: 'age', label: 'Age', type: 'text', x: 20, y: 90, width: 80, height: 60 },
+        { id: 'sex', label: 'Sex', type: 'text', x: 110, y: 90, width: 80, height: 60 },
+        { id: 'health', label: 'Health', type: 'text', x: 200, y: 90, width: 120, height: 60 },
+        { id: 'movement_speed', label: 'Speed', type: 'text', x: 330, y: 90, width: 120, height: 60 },
+        // Extra system field for UI filtering
+        { id: 'relationship', label: 'Relation', type: 'text', x: 460, y: 90, width: 150, height: 60, system: true },
+        { id: 'is_met', label: 'Met?', type: 'checkbox', x: 630, y: 100, width: 80, height: 40, system: true },
+
+        // ROW 3: Description & Personality
+        { id: 'description', label: 'Description', type: 'textarea', x: 20, y: 160, width: 370, height: 150 },
+        { id: 'personality', label: 'Personality', type: 'textarea', x: 410, y: 160, width: 370, height: 150 },
+
+        // ROW 4: Details
+        { id: 'skills', label: 'Skills', type: 'textarea', x: 20, y: 320, width: 370, height: 100 },
+        { id: 'contact_info', label: 'Contact Info', type: 'textarea', x: 410, y: 320, width: 370, height: 100 },
+
+        // ROW 5: Inventory & Notes
+        { id: 'inventory', label: 'Inventory', type: 'textarea', x: 20, y: 430, width: 370, height: 150 },
+        { id: 'notes', label: 'Notes', type: 'textarea', x: 410, y: 430, width: 370, height: 150 },
+
+        // Logs (Placeholders as text areas for now)
+        { id: 'chat', label: 'Chat Logs', type: 'textarea', x: 20, y: 600, width: 240, height: 150 },
+        { id: 'calls', label: 'Call Logs', type: 'textarea', x: 280, y: 600, width: 240, height: 150 },
+        { id: 'texts', label: 'Text Logs', type: 'textarea', x: 540, y: 600, width: 240, height: 150 },
+    ];
+
+    // Mock NPCs
+    const MOCK_NPCS = [
+        {
+            id: 'npc-001',
+            name: 'Jane Doe',
+            home: 'Central Plaza',
+            relationship: 'Neutral',
+            is_met: true,
+            occupation: 'Merchant',
+            description: 'A mysterious merchant who always seems to have what you need.',
+            skills: 'Bartering, Appraising',
+            notes: 'Secretly works for the resistance.',
+            age: '34',
+            sex: 'F',
+            health: 'Good',
+            personality: 'Enigmatic, helpful',
+            contact_info: 'Radio: 102.5',
+            inventory: 'Keys, Datapad'
+        },
+        {
+            id: 'npc-002',
+            name: 'Baron Von Evil',
+            home: 'Dark Castle',
+            relationship: 'Hostile',
+            is_met: false,
+            occupation: 'Warlord',
+            description: 'The ruler of the dark lands.',
+            skills: 'Intimidation, Strategy',
+            notes: 'Objective: Defeat him.',
+            age: '55',
+            sex: 'M',
+            health: 'Excellent',
+            personality: 'Cruel, Arrogant',
+            contact_info: 'Unknown',
+            inventory: 'Scepter of Doom'
+        }
+    ];
+
+    let STATE = {
+        npcs: [],
+        template: [],
+        config: {
+            devMode: false
+        },
+        selectedId: null,
+        editMode: false,
+        drag: {
+            active: false,
+            fieldId: null,
+            startX: 0,
+            startY: 0,
+            initialLeft: 0,
+            initialTop: 0
+        }
+    };
+
+    /* =========================================
+       INITIALIZATION
+       ========================================= */
+    document.addEventListener('DOMContentLoaded', () => {
+        loadState();
+
+        // Global Mouse Listeners for Dragging
+        window.addEventListener('mousemove', onDrag);
+        window.addEventListener('mouseup', endDrag);
+
+        // Theme Sync (Optional if parent sends messages)
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'THEME_CHANGE') {
+                document.body.setAttribute('data-theme', event.data.theme);
+            }
+        });
+    });
+
+    function loadState() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                STATE.npcs = parsed.npcs || MOCK_NPCS;
+                STATE.template = parsed.template || DEFAULT_TEMPLATE;
+                STATE.config = parsed.config || { devMode: false };
+            } catch (e) { console.error("Load Error", e); resetState(); }
+        } else {
+            resetState();
+        }
+
+        // Apply Config
+        document.getElementById('chk-dev-mode').checked = STATE.config.devMode;
+
+        renderList();
+        updateFilterOptions();
+    }
+
+    function resetState() {
+        STATE.npcs = JSON.parse(JSON.stringify(MOCK_NPCS));
+        STATE.template = JSON.parse(JSON.stringify(DEFAULT_TEMPLATE));
+        saveState();
+    }
+
+    function saveState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            npcs: STATE.npcs,
+            template: STATE.template,
+            config: STATE.config
+        }));
+    }
+
+    /* =========================================
+       LIST LOGIC
+       ========================================= */
+    function renderList() {
+        const container = document.getElementById('npc-list-container');
+        container.innerHTML = '';
+
+        const search = document.getElementById('search-input').value.toLowerCase();
+        const locFilter = document.getElementById('filter-location').value;
+        const relFilter = document.getElementById('filter-rel').value;
+
+        // Filter
+        const filtered = STATE.npcs.filter(npc => {
+            // Dev Mode Check
+            if (!STATE.config.devMode && !npc.is_met) return false;
+
+            // Search
+            const nameMatch = (npc.name || '').toLowerCase().includes(search);
+            const descMatch = (npc.description || '').toLowerCase().includes(search);
+            if (!nameMatch && !descMatch) return false;
+
+            // Dropdowns
+            if (locFilter && npc.home !== locFilter) return false;
+            if (relFilter && npc.relationship !== relFilter) return false;
+
+            return true;
+        });
+
+        // Render
+        filtered.forEach(npc => {
+            const card = document.createElement('div');
+            card.className = `npc-card ${STATE.selectedId === npc.id ? 'selected' : ''}`;
+            card.onclick = () => selectNPC(npc.id);
+
+            card.innerHTML = `
+                <div class="npc-name">${npc.name || 'Unnamed NPC'}</div>
+                <div class="npc-meta">
+                    <span>${npc.home || 'Unknown Loc'}</span>
+                    <span class="status-badge">${npc.relationship || 'Neutral'}</span>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        updateFilterOptions();
+    }
+
+    function updateFilterOptions() {
+        // Collect unique locations dynamically
+        const locs = new Set(STATE.npcs.map(n => n.home).filter(Boolean));
+        const sel = document.getElementById('filter-location');
+        const currentVal = sel.value;
+
+        // Keep first option
+        sel.innerHTML = '<option value="">All Locations</option>';
+        locs.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l;
+            opt.innerText = l;
+            sel.appendChild(opt);
+        });
+        sel.value = currentVal;
+    }
+
+    function selectNPC(id) {
+        STATE.selectedId = id;
+
+        // Update List UI
+        document.querySelectorAll('.npc-card').forEach(c => c.classList.remove('selected'));
+        // Find the card again (might need re-query if list re-rendered, but usually safe here)
+        renderList();
+
+        // Show Canvas
+        document.getElementById('empty-state').classList.add('hidden');
+        const canvas = document.getElementById('sheet-canvas');
+        canvas.classList.remove('empty');
+
+        // Enable Save Button
+        document.getElementById('btn-save-current').disabled = false;
+        document.getElementById('btn-save-current').innerText = `Download ${getNPC(id).name} (JSON)`;
+
+        renderCanvas();
+    }
+
+    function getNPC(id) {
+        return STATE.npcs.find(n => n.id === id);
+    }
+
+    /* =========================================
+       CANVAS / BUILDER LOGIC
+       ========================================= */
+    function renderCanvas() {
+        const canvas = document.getElementById('sheet-canvas');
+        canvas.innerHTML = '';
+
+        const npc = getNPC(STATE.selectedId);
+        if (!npc) return;
+
+        STATE.template.forEach(field => {
+            const el = document.createElement('div');
+            el.className = `field-box ${STATE.editMode ? 'editing' : ''}`;
+            el.style.left = field.x + 'px';
+            el.style.top = field.y + 'px';
+            el.style.width = field.width + 'px';
+            el.style.height = field.height + 'px';
+            el.dataset.id = field.id;
+
+            // Label
+            const label = document.createElement('div');
+            label.className = 'field-label';
+            label.innerText = field.label;
+            el.appendChild(label);
+
+            // Input
+            let input;
+            if (field.type === 'textarea') {
+                input = document.createElement('textarea');
+            } else if (field.type === 'checkbox') {
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                // Center checkbox manually if needed, or just let it flow
+                input.style.width = "auto";
+                input.style.height = "auto";
+                input.style.marginTop = "4px";
+            } else {
+                input = document.createElement('input');
+                input.type = 'text'; // default
+            }
+
+            input.className = 'field-input';
+
+            // Bind Data
+            if (field.type === 'checkbox') {
+                input.checked = !!npc[field.id];
+                input.onchange = (e) => {
+                    if (STATE.editMode) return;
+                    npc[field.id] = e.target.checked;
+                    saveState();
+                    if(field.system) renderList(); // Re-render list if system field changes
+                };
+            } else {
+                input.value = npc[field.id] || '';
+                input.oninput = (e) => {
+                    if (STATE.editMode) return;
+                    npc[field.id] = e.target.value;
+                    saveState();
+                    if(field.system) renderList();
+                };
+            }
+
+            el.appendChild(input);
+
+            // Edit Mode Controls
+            if (STATE.editMode) {
+                input.style.pointerEvents = 'none'; // Disable input so we can drag box
+
+                el.onmousedown = (e) => startDrag(e, field.id);
+
+                const controls = document.createElement('div');
+                controls.className = 'field-controls';
+
+                // Only allow deleting non-system fields
+                if (!field.system) {
+                    controls.innerHTML = `<button class="mini-btn btn-danger" onclick="deleteField('${field.id}')">✕</button>`;
+                } else {
+                    controls.innerHTML = `<span style="font-size:9px; color:var(--text-dim); padding:2px;">SYS</span>`;
+                }
+
+                el.appendChild(controls);
+
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.field-box').forEach(b => b.classList.remove('selected'));
+                    el.classList.add('selected');
+                }
+            }
+
+            canvas.appendChild(el);
+        });
+    }
+
+    /* =========================================
+       DRAG LOGIC
+       ========================================= */
+    function startDrag(e, id) {
+        if (!STATE.editMode) return;
+        if (e.target.tagName === 'BUTTON') return;
+
+        const el = document.querySelector(`.field-box[data-id="${id}"]`);
+        STATE.drag.active = true;
+        STATE.drag.fieldId = id;
+        STATE.drag.startX = e.clientX;
+        STATE.drag.startY = e.clientY;
+        STATE.drag.initialLeft = parseInt(el.style.left || 0);
+        STATE.drag.initialTop = parseInt(el.style.top || 0);
+
+        document.querySelectorAll('.field-box').forEach(b => b.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+
+    function onDrag(e) {
+        if (!STATE.drag.active) return;
+        e.preventDefault();
+
+        const dx = e.clientX - STATE.drag.startX;
+        const dy = e.clientY - STATE.drag.startY;
+
+        let newX = STATE.drag.initialLeft + dx;
+        let newY = STATE.drag.initialTop + dy;
+
+        // Snap
+        newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+        newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+        if (newX < 0) newX = 0;
+        if (newY < 0) newY = 0;
+
+        const el = document.querySelector(`.field-box[data-id="${STATE.drag.fieldId}"]`);
+        if (el) {
+            el.style.left = newX + 'px';
+            el.style.top = newY + 'px';
+        }
+    }
+
+    function endDrag() {
+        if (!STATE.drag.active) return;
+
+        const field = STATE.template.find(f => f.id === STATE.drag.fieldId);
+        const el = document.querySelector(`.field-box[data-id="${STATE.drag.fieldId}"]`);
+        if (field && el) {
+            field.x = parseInt(el.style.left);
+            field.y = parseInt(el.style.top);
+            saveState();
+        }
+
+        STATE.drag.active = false;
+        STATE.drag.fieldId = null;
+    }
+
+    /* =========================================
+       SETTINGS & ACTIONS
+       ========================================= */
+    function openSettings() {
+        document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettings() {
+        document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function toggleDevMode() {
+        STATE.config.devMode = document.getElementById('chk-dev-mode').checked;
+        saveState();
+        renderList();
+    }
+
+    function toggleEditMode() {
+        STATE.editMode = !STATE.editMode;
+        const btn = document.getElementById('btn-toggle-edit');
+        const tools = document.getElementById('edit-tools');
+
+        if (STATE.editMode) {
+            btn.classList.add('btn-active');
+            btn.innerText = "✓ DONE EDITING";
+            tools.classList.remove('hidden');
+            showToast("Edit Mode: Drag fields to move");
+        } else {
+            btn.classList.remove('btn-active');
+            btn.innerText = "EDIT LAYOUT";
+            tools.classList.add('hidden');
+        }
+        renderCanvas();
+    }
+
+    function createNewNPC() {
+        const nameInput = document.getElementById('new-npc-name');
+        const name = nameInput.value.trim();
+        if (!name) {
+            alert("Please enter a name.");
+            return;
+        }
+
+        const newNPC = {
+            id: 'npc-' + Date.now(),
+            name: name,
+            home: 'Unknown',
+            relationship: 'Neutral',
+            is_met: true
+            // other fields undefined, will be empty
+        };
+
+        STATE.npcs.push(newNPC);
+        saveState();
+
+        renderList();
+        selectNPC(newNPC.id);
+        nameInput.value = "";
+        closeSettings();
+        showToast(`Created ${name}`);
+    }
+
+    function downloadCurrentNPC() {
+        const npc = getNPC(STATE.selectedId);
+        if (!npc) return;
+        downloadJSON(npc, `npc_${npc.name.replace(/\s+/g, '_')}.json`);
+    }
+
+    function exportAllNPCs() {
+        downloadJSON({ npcs: STATE.npcs }, 'lyrn_npc_database.json');
+    }
+
+    function exportTemplate() {
+        downloadJSON(STATE.template, 'lyrn_npc_template.json');
+    }
+
+    function downloadJSON(data, filename) {
+        const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const a = document.createElement('a');
+        a.href = str;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    function triggerImport(type) {
+        const id = type === 'db' ? 'file-import-db' : 'file-import-tpl';
+        document.getElementById(id).click();
+    }
+
+    function importAllNPCs(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.npcs && Array.isArray(data.npcs)) {
+                    STATE.npcs = data.npcs;
+                    saveState();
+                    renderList();
+                    showToast("Database Imported");
+                    closeSettings();
+                } else {
+                    alert("Invalid DB Format");
+                }
+            } catch(err) { console.error(err); alert("Error parsing JSON"); }
+        };
+        reader.readAsText(file);
+    }
+
+    function importTemplate(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (Array.isArray(data)) {
+                    STATE.template = data;
+                    saveState();
+                    renderCanvas();
+                    showToast("Template Imported");
+                    closeSettings();
+                } else {
+                    alert("Invalid Template Format");
+                }
+            } catch(err) { console.error(err); alert("Error parsing JSON"); }
+        };
+        reader.readAsText(file);
+    }
+
+    /* =========================================
+       EDITOR TOOLS
+       ========================================= */
+    function addFieldToTemplate() {
+        const label = prompt("Enter Field Label:");
+        if (!label) return;
+
+        const type = prompt("Enter Type (text, textarea, checkbox):", "text");
+        if (!['text','textarea','checkbox'].includes(type)) return;
+
+        const newField = {
+            id: 'custom_' + Date.now(),
+            label: label,
+            type: type,
+            x: 20, y: 20,
+            width: type === 'checkbox' ? 150 : 200,
+            height: type === 'textarea' ? 100 : 60,
+            system: false
+        };
+
+        STATE.template.push(newField);
+        saveState();
+        renderCanvas();
+    }
+
+    function deleteField(id) {
+        if(confirm("Delete this field? Data in this field for all NPCs will remain but be hidden.")) {
+            STATE.template = STATE.template.filter(f => f.id !== id);
+            saveState();
+            renderCanvas();
+        }
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+</script>
+</body>
+</html>
