@@ -99,6 +99,88 @@ def configure_tailscale():
     else:
         print("Skipping Tailscale.")
 
+def configure_service():
+    print("\n--- Service Installer ---")
+    choice = input("Install RemoDash as a system service/startup task? (y/N): ").strip().lower()
+    if choice not in ['y', 'yes']:
+        print("Skipping service installation.")
+        return
+
+    if platform.system() == "Windows":
+        # Windows: Startup Folder Shortcut via VBS
+        try:
+            startup_folder = os.path.expandvars(r'%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup')
+            if not os.path.exists(startup_folder):
+                print(f"Error: Startup folder not found at {startup_folder}")
+                return
+
+            # Ensure we have a .bat file to launch
+            bat_path = Path("start_remodash.bat").resolve()
+            with open(bat_path, "w") as f:
+                f.write(f'@echo off\ncd /d "{os.getcwd()}"\n"{venv_python}" server.py\npause')
+
+            # Create VBS script in startup to launch invisible
+            vbs_path = os.path.join(startup_folder, "RemoDash.vbs")
+            with open(vbs_path, "w") as f:
+                f.write('Set WshShell = CreateObject("WScript.Shell")\n')
+                f.write(f'WshShell.Run chr(34) & "{bat_path}" & chr(34), 0\n')
+                f.write('Set WshShell = Nothing\n')
+
+            print(f"Created startup entry: {vbs_path}")
+            print("RemoDash will start automatically on login.")
+
+        except Exception as e:
+            print(f"Error installing service: {e}")
+
+    elif platform.system() == "Linux":
+        # Linux: systemd service
+        if os.geteuid() != 0:
+            print("Error: You must run this script with sudo to install a systemd service.")
+            return
+
+        try:
+            # Determine user
+            user = os.environ.get('SUDO_USER') or os.environ.get('USER')
+            if not user or user == 'root':
+                user = input("Enter username to run service as: ").strip()
+
+            cwd = str(Path.cwd().resolve())
+            python_path = str(Path(venv_python).resolve())
+            server_script = str(Path("server.py").resolve())
+
+            service_content = f"""[Unit]
+Description=RemoDash Server
+After=network.target
+
+[Service]
+User={user}
+WorkingDirectory={cwd}
+ExecStart={python_path} {server_script}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+"""
+            service_path = "/etc/systemd/system/remodash.service"
+            with open(service_path, "w") as f:
+                f.write(service_content)
+
+            print(f"Created {service_path}")
+
+            print("Reloading systemd...")
+            subprocess.check_call(["systemctl", "daemon-reload"])
+
+            print("Enabling service...")
+            subprocess.check_call(["systemctl", "enable", "remodash"])
+
+            choice = input("Start service now? (Y/n): ").strip().lower()
+            if choice in ['y', 'yes', '']:
+                subprocess.check_call(["systemctl", "start", "remodash"])
+                print("Service started.")
+
+        except Exception as e:
+             print(f"Error installing service: {e}")
+
 def configure_port():
     print("\n--- Server Port ---")
     current_port = "8240"
@@ -171,6 +253,7 @@ def main():
     configure_port()
     configure_auth()
     configure_tailscale()
+    configure_service()
 
     print("\nSetup Complete!")
     start_server()

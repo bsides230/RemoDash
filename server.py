@@ -204,6 +204,7 @@ class GitRepoRequest(BaseModel):
     path: str
     message: Optional[str] = None
     branch: Optional[str] = None
+    files: Optional[List[str]] = None
 
 class TaskKillRequest(BaseModel):
     pid: int
@@ -393,6 +394,40 @@ async def health_check():
         "net": psutil.net_io_counters()._asdict() if psutil else {}
     }
 
+# --- Power Endpoints ---
+@app.post("/api/power/restart", dependencies=[Depends(verify_token)])
+async def restart_server():
+    """Restarts the RemoDash server process."""
+    try:
+        # We use sys.executable to restart the current script
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/power/reboot", dependencies=[Depends(verify_token)])
+async def reboot_system():
+    """Reboots the host machine."""
+    try:
+        if platform.system() == "Windows":
+            subprocess.run(["shutdown", "/r", "/t", "0"])
+        else:
+            subprocess.run(["sudo", "reboot"])
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/power/shutdown", dependencies=[Depends(verify_token)])
+async def shutdown_system():
+    """Shuts down the host machine."""
+    try:
+        if platform.system() == "Windows":
+            subprocess.run(["shutdown", "/s", "/t", "0"])
+        else:
+            subprocess.run(["sudo", "shutdown", "now"])
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- Task Manager Endpoints ---
 @app.get("/api/tasks", dependencies=[Depends(verify_token)])
 async def get_tasks():
@@ -537,11 +572,35 @@ async def git_commit(req: GitRepoRequest):
     if not git: raise HTTPException(status_code=501)
     try:
         r = git.Repo(req.path)
-        r.git.add(A=True) # Stage all
+        if req.files and len(req.files) > 0:
+            r.git.reset()
+            for f in req.files:
+                r.git.add(f)
+        else:
+            r.git.add(A=True)
         r.index.commit(req.message or "Update from RemoDash")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/git/diff", dependencies=[Depends(verify_token)])
+async def get_git_diff(path: str, file: str):
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(path)
+        try:
+            diff = r.git.diff('HEAD', file)
+        except:
+            try:
+                diff = r.git.diff(file)
+                if not diff and (file in r.untracked_files):
+                    with open(os.path.join(path, file), 'r', encoding='utf-8', errors='replace') as f:
+                        diff = f.read()
+            except:
+                diff = ""
+        return {"diff": diff}
+    except Exception as e:
+        return {"diff": f"Error: {str(e)}"}
 
 @app.post("/api/git/push", dependencies=[Depends(verify_token)])
 async def git_push(req: GitRepoRequest):
@@ -549,7 +608,8 @@ async def git_push(req: GitRepoRequest):
     try:
         r = git.Repo(req.path)
         origin = r.remote(name='origin')
-        origin.push()
+        with r.git.custom_environment(GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'):
+            origin.push()
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -560,7 +620,8 @@ async def git_pull(req: GitRepoRequest):
     try:
         r = git.Repo(req.path)
         origin = r.remote(name='origin')
-        origin.pull()
+        with r.git.custom_environment(GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'):
+            origin.pull()
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

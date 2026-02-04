@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LYRN Dashboard v0.56 (Center Dock)</title>
+    <title>RemoDash v1.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -16,9 +16,9 @@
         :root {
             --bg-core: #050505;
             --bg-panel: #0a0a0a;
-            --brand-purple: #7c5cff;
-            --brand-purple-dim: rgba(124, 92, 255, 0.1);
-            --brand-purple-glow: rgba(124, 92, 255, 0.4);
+            --brand-color: #10B981; /* Default Emerald */
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
+            --brand-color-glow: rgba(16, 185, 129, 0.4);
             --text-head: #ffffff;
             --text-body: #b0b0b0;
             --text-dim: #666666;
@@ -37,9 +37,9 @@
         body[data-theme="light"] {
             --bg-core: #eef0f4;
             --bg-panel: #ffffff;
-            --brand-purple: #6a4ce0;
-            --brand-purple-dim: rgba(106, 76, 224, 0.1);
-            --brand-purple-glow: rgba(106, 76, 224, 0.3);
+            /* --brand-color override moved to JS for consistency or kept dynamic */
+            --brand-color-dim: rgba(0,0,0, 0.05);
+            --brand-color-glow: rgba(0,0,0, 0.1);
             --text-head: #111111;
             --text-body: #333333;
             --text-dim: #555555;
@@ -59,8 +59,8 @@
             color: var(--text-body);
             transition: background-color 0.5s ease;
             background-image:
-                repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(124, 92, 255, 0.03) 10px, rgba(124, 92, 255, 0.03) 11px),
-                radial-gradient(circle at 50% 0%, rgba(124, 92, 255, 0.15) 0%, transparent 60%);
+                repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(125, 125, 125, 0.03) 10px, rgba(125, 125, 125, 0.03) 11px),
+                radial-gradient(circle at 50% 0%, var(--brand-color-dim) 0%, transparent 60%);
             background-size: auto, 100% 100%;
             background-attachment: fixed;
             font-size: var(--font-size-base);
@@ -92,7 +92,7 @@
             font-size: 11px; color: var(--text-head);
             letter-spacing: 0.05em; cursor: help;
         }
-        #sys-cpu { color: #7c5cff; }
+        #sys-cpu { color: var(--brand-color); }
         .bar-btn {
             background: transparent; border: none; color: var(--text-dim);
             cursor: pointer; font-family: 'JetBrains Mono'; font-size: 14px;
@@ -115,7 +115,7 @@
         }
         .status-light.green { background-color: #00cc66; box-shadow: 0 0 8px rgba(0, 204, 102, 0.6); }
         .status-light.yellow { background-color: #ffbb33; box-shadow: 0 0 8px rgba(255, 187, 51, 0.6); }
-        .status-light.blue { background-color: #7c5cff; box-shadow: 0 0 10px #7c5cff; }
+        .status-light.blue { background-color: var(--brand-color); box-shadow: 0 0 10px var(--brand-color); }
         .status-light.orange { background-color: #ff8800; box-shadow: 0 0 8px #ff8800; }
 
         .status-light.pulse { animation: lightPulse 1.5s infinite ease-in-out; }
@@ -140,8 +140,8 @@
         }
         @keyframes openWin { to { opacity: 1; transform: scale(1); } }
 
-        .lyrn-window.active { border-color: var(--brand-purple); box-shadow: 0 25px 70px rgba(0,0,0,0.7), 0 0 15px var(--brand-purple-dim); }
-        .lyrn-window.always-on-top { z-index: 9999 !important; border: 1px solid var(--brand-purple); box-shadow: 0 0 0 1px var(--brand-purple); }
+        .lyrn-window.active { border-color: var(--brand-color); box-shadow: 0 25px 70px rgba(0,0,0,0.7), 0 0 15px var(--brand-color-dim); }
+        .lyrn-window.always-on-top { z-index: 9999 !important; border: 1px solid var(--brand-color); box-shadow: 0 0 0 1px var(--brand-color); }
         .lyrn-window.maximized { transition: width 0.2s, height 0.2s, left 0.2s, top 0.2s; }
 
         .window-header {
@@ -159,13 +159,13 @@
             display: flex; align-items: center; justify-content: center; font-size: var(--font-size-base);
             transition: all 0.2s;
         }
-        .win-btn:hover { background: var(--brand-purple-dim); color: var(--text-head); }
+        .win-btn:hover { background: var(--brand-color-dim); color: var(--text-head); }
 
         .win-btn.pinned {
-            background: var(--brand-purple-dim);
-            color: var(--brand-purple);
+            background: var(--brand-color-dim);
+            color: var(--brand-color);
             /* Visual indication of "pinned" state */
-            box-shadow: inset 0 0 0 1px var(--brand-purple);
+            box-shadow: inset 0 0 0 1px var(--brand-color);
         }
 
         .window-content { flex: 1; position: relative; background: var(--bg-core); overflow: hidden; }
@@ -180,7 +180,7 @@
         }
         .resize-handle::after {
             content:''; position: absolute; bottom: 4px; right: 4px;
-            width: 8px; height: 8px; border-right: 2px solid var(--brand-purple); border-bottom: 2px solid var(--brand-purple);
+            width: 8px; height: 8px; border-right: 2px solid var(--brand-color); border-bottom: 2px solid var(--brand-color);
             border-radius: 0 0 2px 0;
         }
         .lyrn-window:hover .resize-handle { opacity: 1; }
@@ -195,7 +195,7 @@
             content: ''; width: 40px; height: 4px; background: var(--border-color); border-radius: 2px;
             transition: background 0.2s;
         }
-        .mobile-resize-handle:active::after { background: var(--brand-purple); }
+        .mobile-resize-handle:active::after { background: var(--brand-color); }
 
         /* =========================================
            FLOATING DOCK (WEBSITE STYLE)
@@ -287,9 +287,9 @@
         }
 
         .dock-btn:hover {
-            background: var(--brand-purple-dim);
-            color: var(--brand-purple);
-            border-color: var(--brand-purple);
+            background: var(--brand-color-dim);
+            color: var(--brand-color);
+            border-color: var(--brand-color);
         }
 
         /* The Handle Container */
@@ -322,13 +322,13 @@
             border-radius: 2px;
             opacity: 1;
             /* Purple LED Glow Effect */
-            box-shadow: 0 0 6px var(--brand-purple), 0 0 12px var(--brand-purple);
+            box-shadow: 0 0 6px var(--brand-color), 0 0 12px var(--brand-color);
             transition: all 0.3s;
         }
 
         #floating-dock:hover .handle-bar {
             background-color: #fff;
-            box-shadow: 0 0 8px var(--brand-purple), 0 0 16px var(--brand-purple), 0 0 24px var(--brand-purple);
+            box-shadow: 0 0 8px var(--brand-color), 0 0 16px var(--brand-color), 0 0 24px var(--brand-color);
         }
 
         /* WIGGLE ANIMATION (Edit Mode) */
@@ -351,8 +351,8 @@
         .active-dot {
             position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
             width: 3px; height: 3px; border-radius: 50%;
-            background-color: var(--brand-purple);
-            box-shadow: 0 0 6px var(--brand-purple); display: none;
+            background-color: var(--brand-color);
+            box-shadow: 0 0 6px var(--brand-color); display: none;
         }
         .dock-btn.is-running .active-dot { display: block; }
         .active-dot.minimized-dot { background-color: #ff8800; box-shadow: 0 0 6px #ff8800; }
@@ -385,7 +385,7 @@
             font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
             transition: all 0.2s;
         }
-        .btn-full-width:hover { background: var(--brand-purple); border-color: var(--brand-purple); }
+        .btn-full-width:hover { background: var(--brand-color); border-color: var(--brand-color); }
 
         /* SLIDER STYLES */
         input[type="range"] {
@@ -395,17 +395,17 @@
         input[type="range"]:hover { opacity: 1; }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%;
-            background: var(--brand-purple); cursor: pointer;
+            background: var(--brand-color); cursor: pointer;
         }
         input[type="range"]::-moz-range-thumb {
-            width: 12px; height: 12px; border-radius: 50%; background: var(--brand-purple); cursor: pointer;
+            width: 12px; height: 12px; border-radius: 50%; background: var(--brand-color); cursor: pointer;
         }
 
         /* WELCOME POPUP & CONNECTION POPUP & SERVER CONFIG */
         #welcome-popup, #connection-popup, #server-config-popup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: var(--bg-panel);
-            border: 1px solid var(--brand-purple);
+            border: 1px solid var(--brand-color);
             box-shadow: 0 0 30px rgba(124, 92, 255, 0.2);
             border-radius: 12px; z-index: 22000;
             display: none; flex-direction: column;
@@ -418,13 +418,13 @@
         .welcome-title { font-family: 'JetBrains Mono'; color: var(--text-head); font-size: 14px; margin-bottom: 10px; display: block; text-transform: uppercase; letter-spacing: 1px; }
 
         .cta-btn {
-            background: var(--brand-purple); color: #fff; border: none;
+            background: var(--brand-color); color: #fff; border: none;
             padding: 6px 12px; border-radius: 4px;
             font-family: 'JetBrains Mono'; font-size: 11px;
             cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
             transition: all 0.2s;
         }
-        .cta-btn:hover { background: #fff; color: var(--brand-purple); box-shadow: 0 0 10px var(--brand-purple-glow); }
+        .cta-btn:hover { background: #fff; color: var(--brand-color); box-shadow: 0 0 10px var(--brand-color-glow); }
 
 
         /* EDIT POPUP */
@@ -450,7 +450,7 @@
         /* EDIT MODE BANNER */
         #edit-mode-banner {
             position: fixed; top: 40px; left: 50%; transform: translateX(-50%);
-            background: var(--brand-purple); color: #fff;
+            background: var(--brand-color); color: #fff;
             padding: 8px 16px; border-radius: 30px;
             font-family: 'JetBrains Mono', monospace; font-size: 12px;
             display: none; align-items: center; gap: 10px;
@@ -468,7 +468,7 @@
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
         .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 18px; }
         .toggle-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
-        input:checked + .toggle-slider { background-color: var(--brand-purple); }
+        input:checked + .toggle-slider { background-color: var(--brand-color); }
         input:checked + .toggle-slider:before { transform: translateX(14px); background-color: white; }
 
         /* =========================================
@@ -527,6 +527,39 @@
             .win-controls .win-btn:first-child { display: none; } /* Hide Maximize */
         }
 
+        /* COLOR PICKER */
+        .color-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 5px;
+        }
+        .color-opt {
+            width: 100%; height: 24px; border-radius: 4px; cursor: pointer;
+            border: 2px solid transparent; transition: all 0.2s;
+        }
+        .color-opt:hover { transform: scale(1.1); }
+        .color-opt.active { border-color: var(--text-head); box-shadow: 0 0 5px var(--text-head); }
+
+        /* POWER MODAL */
+        #power-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            z-index: 25000; display: none; align-items: center; justify-content: center;
+        }
+        .power-box {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            padding: 20px; border-radius: 12px; width: 300px;
+            display: flex; flex-direction: column; gap: 10px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+        .power-btn {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 12px; border-radius: 6px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-family: 'JetBrains Mono'; transition: all 0.2s;
+        }
+        .power-btn:hover { background: var(--brand-color); color: #fff; border-color: var(--brand-color); }
+        .power-btn.danger { color: #ff5555; border-color: rgba(255,85,85,0.3); }
+        .power-btn.danger:hover { background: #ff5555; color: #fff; }
+
     </style>
 </head>
 <body data-theme="dark">
@@ -540,6 +573,7 @@
             <span class="system-text" id="sys-battery"></span>
         </div>
         <div class="bar-section">
+            <button class="bar-btn" title="Power" onclick="openPowerModal()">⏻</button>
             <button class="bar-btn" title="Help" onclick="openWelcome()">?</button>
             <button class="bar-btn" title="Reset Dock" onclick="resetDock()">⚓</button>
             <button class="bar-btn" title="Fullscreen" onclick="toggleDashboardFullscreen()">⛶</button>
@@ -547,13 +581,25 @@
         </div>
     </div>
 
+    <div id="power-modal">
+        <div class="power-box">
+            <div class="window-header">
+                <span class="window-title">Power Options</span>
+                <button class="win-btn" onclick="closePowerModal()">✕</button>
+            </div>
+            <button class="power-btn" onclick="confirmPower('restart')">↺ Restart Server</button>
+            <button class="power-btn" onclick="confirmPower('reboot')">⟲ Reboot System</button>
+            <button class="power-btn danger" onclick="confirmPower('shutdown')">⏻ Shutdown System</button>
+        </div>
+    </div>
+
     <div id="auth-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); backdrop-filter:blur(15px); z-index:30000; align-items:center; justify-content:center; flex-direction:column;">
-        <div style="background:var(--bg-panel); border:1px solid var(--brand-purple); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
+        <div style="background:var(--bg-panel); border:1px solid var(--brand-color); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
             <h2 style="margin:0 0 20px 0; color:var(--text-head); font-family:'JetBrains Mono'; text-transform:uppercase; font-size:16px;">Authentication Required</h2>
             <p style="font-size:12px; color:var(--text-body); margin-bottom:20px; line-height:1.4;">Please enter your Admin Token to access the system.</p>
             <div style="margin-bottom: 15px; text-align: center;">
                  <input type="file" id="inp-token-file" accept=".txt" style="display:none" onchange="handleTokenFile(this)">
-                 <button class="cta-btn" onclick="document.getElementById('inp-token-file').click()" style="width:100%; padding:10px; background:transparent; border:1px solid var(--brand-purple);">
+                 <button class="cta-btn" onclick="document.getElementById('inp-token-file').click()" style="width:100%; padding:10px; background:transparent; border:1px solid var(--brand-color);">
                     📂 Upload Token File
                  </button>
                  <p style="font-size:10px; color:var(--text-dim); margin-top:5px; margin-bottom:0;">Select admin_token.txt</p>
@@ -663,6 +709,11 @@
             <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
         </div>
 
+        <div class="settings-row" style="flex-direction:column; align-items:flex-start; margin-top:10px;">
+            <span>Accent Color</span>
+            <div class="color-grid" id="color-picker-grid"></div>
+        </div>
+
         <div class="settings-header" style="margin-top:5px;">Layout</div>
         <button class="btn-full-width" onclick="enableEditMode()">Edit Dock Order</button>
 
@@ -697,9 +748,10 @@
         let appSettings = {
             activeModules: ['mod_server_status', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git'],
             dockPinned: true,
-            dockPos: null, // Initial null to trigger center calculation
+            dockPos: null,
             theme: 'dark',
-            fontSize: 12
+            fontSize: 12,
+            brandColor: '#10B981'
         };
 
         let zIndexCounter = 100;
@@ -720,18 +772,21 @@
             renderDock();
             initDockDrag();
             startClock();
-            // startCpuMonitor();
             initSystemMonitor();
             checkIfIframe();
             checkWelcome();
             checkConnection();
+            initColorPicker();
 
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
 
             // Initialize Font Size Slider
             document.getElementById('setting-font-size').value = appSettings.fontSize;
-            updateFontSize(appSettings.fontSize, false); // False = don't save yet, just apply
+            updateFontSize(appSettings.fontSize, false);
+
+            // Apply Brand Color
+            if(appSettings.brandColor) updateBrandColor(appSettings.brandColor);
 
             // Handle clicking outside
             document.addEventListener('click', (e) => {
@@ -805,18 +860,32 @@
                 e.stopPropagation();
                 if(isEditMode) return;
                 const popup = document.getElementById('settings-popup');
+                if(popup.classList.contains('show')) {
+                    popup.classList.remove('show');
+                    return;
+                }
 
                 const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
+                // Estimate height or use fixed
+                const pHeight = 450;
+                const pWidth = 260;
 
-                // Position Settings Popup relative to dock
-                const popupW = 260;
-                let leftPos = dockRect.left - popupW - 15;
+                let leftPos = dockRect.left - pWidth - 15;
                 if(leftPos < 10) leftPos = dockRect.right + 15;
 
-                popup.style.top = (dockRect.top - 100) + 'px';
+                // Vertical positioning smarts
+                let topPos = dockRect.bottom - pHeight;
+                // If near top, align top
+                if (dockRect.top < pHeight) topPos = dockRect.top;
+
+                // Clamp
+                if (topPos + pHeight > window.innerHeight) topPos = window.innerHeight - pHeight - 20;
+                if (topPos < 10) topPos = 10;
+
+                popup.style.top = topPos + 'px';
                 popup.style.left = leftPos + 'px';
 
-                popup.classList.toggle('show');
+                popup.classList.add('show');
             };
             container.appendChild(settingsBtn);
 
@@ -1381,6 +1450,76 @@
         function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
         function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
         function loadSettings() { const s = localStorage.getItem('lyrn-settings'); if(s) appSettings = { ...appSettings, ...JSON.parse(s) }; if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme); }
+
+        /* POWER */
+        function openPowerModal() { document.getElementById('power-modal').style.display = 'flex'; }
+        function closePowerModal() { document.getElementById('power-modal').style.display = 'none'; }
+        async function confirmPower(action) {
+            if(confirm("Are you sure you want to " + action + "?")) {
+                try {
+                    const res = await fetch(coreUrl + '/api/power/' + action, {
+                        method: 'POST',
+                        headers: { 'X-Token': authToken }
+                    });
+                    if(res.ok) {
+                        alert("Command sent: " + action);
+                        closePowerModal();
+                    } else {
+                        alert("Failed: " + await res.text());
+                    }
+                } catch(e) { alert("Error: " + e.message); }
+            }
+        }
+
+        /* COLOR PICKER */
+        const BRAND_COLORS = [
+            '#10B981', // Emerald (Default)
+            '#7c5cff', // Purple (Old)
+            '#3B82F6', // Blue
+            '#F59E0B', // Orange
+            '#EF4444', // Red
+            '#EC4899', // Pink
+            '#14B8A6', // Teal
+            '#6366F1'  // Indigo
+        ];
+
+        function initColorPicker() {
+            const grid = document.getElementById('color-picker-grid');
+            if(!grid) return;
+            grid.innerHTML = '';
+            BRAND_COLORS.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'color-opt';
+                div.style.backgroundColor = c;
+                div.onclick = () => updateBrandColor(c);
+                if(c.toUpperCase() === (appSettings.brandColor || '').toUpperCase()) div.classList.add('active');
+                grid.appendChild(div);
+            });
+        }
+
+        function updateBrandColor(color) {
+            appSettings.brandColor = color;
+            document.documentElement.style.setProperty('--brand-color', color);
+
+            // Re-calc dims
+            // Simple hex parsing
+            let hex = color.replace('#','');
+            if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+            const r = parseInt(hex.substring(0,2), 16);
+            const g = parseInt(hex.substring(2,4), 16);
+            const b = parseInt(hex.substring(4,6), 16);
+
+            document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+            document.documentElement.style.setProperty('--brand-color-glow', `rgba(${r},${g},${b}, 0.4)`);
+
+            saveSettings();
+            initColorPicker(); // Update active state
+
+            // Broadcast
+            document.querySelectorAll('iframe').forEach(f => {
+                f.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: color }, '*');
+            });
+        }
 
         function startClock() {
             const timeEl = document.getElementById('sys-clock');
