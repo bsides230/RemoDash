@@ -1,2 +1,3 @@
 global_flags/no_auth
 /logs
+admin_token.txt
