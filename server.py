@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request, HTTPException, Header, Depends, Body, WebS
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -25,6 +26,16 @@ try:
     import pynvml
 except ImportError:
     pynvml = None
+
+try:
+    import git
+except ImportError:
+    git = None
+
+try:
+    from crontab import CronTab
+except ImportError:
+    CronTab = None
 
 # Platform-specific imports for Terminal
 if platform.system() != "Windows":
@@ -112,7 +123,9 @@ class DiskJournalLogger:
 
         try:
             # Yield initial connection message
-            yield f"data: {json.dumps({'level':'Success', 'msg': 'Connected to Log Stream', 'ts': datetime.datetime.now().isoformat(), 'source': 'System'})}\n\n"
+            yield {
+                "data": json.dumps({'level':'Success', 'msg': 'Connected to Log Stream', 'ts': datetime.datetime.now().isoformat(), 'source': 'System'})
+            }
 
             while True:
                 if await request.is_disconnected():
@@ -120,9 +133,9 @@ class DiskJournalLogger:
 
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=15.0)
-                    yield f"data: {json.dumps(event)}\n\n"
+                    yield {"data": json.dumps(event)}
                 except asyncio.TimeoutError:
-                    yield f": heartbeat\n\n"
+                    yield {"comment": "heartbeat"}
         finally:
             async with self.lock:
                 if q in self.subscribers:
@@ -186,6 +199,17 @@ class FileOpRequest(BaseModel):
     path: str
     content: Optional[str] = None
     new_path: Optional[str] = None
+
+class GitRepoRequest(BaseModel):
+    path: str
+    message: Optional[str] = None
+    branch: Optional[str] = None
+
+class TaskKillRequest(BaseModel):
+    pid: int
+
+class CronRequest(BaseModel):
+    lines: str
 
 # --- App Setup ---
 
@@ -266,7 +290,28 @@ async def verify_token_endpoint():
 async def health_check():
     cpu_percent = psutil.cpu_percent()
     ram = psutil.virtual_memory()
+
+    # Disk Usage (Root)
     disk = psutil.disk_usage('.')
+
+    # Detailed Partitions (New)
+    partitions_info = []
+    try:
+        for part in psutil.disk_partitions():
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+                partitions_info.append({
+                    "device": part.device,
+                    "mountpoint": part.mountpoint,
+                    "fstype": part.fstype,
+                    "total_gb": usage.total / (1024**3),
+                    "used_gb": usage.used / (1024**3),
+                    "percent": usage.percent
+                })
+            except (OSError, PermissionError):
+                continue
+    except Exception:
+        pass
 
     # Extended System Info
 
@@ -339,12 +384,186 @@ async def health_check():
         "disk": {
             "percent": disk.percent,
             "used_gb": disk.used / (1024**3),
-            "total_gb": disk.total / (1024**3)
+            "total_gb": disk.total / (1024**3),
+            "partitions": partitions_info
         },
         "gpu": gpu_stats,
         "battery": battery_info,
-        "os": os_info
+        "os": os_info,
+        "net": psutil.net_io_counters()._asdict() if psutil else {}
     }
+
+# --- Task Manager Endpoints ---
+@app.get("/api/tasks", dependencies=[Depends(verify_token)])
+async def get_tasks():
+    processes = []
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_percent', 'status']):
+            try:
+                processes.append(proc.info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception: pass
+    return processes
+
+@app.post("/api/tasks/kill", dependencies=[Depends(verify_token)])
+async def kill_task(req: TaskKillRequest):
+    try:
+        p = psutil.Process(req.pid)
+        p.terminate()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Network Monitor Endpoints ---
+@app.get("/api/network", dependencies=[Depends(verify_token)])
+async def get_network_stats():
+    return psutil.net_io_counters()._asdict()
+
+# --- Cron Manager Endpoints ---
+@app.get("/api/cron", dependencies=[Depends(verify_token)])
+async def get_cron():
+    if not CronTab:
+        raise HTTPException(status_code=501, detail="python-crontab not installed")
+    try:
+        cron = CronTab(user=True)
+        return {"lines": cron.render()}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/cron", dependencies=[Depends(verify_token)])
+async def save_cron(req: CronRequest):
+    try:
+        proc = subprocess.Popen(['crontab', '-'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate(input=req.lines.encode('utf-8'))
+
+        if proc.returncode != 0:
+             raise Exception(stderr.decode())
+
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Git Manager Endpoints ---
+@app.get("/api/git/repos", dependencies=[Depends(verify_token)])
+async def list_git_repos():
+    repos = settings_manager.settings.get("git_repos", [])
+    result = []
+    for path in repos:
+        status = "Unknown"
+        branch = "Unknown"
+        changed = False
+        try:
+            if git:
+                r = git.Repo(path)
+                try:
+                    branch = r.active_branch.name
+                except:
+                    branch = "Detached"
+                changed = r.is_dirty() or (len(r.untracked_files) > 0)
+                status = "Dirty" if changed else "Clean"
+        except Exception as e:
+            status = f"Error: {str(e)}"
+
+        result.append({
+            "path": path,
+            "name": os.path.basename(path),
+            "status": status,
+            "branch": branch,
+            "changed": changed
+        })
+    return result
+
+@app.post("/api/git/repos", dependencies=[Depends(verify_token)])
+async def add_git_repo(req: GitRepoRequest):
+    p = str(Path(req.path).resolve())
+    if not os.path.exists(p):
+        raise HTTPException(status_code=404, detail="Path does not exist")
+
+    current = settings_manager.settings.get("git_repos", [])
+    if p not in current:
+        current.append(p)
+        settings_manager.settings["git_repos"] = current
+        settings_manager.save_settings()
+    return {"success": True}
+
+@app.post("/api/git/repos/remove", dependencies=[Depends(verify_token)])
+async def remove_git_repo(req: GitRepoRequest):
+    p = req.path
+    current = settings_manager.settings.get("git_repos", [])
+    if p in current:
+        current.remove(p)
+        settings_manager.settings["git_repos"] = current
+        settings_manager.save_settings()
+    return {"success": True}
+
+@app.get("/api/git/status", dependencies=[Depends(verify_token)])
+async def get_git_status(path: str):
+    if not git:
+         raise HTTPException(status_code=501, detail="GitPython not installed")
+    try:
+        r = git.Repo(path)
+        diffs = []
+        # Staged
+        for item in r.index.diff(None):
+             diffs.append({"file": item.a_path, "type": "modified", "staged": False})
+        for item in r.index.diff("HEAD"):
+             diffs.append({"file": item.a_path, "type": "modified", "staged": True})
+        # Untracked
+        for f in r.untracked_files:
+            diffs.append({"file": f, "type": "untracked", "staged": False})
+
+        history = []
+        try:
+            for c in list(r.iter_commits(max_count=10)):
+                history.append({
+                    "hexsha": c.hexsha[:7],
+                    "message": c.message.strip(),
+                    "author": str(c.author),
+                    "time": c.committed_datetime.isoformat()
+                })
+        except: pass
+
+        return {
+            "branch": r.active_branch.name if not r.head.is_detached else "Detached",
+            "files": diffs,
+            "history": history
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/commit", dependencies=[Depends(verify_token)])
+async def git_commit(req: GitRepoRequest):
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(req.path)
+        r.git.add(A=True) # Stage all
+        r.index.commit(req.message or "Update from RemoDash")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/push", dependencies=[Depends(verify_token)])
+async def git_push(req: GitRepoRequest):
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(req.path)
+        origin = r.remote(name='origin')
+        origin.push()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/pull", dependencies=[Depends(verify_token)])
+async def git_pull(req: GitRepoRequest):
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(req.path)
+        origin = r.remote(name='origin')
+        origin.pull()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/sysinfo", dependencies=[Depends(verify_token)])
 async def get_sysinfo():
@@ -662,7 +881,7 @@ async def rename_item(data: FileOpRequest):
 # Logging Endpoints
 @app.get("/api/logs", dependencies=[Depends(verify_token)])
 async def stream_logs(request: Request):
-    return StreamingResponse(logger.subscribe(request), media_type="text/event-stream")
+    return EventSourceResponse(logger.subscribe(request))
 
 @app.get("/api/logs/sessions", dependencies=[Depends(verify_token)])
 async def list_log_sessions():

@@ -368,6 +368,7 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.6);
             display: none; flex-direction: column; gap: 12px;
             z-index: 20001;
+            max-height: 80vh; overflow-y: auto;
         }
         #settings-popup.show { display: flex; animation: fadeUp 0.2s; }
         @keyframes fadeUp { from{opacity:0; transform:scale(0.95);} to{opacity:1; transform:scale(1);} }
@@ -400,8 +401,8 @@
             width: 12px; height: 12px; border-radius: 50%; background: var(--brand-purple); cursor: pointer;
         }
 
-        /* WELCOME POPUP & CONNECTION POPUP */
-        #welcome-popup, #connection-popup {
+        /* WELCOME POPUP & CONNECTION POPUP & SERVER CONFIG */
+        #welcome-popup, #connection-popup, #server-config-popup {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: var(--bg-panel);
             border: 1px solid var(--brand-purple);
@@ -625,9 +626,24 @@
         </div>
     </div>
 
+    <div id="server-config-popup" style="width:500px; display:none;">
+        <div class="window-header">
+            <span class="window-title">Server Configuration</span>
+            <button class="win-btn" onclick="closeServerConfig()">✕</button>
+        </div>
+        <div class="welcome-content">
+             <p>Edit <code>settings.json</code> directly. Use caution.</p>
+             <textarea id="sys-config-editor" style="width:100%; height:300px; font-family:'JetBrains Mono'; font-size:12px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; padding:10px; resize:vertical;"></textarea>
+        </div>
+        <div class="welcome-footer">
+             <button class="cta-btn" onclick="saveServerConfig()">Save & Apply</button>
+        </div>
+    </div>
+
     <div id="settings-popup">
         <div class="settings-header">General</div>
         <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
+        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openServerConfig()">Edit Server Config</button>
         <div class="settings-row">
             <span>Dark Mode</span>
             <label class="toggle-switch">
@@ -671,11 +687,15 @@
             { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "📁" },
             { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "💻" },
             { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "📝" },
-            { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "⚙️" },
+            { id: "mod_tasks", file: "TaskManager.html", name: "Task Manager", icon: "⚡" },
+            { id: "mod_git", file: "GitManager.html", name: "Git Manager", icon: "🐙" },
+            { id: "mod_net", file: "NetworkMonitor.html", name: "Network", icon: "📡" },
+            { id: "mod_logs", file: "LogViewer.html", name: "Logs", icon: "📜" },
+            { id: "mod_cron", file: "CronManager.html", name: "Cron Jobs", icon: "⏰" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_server_status', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_settings'],
+            activeModules: ['mod_server_status', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git'],
             dockPinned: true,
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -1720,6 +1740,39 @@
         }
         function toggleHideWelcome(isChecked) {
             localStorage.setItem('lyrn-welcome-hidden', isChecked);
+        }
+
+        // Server Config Logic
+        function openServerConfig() {
+            document.getElementById('server-config-popup').style.display = 'flex';
+            document.getElementById('settings-popup').classList.remove('show');
+            fetchServerConfig();
+        }
+        function closeServerConfig() {
+             document.getElementById('server-config-popup').style.display = 'none';
+        }
+
+        async function fetchServerConfig() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const json = await res.json();
+                document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
+            } catch(e) { console.error(e); }
+        }
+
+        async function saveServerConfig() {
+            try {
+                const text = document.getElementById('sys-config-editor').value;
+                const json = JSON.parse(text);
+                await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify(json)
+                });
+                alert("Saved. Restart server to apply some changes.");
+                closeServerConfig();
+            } catch(e) { alert("Error: " + e.message); }
         }
 
         // Service Worker Registration

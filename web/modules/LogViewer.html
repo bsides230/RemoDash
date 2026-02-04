@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Log Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-purple: #7c5cff;
+            --border-color: #222222;
+            --bg-input: #111;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --brand-purple: #6a4ce0;
+            --bg-input: #f3f4f6;
+        }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'JetBrains Mono', monospace;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            font-size: 12px; display: flex; flex-direction: column;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        #toolbar {
+            padding: 10px; display: flex; gap: 10px; border-bottom: 1px solid var(--border-color);
+            background: var(--bg-panel); align-items: center; font-family: 'Inter', sans-serif;
+        }
+
+        input[type="text"] {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 6px; border-radius: 4px;
+            font-size: 11px; font-family: 'JetBrains Mono'; flex: 1;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: var(--brand-purple); }
+
+        button {
+            background: transparent; border: 1px solid var(--border-color);
+            color: var(--text-dim); cursor: pointer; padding: 4px 8px; border-radius: 4px;
+            font-size: 11px;
+        }
+        button:hover { color: var(--text-head); border-color: var(--text-head); }
+
+        #log-container {
+            flex: 1; overflow-y: auto; padding: 10px; font-size: 11px;
+            scroll-behavior: smooth;
+        }
+
+        .log-entry {
+            margin-bottom: 2px; line-height: 1.4; display: flex; gap: 8px;
+            border-bottom: 1px solid transparent;
+        }
+        .log-entry:hover { background: rgba(128,128,128,0.05); }
+
+        .ts { color: var(--text-dim); white-space: nowrap; }
+        .lvl { width: 50px; flex-shrink: 0; font-weight: bold; }
+        .src { width: 80px; flex-shrink: 0; color: var(--brand-purple); overflow: hidden; text-overflow: ellipsis; }
+        .msg { flex: 1; color: var(--text-body); word-break: break-all; }
+
+        .lvl-Info { color: #60a5fa; }
+        .lvl-Error { color: #ef4444; }
+        .lvl-Warn { color: #f59e0b; }
+        .lvl-Success { color: #10b981; }
+
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <input type="text" id="filter" placeholder="Filter logs..." oninput="applyFilter()">
+        <label style="display:flex; align-items:center; gap:5px; font-size:11px; user-select:none;">
+            <input type="checkbox" id="chk-auto-scroll" checked> Auto Scroll
+        </label>
+        <button onclick="clearLogs()">Clear</button>
+    </div>
+
+    <div id="log-container">
+        <div style="padding:10px; color:var(--text-dim)">Connecting to log stream...</div>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+        let eventSource = null;
+        let logs = [];
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') { coreUrl = e.data.url; connect(); }
+            if (e.data.type === 'TOKEN_UPDATE') { authToken = e.data.token; connect(); }
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+        });
+
+        function connect() {
+            if(eventSource) eventSource.close();
+            if(!coreUrl || !authToken) return;
+
+            const container = document.getElementById('log-container');
+            container.innerHTML = '';
+            logs = [];
+
+            // EventSource sends cookies but not custom headers easily in standard API.
+            // But we modified backend verify_token to accept query param 'token' too.
+            // Check verify_token implementation in server.py
+            // "auth_token = x_token or token" -> Supports query param named 'token'.
+
+            const url = `${coreUrl}/api/logs?token=${encodeURIComponent(authToken)}`;
+            eventSource = new EventSource(url);
+
+            eventSource.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    addLog(data);
+                } catch(err) {
+                    // Heartbeat or error
+                }
+            };
+
+            eventSource.onerror = () => {
+                // container.innerHTML += '<div style="color:var(--text-dim)">Connection lost. Retrying...</div>';
+            };
+        }
+
+        function addLog(entry) {
+            logs.push(entry);
+            const container = document.getElementById('log-container');
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+
+            // Filter check
+            const filter = document.getElementById('filter').value.toLowerCase();
+            if(filter && !JSON.stringify(entry).toLowerCase().includes(filter)) {
+                div.style.display = 'none';
+            }
+
+            const ts = new Date(entry.ts).toLocaleTimeString();
+            div.innerHTML = `
+                <span class="ts">${ts}</span>
+                <span class="lvl lvl-${entry.level}">${entry.level}</span>
+                <span class="src">${entry.source}</span>
+                <span class="msg">${entry.msg}</span>
+            `;
+
+            container.appendChild(div);
+
+            if(document.getElementById('chk-auto-scroll').checked) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function applyFilter() {
+            const filter = document.getElementById('filter').value.toLowerCase();
+            const entries = document.querySelectorAll('.log-entry');
+            entries.forEach((el, idx) => {
+                const entry = logs[idx]; // Corresponds if logs[] stays synced with DOM order
+                if(!entry) return;
+                const match = JSON.stringify(entry).toLowerCase().includes(filter);
+                el.style.display = match ? 'flex' : 'none';
+            });
+        }
+
+        function clearLogs() {
+            document.getElementById('log-container').innerHTML = '';
+            logs = [];
+        }
+
+        // Init
+        if(coreUrl && authToken) connect();
+    </script>
+</body>
+</html>

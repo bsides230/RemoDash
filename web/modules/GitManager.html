@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Git Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-purple: #7c5cff;
+            --brand-purple-dim: rgba(124, 92, 255, 0.1);
+            --border-color: #222222;
+            --bg-input: #111;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --brand-purple: #6a4ce0;
+            --bg-input: #f3f4f6;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            font-size: 13px;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+        /* Layout */
+        #app { display: flex; height: 100%; }
+
+        /* Sidebar */
+        #sidebar {
+            width: 250px; background: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 15px; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+            font-family: 'JetBrains Mono'; font-weight: bold; color: var(--text-head);
+        }
+
+        #btn-add-repo {
+            background: transparent; border: 1px solid var(--border-color);
+            color: var(--text-head); width: 24px; height: 24px; border-radius: 4px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        #btn-add-repo:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+
+        #repo-list { flex: 1; overflow-y: auto; padding: 10px; }
+
+        .repo-item {
+            padding: 10px; border-radius: 6px; cursor: pointer;
+            margin-bottom: 5px; border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        .repo-item:hover { background: var(--bg-core); }
+        .repo-item.active { background: var(--brand-purple-dim); border-color: var(--brand-purple); }
+
+        .repo-name { font-weight: 500; color: var(--text-head); display: block; margin-bottom: 2px; }
+        .repo-path { font-size: 10px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+        .status-badge {
+            font-size: 9px; padding: 2px 4px; border-radius: 3px;
+            text-transform: uppercase; margin-top: 4px; display: inline-block;
+        }
+        .status-clean { color: var(--success); border: 1px solid var(--success); }
+        .status-dirty { color: var(--warning); border: 1px solid var(--warning); }
+        .status-error { color: var(--danger); border: 1px solid var(--danger); }
+
+        /* Main */
+        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-core); }
+
+        #empty-state {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            color: var(--text-dim); font-family: 'JetBrains Mono';
+        }
+
+        #repo-header {
+            padding: 20px; border-bottom: 1px solid var(--border-color);
+            background: var(--bg-panel);
+        }
+
+        h2 { margin: 0 0 5px 0; font-family: 'JetBrains Mono'; font-size: 18px; color: var(--text-head); }
+        .repo-meta { font-size: 11px; color: var(--text-dim); margin-bottom: 15px; display: flex; gap: 15px; }
+        .repo-meta span { display: flex; align-items: center; gap: 5px; }
+
+        .repo-actions { display: flex; gap: 10px; }
+
+        button {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-body); padding: 6px 12px; border-radius: 4px;
+            cursor: pointer; font-family: 'JetBrains Mono'; font-size: 11px;
+            transition: all 0.2s;
+        }
+        button:hover { border-color: var(--brand-purple); color: var(--text-head); }
+        button.primary { background: var(--brand-purple); border-color: var(--brand-purple); color: #fff; }
+        button.primary:hover { opacity: 0.9; }
+        button.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); padding: 0 20px; background: var(--bg-panel); }
+        .tab-btn {
+            background: transparent; border: none; border-bottom: 2px solid transparent;
+            padding: 10px 15px; color: var(--text-dim); cursor: pointer;
+        }
+        .tab-btn.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); }
+
+        #repo-content { flex: 1; overflow-y: auto; padding: 20px; display: none; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        /* File List */
+        .file-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px; border-bottom: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono'; font-size: 12px;
+        }
+        .file-status { font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+        .st-modified { color: #60a5fa; background: rgba(96,165,250,0.1); }
+        .st-untracked { color: var(--text-dim); background: rgba(255,255,255,0.05); }
+
+        /* Commit Box */
+        .commit-box { margin-top: 20px; padding: 15px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; }
+        textarea {
+            width: 100%; height: 60px; background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 10px; font-family: 'JetBrains Mono'; font-size: 12px;
+            margin-bottom: 10px; border-radius: 4px; resize: none;
+        }
+
+        /* History */
+        .commit-item {
+            padding: 10px; border-bottom: 1px solid var(--border-color);
+        }
+        .commit-msg { font-weight: 500; color: var(--text-head); margin-bottom: 4px; }
+        .commit-meta { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono'; }
+
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <span>REPOSITORIES</span>
+                <button id="btn-add-repo" onclick="promptAddRepo()">+</button>
+            </div>
+            <div id="repo-list">Loading...</div>
+        </div>
+
+        <div id="main">
+            <div id="empty-state">Select a repository to manage.</div>
+
+            <div id="repo-view" style="display:none; height:100%; flex-direction:column;">
+                <div id="repo-header">
+                    <h2 id="view-name">Repo Name</h2>
+                    <div class="repo-meta">
+                        <span id="view-branch">Branch: -</span>
+                        <span id="view-path">Path: -</span>
+                    </div>
+                    <div class="repo-actions">
+                        <button onclick="doPull()">↓ Pull</button>
+                        <button onclick="doPush()">↑ Push</button>
+                        <button onclick="loadRepoDetails()" title="Refresh">↻</button>
+                        <button class="danger" onclick="removeRepo()">Remove</button>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('changes')">Changes</button>
+                    <button class="tab-btn" onclick="switchTab('history')">History</button>
+                </div>
+
+                <div id="repo-content">
+                    <!-- Changes Tab -->
+                    <div id="tab-changes" class="tab-pane active">
+                        <div id="files-list"></div>
+                        <div class="commit-box">
+                            <textarea id="commit-msg" placeholder="Commit message..."></textarea>
+                            <button class="primary" onclick="doCommit()">Commit All Changes</button>
+                        </div>
+                    </div>
+
+                    <!-- History Tab -->
+                    <div id="tab-history" class="tab-pane">
+                        <div id="history-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+        let currentRepoPath = null;
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
+            if (e.data.type === 'TOKEN_UPDATE') authToken = e.data.token;
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+        });
+
+        async function fetchAPI(endpoint, method='GET', body=null) {
+            if(!coreUrl || !authToken) return null;
+            const opts = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Token': authToken
+                }
+            };
+            if(body) opts.body = JSON.stringify(body);
+            try {
+                const res = await fetch(coreUrl + endpoint, opts);
+                if(!res.ok) throw new Error(await res.text());
+                return await res.json();
+            } catch(e) {
+                console.error(e);
+                alert("Error: " + e.message);
+                return null;
+            }
+        }
+
+        async function loadRepos() {
+            const list = document.getElementById('repo-list');
+            list.innerHTML = '<div style="padding:10px; color:var(--text-dim)">Loading...</div>';
+
+            const repos = await fetchAPI('/api/git/repos');
+            if(!repos) {
+                list.innerHTML = '<div style="padding:10px; color:var(--error-color)">Failed to load.</div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            repos.forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'repo-item';
+                if(r.path === currentRepoPath) item.classList.add('active');
+
+                let statusClass = 'status-clean';
+                if(r.status.includes('Dirty')) statusClass = 'status-dirty';
+                if(r.status.includes('Error')) statusClass = 'status-error';
+
+                item.innerHTML = `
+                    <span class="repo-name">${r.name}</span>
+                    <span class="repo-path">${r.path}</span>
+                    <span class="status-badge ${statusClass}">${r.branch} • ${r.status}</span>
+                `;
+                item.onclick = () => selectRepo(r.path, r.name);
+                list.appendChild(item);
+            });
+        }
+
+        function selectRepo(path, name) {
+            currentRepoPath = path;
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('repo-view').style.display = 'flex';
+
+            document.getElementById('view-name').innerText = name;
+            document.getElementById('view-path').innerText = path;
+
+            // Reload list to update active state
+            loadRepos();
+
+            loadRepoDetails();
+        }
+
+        async function loadRepoDetails() {
+            if(!currentRepoPath) return;
+            const data = await fetchAPI('/api/git/status?path=' + encodeURIComponent(currentRepoPath));
+            if(!data) return;
+
+            document.getElementById('view-branch').innerText = "Branch: " + data.branch;
+
+            // Render Files
+            const filesList = document.getElementById('files-list');
+            filesList.innerHTML = '';
+            if(data.files.length === 0) {
+                 filesList.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">No changes detected.</div>';
+            } else {
+                data.files.forEach(f => {
+                    const div = document.createElement('div');
+                    div.className = 'file-item';
+                    div.innerHTML = `
+                        <span>${f.file}</span>
+                        <span class="file-status ${f.staged ? 'st-modified' : 'st-untracked'}">${f.type}</span>
+                    `;
+                    filesList.appendChild(div);
+                });
+            }
+
+            // Render History
+            const histList = document.getElementById('history-list');
+            histList.innerHTML = '';
+            if(data.history) {
+                data.history.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'commit-item';
+                    div.innerHTML = `
+                        <div class="commit-msg">${c.message}</div>
+                        <div class="commit-meta">${c.hexsha} • ${c.author} • ${new Date(c.time).toLocaleString()}</div>
+                    `;
+                    histList.appendChild(div);
+                });
+            }
+        }
+
+        async function promptAddRepo() {
+            const path = prompt("Enter full local path to git repository:");
+            if(path) {
+                const res = await fetchAPI('/api/git/repos', 'POST', { path });
+                if(res && res.success) loadRepos();
+            }
+        }
+
+        async function removeRepo() {
+            if(!confirm("Stop managing this repo? (Files will not be deleted)")) return;
+            const res = await fetchAPI('/api/git/repos/remove', 'POST', { path: currentRepoPath });
+            if(res && res.success) {
+                currentRepoPath = null;
+                document.getElementById('repo-view').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'flex';
+                loadRepos();
+            }
+        }
+
+        async function doCommit() {
+            const msg = document.getElementById('commit-msg').value;
+            if(!msg) return alert("Enter a commit message");
+
+            const res = await fetchAPI('/api/git/commit', 'POST', { path: currentRepoPath, message: msg });
+            if(res && res.success) {
+                document.getElementById('commit-msg').value = '';
+                loadRepoDetails();
+            }
+        }
+
+        async function doPush() {
+            const btn = event.target;
+            const og = btn.innerText;
+            btn.innerText = "Pushing...";
+            btn.disabled = true;
+
+            const res = await fetchAPI('/api/git/push', 'POST', { path: currentRepoPath });
+            if(res && res.success) alert("Push successful");
+
+            btn.innerText = og;
+            btn.disabled = false;
+        }
+
+        async function doPull() {
+            const btn = event.target;
+            const og = btn.innerText;
+            btn.innerText = "Pulling...";
+            btn.disabled = true;
+
+            const res = await fetchAPI('/api/git/pull', 'POST', { path: currentRepoPath });
+            if(res && res.success) {
+                alert("Pull successful");
+                loadRepoDetails();
+            }
+
+            btn.innerText = og;
+            btn.disabled = false;
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+        }
+
+        // Init
+        if(coreUrl && authToken) loadRepos();
+    </script>
+</body>
+</html>

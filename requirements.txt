@@ -5,3 +5,6 @@ aiofiles
 aiohttp
 nvidia-ml-py
 websockets
+GitPython
+python-crontab
+sse-starlette
