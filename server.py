@@ -528,6 +528,59 @@ async def reboot_system():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/git/stash", dependencies=[Depends(verify_token)])
+async def git_stash(req: GitRepoRequest):
+    check_path_access(req.path) # Validate Access
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(req.path)
+        r.git.stash('save', req.message or f"Stash from RemoDash {datetime.datetime.now()}")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/stash/pop", dependencies=[Depends(verify_token)])
+async def git_stash_pop(req: GitRepoRequest):
+    check_path_access(req.path) # Validate Access
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(req.path)
+        r.git.stash('pop')
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/discard", dependencies=[Depends(verify_token)])
+async def git_discard(req: GitRepoRequest):
+    check_path_access(req.path) # Validate Access
+    if not git: raise HTTPException(status_code=501)
+    try:
+        r = git.Repo(req.path)
+        if req.files and len(req.files) > 0:
+            # Discard specific files
+            # For tracked files: checkout HEAD -- file
+            # For untracked files: clean -f file (or manually remove)
+            # GitPython doesn't have a simple "discard" so we use git command
+
+            # Separate untracked
+            untracked = set(r.untracked_files)
+
+            for f in req.files:
+                if f in untracked:
+                     fp = os.path.join(req.path, f)
+                     if os.path.exists(fp):
+                         os.remove(fp)
+                else:
+                    r.git.checkout('HEAD', '--', f)
+        else:
+            # Discard all
+            r.git.reset('--hard', 'HEAD')
+            r.git.clean('-fd') # Clean untracked
+
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/power/shutdown", dependencies=[Depends(verify_token)])
 async def shutdown_system():
     """Shuts down the host machine."""

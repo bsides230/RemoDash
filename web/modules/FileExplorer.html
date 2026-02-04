@@ -109,12 +109,14 @@
             padding: 8px; background: var(--bg-panel);
             border-bottom: 1px solid var(--border-color);
             display: flex; align-items: center; gap: 8px;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
         }
-        .nav-btn { background: transparent; border: none; color: var(--text-head); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; }
+        .nav-btn { background: transparent; border: none; color: var(--text-head); cursor: pointer; font-size: 14px; padding: 4px; border-radius: 4px; flex-shrink: 0; }
         .nav-btn:hover { background: var(--bg-hover); }
         .path-bar {
             flex: 1; display: flex; align-items: center; background: var(--bg-core);
             border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px;
+            min-width: 200px;
         }
         .path-input {
             width: 100%; background: transparent; border: none; color: var(--text-head);
@@ -124,26 +126,35 @@
             background: var(--bg-panel); border: 1px solid var(--border-color);
             color: var(--text-dim); padding: 4px 8px; border-radius: 4px;
             font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px;
+            white-space: nowrap; flex-shrink: 0;
         }
         .tool-btn:hover { border-color: var(--text-dim); color: var(--text-head); }
         .tool-btn.primary { color: var(--brand-purple); border-color: var(--brand-purple); }
 
-        /* File List */
+        /* File List Container */
+        #file-scroll-container {
+             flex: 1; overflow: auto; background: var(--bg-core);
+             display: flex; flex-direction: column;
+        }
+
         .file-header {
             display: grid; grid-template-columns: 40px 30px 2fr 100px 150px;
             padding: 8px 0; border-bottom: 1px solid var(--border-color);
             font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase;
+            position: sticky; top: 0; background: var(--bg-core); z-index: 1;
+            min-width: 100%; /* Ensure it fills container */
         }
         .header-col { padding: 0 8px; cursor: pointer; }
         .header-col:hover { color: var(--text-head); }
 
-        #file-view { flex: 1; overflow-y: auto; background: var(--bg-core); }
+        #file-view { flex: 1; }
 
         .file-row {
             display: grid; grid-template-columns: 40px 30px 2fr 100px 150px;
             padding: 6px 0; border-bottom: 1px solid transparent;
             align-items: center; cursor: default;
             font-size: 12px;
+            min-width: 100%;
         }
         .file-row:hover { background: var(--bg-hover); }
         .file-row.selected { background: rgba(124, 92, 255, 0.1); border-bottom-color: rgba(124, 92, 255, 0.2); }
@@ -156,8 +167,6 @@
 
         /* Checkbox */
         input[type="checkbox"] { cursor: pointer; }
-
-        /* Context Menu (Optional / Future) */
 
         /* Modals */
         .modal-overlay {
@@ -193,14 +202,19 @@
             }
             #sidebar-overlay.visible { display: block; }
 
-            .toolbar { flex-wrap: wrap; }
-            .tool-btn { padding: 8px 12px; } /* Larger touch targets */
-
             #mobile-menu-btn { display: flex !important; margin-right: 10px; }
 
-            /* Hide non-essential columns on mobile */
-            .col-size, .col-date, .header-col:nth-child(4), .header-col:nth-child(5) { display: none; }
-            .file-row, .file-header { grid-template-columns: 40px 30px 1fr; }
+            /* Mobile Horizontal Scroll */
+            /* Enforce min-width to trigger scroll */
+            .file-header, .file-row {
+                min-width: 600px;
+            }
+
+            /* Ensure columns are visible */
+            .col-size, .col-date { display: block; }
+
+            /* Full width path bar on its own line if needed, or flex grow */
+            .path-bar { min-width: 0; flex-basis: 100%; order: 10; margin-top: 5px; }
         }
 
         #mobile-menu-btn {
@@ -208,6 +222,9 @@
             background: transparent; border: 1px solid var(--border-color); border-radius: 4px;
             color: var(--text-head); cursor: pointer;
         }
+
+        /* Bottom padding for mobile drag handle */
+        #file-view { padding-bottom: 40px; }
 
         /* Upload Progress */
         #upload-status {
@@ -227,15 +244,11 @@
     <div id="sidebar">
         <div class="sidebar-section">
             <div class="sidebar-title">Favorites</div>
-            <div id="fav-list">
-                <!-- Populated by JS -->
-            </div>
+            <div id="fav-list"></div>
         </div>
         <div class="sidebar-section">
             <div class="sidebar-title">Drives</div>
-            <div id="drive-list">
-                <!-- Populated by JS -->
-            </div>
+            <div id="drive-list"></div>
         </div>
     </div>
 
@@ -266,23 +279,26 @@
             <button class="tool-btn" onclick="showCreateModal('folder')">+ Folder</button>
             <button class="tool-btn" id="btn-create-shortcut" onclick="showShortcutModal()" style="display:none;">Create Shortcut</button>
             <button class="tool-btn" onclick="deleteSelection()" style="color:#ff5555;">Delete</button>
+            <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
+            <button class="tool-btn" onclick="addToGit()">+ Git</button>
         </div>
 
-        <div class="file-header">
-            <div class="header-col col-check"><input type="checkbox" id="check-all" onchange="toggleSelectAll(this.checked)"></div>
-            <div class="header-col"></div>
-            <div class="header-col" onclick="setSort('name')">Name</div>
-            <div class="header-col" onclick="setSort('size')">Size</div>
-            <div class="header-col" onclick="setSort('date')">Date</div>
-        </div>
+        <div id="file-scroll-container">
+             <div class="file-header">
+                <div class="header-col col-check"><input type="checkbox" id="check-all" onchange="toggleSelectAll(this.checked)"></div>
+                <div class="header-col"></div>
+                <div class="header-col" onclick="setSort('name')">Name</div>
+                <div class="header-col" onclick="setSort('size')">Size</div>
+                <div class="header-col" onclick="setSort('date')">Date</div>
+            </div>
 
-        <div id="file-view">
-            <!-- Files injected here -->
+            <div id="file-view">
+                <!-- Files injected here -->
+            </div>
         </div>
     </div>
 
     <!-- Modals -->
-    <!-- Upload Status -->
     <div id="upload-status">
         <div style="font-size:11px; color:var(--text-head); display:flex; justify-content:space-between;">
             <span>Uploading...</span>
@@ -341,80 +357,62 @@
         // State
         let tabs = [];
         let activeTabIndex = -1;
-        let drives = [];
         let sortMode = "name";
         let sortOrder = "asc";
 
-        // Clipboard
-        // Key: lyrn_clipboard = JSON.stringify({ action: 'copy'|'cut', items: [{path:.., type:..}] })
-
         document.addEventListener('DOMContentLoaded', () => {
             initSidebar();
-
-            // Check for initial path via URL params (Pop-out mode)
             const urlParams = new URLSearchParams(window.location.search);
             const initialPath = urlParams.get('path') || '/';
-
             addNewTab(initialPath);
         });
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
-            if (e.data.type === 'TOKEN_UPDATE') { authToken = e.data.token; refreshTab(); }
+            if (e.data.type === 'TOKEN_UPDATE') { authToken = e.data.token; refreshTab(); initSidebar(); }
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+            if (e.data.type === 'COLOR_CHANGE') {
+                document.documentElement.style.setProperty('--brand-purple', e.data.color);
+            }
         });
 
-        // --- Sidebar ---
         async function initSidebar() {
-            // Favorites (Static for now, could be saved in localStorage)
-            const favs = [
-                { name: "Root", path: "/" },
-                { name: "Home", path: "/home" }, // Adjust for OS later?
-            ];
-
+            const favs = [ { name: "Root", path: "/" }, { name: "Home", path: "/home" } ];
             const favList = document.getElementById('fav-list');
             favList.innerHTML = '';
             favs.forEach(f => {
                 const el = document.createElement('div');
                 el.className = 'sidebar-item';
                 el.innerHTML = `<span>★</span><span>${f.name}</span>`;
-                el.onclick = () => navigate(f.path);
+                el.onclick = () => { navigate(f.path); toggleSidebar(); };
                 favList.appendChild(el);
             });
 
-            // Drives
             if(!coreUrl || !authToken) return;
             try {
                 const res = await fetch(`${coreUrl}/api/sysinfo`, { headers: { 'X-Token': authToken } });
                 const data = await res.json();
-
                 const driveList = document.getElementById('drive-list');
                 driveList.innerHTML = '';
-
                 if (data.partitions) {
                     data.partitions.forEach(p => {
                         const el = document.createElement('div');
                         el.className = 'sidebar-item';
-                        // Icon based on mountpoint or device
                         let icon = '💾';
                         if (p.opts && p.opts.includes('ro')) icon = '🔒';
-
                         el.innerHTML = `<span>${icon}</span><span>${p.mountpoint}</span>`;
                         el.title = `Device: ${p.device} | Used: ${Math.round(p.percent)}%`;
-                        el.onclick = () => navigate(p.mountpoint);
+                        el.onclick = () => { navigate(p.mountpoint); toggleSidebar(); };
                         driveList.appendChild(el);
                     });
                 }
             } catch(e) { console.error("Sidebar load failed", e); }
         }
 
-        // --- Tabs ---
         function addNewTab(path = "/") {
             const tab = {
                 id: Date.now() + Math.random(),
                 path: path,
-                history: [],
-                historyIndex: -1,
                 items: [],
                 selected: new Set()
             };
@@ -424,8 +422,7 @@
 
         function closeTab(index, e) {
             if(e) e.stopPropagation();
-            if(tabs.length === 1) return; // Keep one open
-
+            if(tabs.length === 1) return;
             tabs.splice(index, 1);
             if(activeTabIndex >= index) {
                 activeTabIndex = Math.max(0, activeTabIndex - 1);
@@ -443,25 +440,20 @@
 
         function renderTabs() {
             const bar = document.getElementById('tabs-bar');
-            // Remove existing tabs (keep button)
             const existing = bar.querySelectorAll('.tab');
             existing.forEach(e => e.remove());
 
             tabs.forEach((t, i) => {
                 const el = document.createElement('div');
                 el.className = `tab ${i === activeTabIndex ? 'active' : ''}`;
-
-                // Get folder name
                 const parts = t.path.split(/[/\\]/).filter(Boolean);
                 const title = parts.length > 0 ? parts[parts.length-1] : (t.path === '/' ? 'Root' : t.path);
-
                 el.innerHTML = `
                     <div class="tab-title">${title}</div>
                     <div class="tab-popout" title="Pop Out Window" onclick="popOutTab(${i}, event)">⇱</div>
                     <div class="tab-close" onclick="closeTab(${i}, event)">✕</div>
                 `;
                 el.onclick = () => setActiveTab(i);
-
                 bar.insertBefore(el, bar.lastElementChild);
             });
         }
@@ -469,8 +461,6 @@
         function popOutTab(index, e) {
             if(e) e.stopPropagation();
             const t = tabs[index];
-
-            // Send message to dashboard
             window.parent.postMessage({
                 type: 'OPEN_CHILD_WINDOW',
                 parentId: 'mod_file_explorer',
@@ -481,12 +471,9 @@
             }, '*');
         }
 
-        // --- File Logic ---
         async function loadFilesForTab(index) {
             const tab = tabs[index];
             if(!tab) return;
-
-            // Update UI immediately
             document.getElementById('current-path').value = tab.path;
             const view = document.getElementById('file-view');
             view.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">Loading...</div>';
@@ -497,18 +484,16 @@
                 const res = await fetch(`${coreUrl}/api/files/list?path=${encodeURIComponent(tab.path)}&sort_by=${sortMode}&order=${sortOrder}`, {
                     headers: { 'X-Token': authToken }
                 });
-
                 if(!res.ok) throw new Error(res.statusText);
 
                 const data = await res.json();
-                tab.path = data.path; // Canonical
+                tab.path = data.path;
                 tab.items = data.items;
                 tab.selected.clear();
 
                 document.getElementById('current-path').value = tab.path;
                 renderFileList(tab);
-                renderTabs(); // Update title
-
+                renderTabs();
             } catch(e) {
                 view.innerHTML = `<div style="padding:20px; text-align:center; color:#ff5555">Error: ${e.message}</div>`;
             }
@@ -517,7 +502,6 @@
         function renderFileList(tab) {
             const view = document.getElementById('file-view');
             view.innerHTML = '';
-
             document.getElementById('check-all').checked = false;
 
             if(tab.items.length === 0) {
@@ -542,21 +526,14 @@
                     <div class="col-date">${date}</div>
                 `;
 
-                // Mobile/Global: Row click toggles selection
                 row.onclick = (e) => {
-                    // Prevent double toggle if clicking the checkbox directly
-                    if(e.target.type !== 'checkbox') {
-                        toggleItemSelect(item.path, e);
-                    }
+                    if(e.target.type !== 'checkbox') toggleItemSelect(item.path, e);
                 };
-
                 row.ondblclick = () => handleItemDblClick(item);
-
                 view.appendChild(row);
             });
         }
 
-        // --- Mobile Sidebar ---
         function toggleSidebar() {
             const sb = document.getElementById('sidebar');
             const ov = document.getElementById('sidebar-overlay');
@@ -569,28 +546,18 @@
             }
         }
 
-        // --- Selection ---
         function toggleItemSelect(path, e) {
-            // If triggered by row click, e is event.
-            // If triggered by checkbox click, e is event.
-            // We just toggle state.
             const tab = tabs[activeTabIndex];
-            if(tab.selected.has(path)) {
-                tab.selected.delete(path);
-            } else {
-                tab.selected.add(path);
-            }
+            if(tab.selected.has(path)) tab.selected.delete(path);
+            else tab.selected.add(path);
             updateToolbar();
             renderFileList(tab);
         }
 
         function toggleSelectAll(checked) {
             const tab = tabs[activeTabIndex];
-            if(checked) {
-                tab.items.forEach(i => tab.selected.add(i.path));
-            } else {
-                tab.selected.clear();
-            }
+            if(checked) tab.items.forEach(i => tab.selected.add(i.path));
+            else tab.selected.clear();
             updateToolbar();
             renderFileList(tab);
         }
@@ -611,7 +578,6 @@
             btn.style.display = 'none';
         }
 
-        // --- Navigation ---
         function navigate(path) {
             const tab = tabs[activeTabIndex];
             tab.path = path;
@@ -621,50 +587,42 @@
         function navUp() {
             const tab = tabs[activeTabIndex];
             let p = tab.path;
-            // Remove trailing slash
             if(p.endsWith('/') && p.length > 1) p = p.slice(0, -1);
             if(p.endsWith('\\') && p.length > 1) p = p.slice(0, -1);
-
-            // Find parent
             const sep = p.includes('\\') ? '\\' : '/';
             const idx = p.lastIndexOf(sep);
-            if(idx === -1) return; // Can't go up
-
+            if(idx === -1) return;
             const newPath = p.substring(0, idx) || (p.includes('\\') ? p.substring(0, idx+1) : '/');
             if(newPath === tab.path) return;
-
             navigate(newPath);
         }
 
         function refreshTab() { loadFilesForTab(activeTabIndex); }
-        function navBack() { /* TODO: History Implementation */ }
+        function navBack() { /* TODO */ }
 
-        // --- Operations ---
         function handleItemDblClick(item) {
-            if(item.type === 'dir') {
-                navigate(item.path);
-            } else {
-                openFile(item);
-            }
+            if(item.type === 'dir') navigate(item.path);
+            else openFile(item);
         }
 
         function openFile(item) {
             const ext = item.name.split('.').pop().toLowerCase();
             const images = ['png','jpg','jpeg','gif','webp','bmp','svg'];
-            const code = ['txt','md','py','js','html','css','json','xml','yml','bat','sh','log','conf','ini'];
+            const media = ['mp4','mov','mkv','webm','mp3','wav','ogg'];
+            const pdf = ['pdf'];
 
-            if(images.includes(ext)) {
-                 // Image Viewer
+            if(images.includes(ext) || media.includes(ext) || pdf.includes(ext)) {
+                 // Use ImageViewer (generic viewer)
+                 // Note: We might want to rename ImageViewer to FileViewer, but for now reuse.
                  window.parent.postMessage({
                      type: 'OPEN_CHILD_WINDOW',
-                     id: 'img_' + Date.now(),
+                     id: 'view_' + Date.now(),
                      title: item.name,
                      url: `ImageViewer.html?src=${encodeURIComponent(item.path)}`,
                      canMinimize: false
                  }, '*');
             } else {
-                // File Editor (Main App)
-                // We send OPEN_FILE to dashboard
+                // Code Editor
                 window.parent.postMessage({
                     type: 'OPEN_FILE',
                     path: item.path,
@@ -673,13 +631,41 @@
             }
         }
 
-        // --- Clipboard ---
+        async function addToGit() {
+             const tab = tabs[activeTabIndex];
+             // If selection contains folders, add them. Else add current path.
+             let pathsToAdd = [];
+
+             if(tab.selected.size > 0) {
+                 for(const p of tab.selected) {
+                     const item = tab.items.find(i => i.path === p);
+                     if(item && item.type === 'dir') pathsToAdd.push(p);
+                 }
+             }
+
+             if(pathsToAdd.length === 0) {
+                 // Add current directory
+                 pathsToAdd.push(tab.path);
+             }
+
+             if(!confirm(`Add ${pathsToAdd.length} repositories to Git Manager?`)) return;
+
+             for(const p of pathsToAdd) {
+                  await fetch(`${coreUrl}/api/git/repos`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                        body: JSON.stringify({ path: p })
+                  });
+             }
+             alert("Repositories added.");
+        }
+
+        // --- Clipboard (Copy/Cut/Paste/Delete) ---
         function copySelection() {
             const tab = tabs[activeTabIndex];
             if(tab.selected.size === 0) return;
             const items = Array.from(tab.selected);
             localStorage.setItem('lyrn_clipboard', JSON.stringify({ action: 'copy', items: items }));
-            // Visual feedback
             alert(`Copied ${items.length} items.`);
         }
 
@@ -695,14 +681,10 @@
             const clipRaw = localStorage.getItem('lyrn_clipboard');
             if(!clipRaw) return;
             const clip = JSON.parse(clipRaw);
-
             const dest = tabs[activeTabIndex].path;
-
             if(!confirm(`Paste ${clip.items.length} items to ${dest}?`)) return;
 
-            // Loop items (Sequential for now)
             for (const srcPath of clip.items) {
-                // Determine new path
                 const parts = srcPath.split(/[/\\]/);
                 const name = parts[parts.length-1];
                 const sep = dest.includes('\\') ? '\\' : '/';
@@ -714,14 +696,9 @@
                         headers: {'Content-Type':'application/json', 'X-Token':authToken},
                         body: JSON.stringify({ path: srcPath, new_path: destPath })
                     });
-                } else {
-                     // Copy - Not fully implemented backend side yet
                 }
             }
-
-            if(clip.action === 'cut') {
-                localStorage.removeItem('lyrn_clipboard'); // Consumed
-            }
+            if(clip.action === 'cut') localStorage.removeItem('lyrn_clipboard');
             reload();
         }
 
@@ -729,7 +706,6 @@
              const tab = tabs[activeTabIndex];
              if(tab.selected.size === 0) return;
              if(!confirm(`Delete ${tab.selected.size} items?`)) return;
-
              for(const path of tab.selected) {
                  await fetch(`${coreUrl}/api/files/delete`, {
                     method: 'POST',
@@ -740,7 +716,7 @@
              reload();
         }
 
-        // --- Creation ---
+        // --- Creation/Modals ---
         let createType = 'file';
         function showCreateModal(type) {
             createType = type;
@@ -749,7 +725,6 @@
             document.getElementById('modal-create').style.display = 'flex';
             document.getElementById('inp-create-name').focus();
         }
-
         document.getElementById('btn-create-confirm').onclick = async () => {
              const name = document.getElementById('inp-create-name').value;
              if(!name) return;
@@ -757,23 +732,17 @@
              const sep = tab.path.includes('\\') ? '\\' : '/';
              const parent = tab.path.endsWith(sep) ? tab.path : tab.path + sep;
              const newPath = parent + name;
-
              const endpoint = createType === 'file' ? '/api/files/save' : '/api/files/create_folder';
              const body = createType === 'file' ? { path: newPath, content: "" } : { path: newPath };
-
              try {
                 const res = await fetch(`${coreUrl}${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify(body)
                 });
-                if(res.ok) {
-                    closeModal('modal-create');
-                    reload();
-                } else alert("Failed to create");
+                if(res.ok) { closeModal('modal-create'); reload(); } else alert("Failed to create");
              } catch(e) { alert(e); }
         };
-
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         function reload() { refreshTab(); }
         function setSort(mode) {
@@ -782,26 +751,22 @@
              refreshTab();
         }
 
-        // --- Shortcut Logic ---
+        // --- Shortcuts ---
         function showShortcutModal() {
             const tab = tabs[activeTabIndex];
             if(tab.selected.size !== 1) return;
             const path = Array.from(tab.selected)[0];
             const filename = path.split(/[/\\]/).pop();
-            const name = filename.split('.').slice(0, -1).join('.') || filename; // Remove ext
-
+            const name = filename.split('.').slice(0, -1).join('.') || filename;
             document.getElementById('sc-name').value = name;
             document.getElementById('sc-path').value = path;
             document.getElementById('sc-mode').value = 'terminal';
             document.getElementById('modal-shortcut').style.display = 'flex';
         }
-
         async function saveShortcut() {
             const tab = tabs[activeTabIndex];
             const path = document.getElementById('sc-path').value;
-            // Get CWD from tab path
             const cwd = tab.path;
-
             const payload = {
                 name: document.getElementById('sc-name').value,
                 path: path,
@@ -811,21 +776,13 @@
                 capture_output: document.getElementById('sc-capture').checked,
                 run_mode: document.getElementById('sc-mode').value
             };
-
-            if (!payload.name) { alert("Name required"); return; }
-
             try {
                 const res = await fetch(`${coreUrl}/api/shortcuts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify(payload)
                 });
-                if(res.ok) {
-                    closeModal('modal-shortcut');
-                    alert("Shortcut created!");
-                } else {
-                    alert("Error: " + await res.text());
-                }
+                if(res.ok) { closeModal('modal-shortcut'); alert("Shortcut created!"); } else alert("Error: " + await res.text());
             } catch(e) { alert("Error: " + e.message); }
         }
 
@@ -848,130 +805,58 @@
             return '📄';
         }
 
-        // --- Upload / Download ---
-        function triggerUpload() {
-            document.getElementById('inp-upload').click();
-        }
-
+        // --- Upload/Download ---
+        function triggerUpload() { document.getElementById('inp-upload').click(); }
         function handleUpload(files) {
             if(files.length === 0) return;
             const tab = tabs[activeTabIndex];
-
             const formData = new FormData();
             formData.append('path', tab.path);
-            for(let i=0; i<files.length; i++) {
-                formData.append('files', files[i]);
-            }
-
-            // Show UI
+            for(let i=0; i<files.length; i++) formData.append('files', files[i]);
             const ui = document.getElementById('upload-status');
             const bar = document.getElementById('upload-bar-fill');
             const txt = document.getElementById('upload-percent');
-            ui.style.display = 'flex';
-            bar.style.width = '0%';
-            txt.innerText = '0%';
-
+            ui.style.display = 'flex'; bar.style.width = '0%'; txt.innerText = '0%';
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `${coreUrl}/api/files/upload`, true);
-
-            // Auth Header
             if(authToken) xhr.setRequestHeader('X-Token', authToken);
-
-            // Progress
             xhr.upload.onprogress = (e) => {
                 if(e.lengthComputable) {
                     const percent = (e.loaded / e.total) * 100;
-                    bar.style.width = percent + '%';
-                    txt.innerText = Math.round(percent) + '%';
+                    bar.style.width = percent + '%'; txt.innerText = Math.round(percent) + '%';
                 }
             };
-
             xhr.onload = () => {
-                if(xhr.status === 200) {
-                    bar.style.width = '100%';
-                    txt.innerText = '100%';
-                    setTimeout(() => {
-                        ui.style.display = 'none';
-                        reload();
-                    }, 1000);
-                } else {
-                    alert("Upload failed: " + xhr.responseText);
-                    ui.style.display = 'none';
-                }
-                // Reset input
+                if(xhr.status === 200) { bar.style.width = '100%'; txt.innerText = '100%'; setTimeout(() => { ui.style.display = 'none'; reload(); }, 1000); }
+                else { alert("Upload failed"); ui.style.display = 'none'; }
                 document.getElementById('inp-upload').value = '';
             };
-
-            xhr.onerror = () => {
-                alert("Upload error.");
-                ui.style.display = 'none';
-                document.getElementById('inp-upload').value = '';
-            };
-
+            xhr.onerror = () => { alert("Upload error"); ui.style.display = 'none'; document.getElementById('inp-upload').value = ''; };
             xhr.send(formData);
         }
-
         async function triggerDownload() {
             const tab = tabs[activeTabIndex];
-            if(tab.selected.size === 0) {
-                alert("Please select files to download.");
-                return;
-            }
-
+            if(tab.selected.size === 0) { alert("Please select files to download."); return; }
             const items = Array.from(tab.selected);
-
-            // Single File Download (Direct)
             if(items.length === 1) {
                 const path = items[0];
-                // Check if it's a file
                 const isDir = tab.items.find(i => i.path === path)?.type === 'dir';
-                if(!isDir) {
-                    const url = `${coreUrl}/api/files/view?path=${encodeURIComponent(path)}&token=${authToken}`;
-                    window.open(url, '_blank');
-                    return;
-                }
+                if(!isDir) { window.open(`${coreUrl}/api/files/view?path=${encodeURIComponent(path)}&token=${authToken}`, '_blank'); return; }
             }
-
-            // Multiple or Folder (Zip)
-            const payload = { paths: items };
-
-            // Trigger download via blob
-            // Using fetch to handle auth headers cleanly, then create object URL
-            const btn = event.target;
-            const oldText = btn.innerText;
-            btn.innerText = "Zipping...";
-            btn.disabled = true;
-
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = "Zipping..."; btn.disabled = true;
             try {
                 const res = await fetch(`${coreUrl}/api/files/zip`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Token': authToken
-                    },
-                    body: JSON.stringify(payload)
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ paths: items })
                 });
-
                 if(!res.ok) throw new Error(await res.text());
-
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "archive.zip";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-
-            } catch(e) {
-                alert("Download failed: " + e.message);
-            } finally {
-                btn.innerText = oldText;
-                btn.disabled = false;
-            }
+                const a = document.createElement('a'); a.href = url; a.download = "archive.zip";
+                document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
+            } catch(e) { alert("Download failed: " + e.message); } finally { btn.innerText = oldText; btn.disabled = false; }
         }
-
     </script>
 </body>
 </html>

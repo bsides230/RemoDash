@@ -19,10 +19,11 @@
             --brand-color: #10B981; /* Default Emerald */
             --brand-color-dim: rgba(16, 185, 129, 0.1);
             --brand-color-glow: rgba(16, 185, 129, 0.4);
+            --brand-bg-gradient: rgba(16, 185, 129, 0.15); /* Stronger background */
             --text-head: #ffffff;
             --text-body: #b0b0b0;
             --text-dim: #666666;
-            --border-color: #222222;
+            --border-color: #333333; /* Slightly lighter default */
 
             --dock-bg: rgba(20, 20, 20, 0.6);
             --dock-border: rgba(255, 255, 255, 0.1);
@@ -40,6 +41,7 @@
             /* --brand-color override moved to JS for consistency or kept dynamic */
             --brand-color-dim: rgba(0,0,0, 0.05);
             --brand-color-glow: rgba(0,0,0, 0.1);
+            --brand-bg-gradient: rgba(0,0,0, 0.05);
             --text-head: #111111;
             --text-body: #333333;
             --text-dim: #555555;
@@ -60,7 +62,7 @@
             transition: background-color 0.5s ease;
             background-image:
                 repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(125, 125, 125, 0.03) 10px, rgba(125, 125, 125, 0.03) 11px),
-                radial-gradient(circle at 50% 0%, var(--brand-color-dim) 0%, transparent 60%);
+                radial-gradient(circle at 50% 0%, var(--brand-bg-gradient) 0%, transparent 70%); /* Bigger/Brighter */
             background-size: auto, 100% 100%;
             background-attachment: fixed;
             font-size: var(--font-size-base);
@@ -148,9 +150,17 @@
             height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
             display: flex; justify-content: space-between; align-items: center; padding: 0 8px 0 12px;
             cursor: grab; user-select: none; flex-shrink: 0;
+            transition: background 0.3s;
         }
+        /* Themeable header via JS injection */
+        .window-header.themed {
+            background: var(--brand-color-dim);
+            border-bottom: 1px solid var(--brand-color);
+        }
+
         .window-header:active { cursor: grabbing; }
         .window-title { font-family: 'JetBrains Mono', monospace; font-size: calc(var(--font-size-base) - 1px); text-transform: uppercase; color: var(--text-dim); }
+        .window-header.themed .window-title { color: var(--text-head); }
 
         .win-controls { display: flex; align-items: center; gap: 6px; }
         .win-btn {
@@ -160,6 +170,7 @@
             transition: all 0.2s;
         }
         .win-btn:hover { background: var(--brand-color-dim); color: var(--text-head); }
+        .window-header.themed .win-btn:hover { background: var(--bg-panel); color: var(--brand-color); }
 
         .win-btn.pinned {
             background: var(--brand-color-dim);
@@ -575,7 +586,7 @@
             display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 5px;
         }
         .color-opt {
-            width: 100%; height: 24px; border-radius: 4px; cursor: pointer;
+            width: 100%; height: 40px; border-radius: 4px; cursor: pointer;
             border: 2px solid transparent; transition: all 0.2s;
         }
         .color-opt:hover { transform: scale(1.1); }
@@ -842,6 +853,13 @@
             </label>
         </div>
         <div class="settings-row">
+            <span>Theme Windows</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="setting-theme-windows" onchange="toggleWindowTheming(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="settings-row">
             <span>Font Size: <b id="font-size-display">12</b>px</span>
             <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
         </div>
@@ -889,7 +907,8 @@
             dockPos: null,
             theme: 'dark',
             fontSize: 12,
-            brandColor: '#10B981'
+            brandColor: '#10B981',
+            themeWindows: false
         };
 
         let zIndexCounter = 100;
@@ -918,13 +937,15 @@
 
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
+            document.getElementById('setting-theme-windows').checked = appSettings.themeWindows || false;
 
             // Initialize Font Size Slider
             document.getElementById('setting-font-size').value = appSettings.fontSize;
             updateFontSize(appSettings.fontSize, false);
 
-            // Apply Brand Color
+            // Apply Brand Color & Window Theme
             if(appSettings.brandColor) updateBrandColor(appSettings.brandColor);
+            toggleWindowTheming(appSettings.themeWindows || false, false);
 
             // Handle clicking outside
             document.addEventListener('click', (e) => {
@@ -1327,7 +1348,7 @@
             if(!src.includes('/') && !src.startsWith('http')) src = 'modules/' + src;
 
             win.innerHTML = `
-                <div class="window-header">
+                <div class="window-header ${appSettings.themeWindows ? 'themed' : ''}">
                     <span class="window-title">${mod.name}</span>
                     <div class="win-controls">
                          ${controlsHtml}
@@ -1580,6 +1601,16 @@
             }
         }
 
+        function toggleWindowTheming(checked, save = true) {
+            appSettings.themeWindows = checked;
+            const headers = document.querySelectorAll('.window-header');
+            headers.forEach(h => {
+                if(checked) h.classList.add('themed');
+                else h.classList.remove('themed');
+            });
+            if(save) saveSettings();
+        }
+
         function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
         function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
         function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
@@ -1607,14 +1638,16 @@
 
         /* COLOR PICKER */
         const BRAND_COLORS = [
-            '#10B981', // Emerald (Default)
-            '#7c5cff', // Purple (Old)
+            '#10B981', // Emerald
+            '#7c5cff', // Purple
             '#3B82F6', // Blue
             '#F59E0B', // Orange
             '#EF4444', // Red
             '#EC4899', // Pink
             '#14B8A6', // Teal
-            '#6366F1'  // Indigo
+            '#6366F1', // Indigo
+            '#000000', // Black
+            '#ffffff'  // White
         ];
 
         function initColorPicker() {
@@ -1636,7 +1669,6 @@
             document.documentElement.style.setProperty('--brand-color', color);
 
             // Re-calc dims
-            // Simple hex parsing
             let hex = color.replace('#','');
             if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
             const r = parseInt(hex.substring(0,2), 16);
@@ -1645,6 +1677,7 @@
 
             document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
             document.documentElement.style.setProperty('--brand-color-glow', `rgba(${r},${g},${b}, 0.4)`);
+            document.documentElement.style.setProperty('--brand-bg-gradient', `rgba(${r},${g},${b}, 0.3)`); // Brighter
 
             saveSettings();
             initColorPicker(); // Update active state
