@@ -2,6 +2,22 @@
 
 ## Updates - [Date]
 
+### Installation
+- **Split Wizard:** Refactored `wizard.py` into `wizard_linux.py` and `wizard_windows.py` to provide cleaner, OS-specific installation flows.
+  - Windows wizard removes Linux-specific checks (Tailscale, systemd, break-system-packages).
+  - Linux wizard retains full server-grade configuration.
+  - Updated `wizard.bat` to launch the Windows wizard.
+
+### Documentation & Templates
+- **Module Guide:** Created `templates and guides/Module_Dev_Guide.md` and `template_module.html` to assist developers in extending RemoDash.
+- **README:** Completely rewrote `README.md` with a visual tour and clear value propositions, replacing the legacy text file.
+- **Screenshots:** Added automated screenshots to `assets/` for the documentation.
+
+### User Experience
+- **Welcome Tour:** Replaced the simple welcome popup with a multi-step interactive tour explaining the Dock, Modules, and basic usage.
+
+## Updates - [Date]
+
 ### New Modules
 - **Shortcuts:** Added a user-defined launcher module (`web/modules/Shortcuts.html`) to execute scripts and commands. Backend endpoints at `/api/shortcuts`.
   - Supports `output` mode (capturing stdout/stderr) and `terminal` mode (running in a new Terminal tab).

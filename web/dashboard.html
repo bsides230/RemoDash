@@ -678,17 +678,70 @@
             <span class="window-title">System Welcome</span>
             <button class="win-btn" onclick="closeWelcome()">✕</button>
         </div>
-        <div class="welcome-content">
-            <span class="welcome-title">LYRN Dock System</span>
-            <p>The floating dock is your main navigation tool. You can drag the glowing handle to move it anywhere on the screen. Click the handle to toggle collapse.</p>
-            <p><strong>Lost the dock?</strong> Click the anchor (⚓) icon in the top system bar to reset its position to the center.</p>
+
+        <!-- STEP 1: WELCOME -->
+        <div class="welcome-step" id="w-step-1">
+            <div class="welcome-content">
+                <span class="welcome-title">Welcome to RemoDash</span>
+                <p>RemoDash turns this machine into a visual server you can control from any browser.</p>
+                <p>This quick tour will guide you through the basics of the interface.</p>
+            </div>
+            <div class="welcome-footer">
+                <div style="flex:1"></div>
+                <button class="cta-btn" onclick="setWelcomeStep(2)">Next ➔</button>
+            </div>
         </div>
-        <div class="welcome-footer">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                <input type="checkbox" id="chk-hide-welcome" onchange="toggleHideWelcome(this.checked)">
-                Don't show on startup
-            </label>
-            <button class="cta-btn" onclick="closeWelcome()">INITIALIZE</button>
+
+        <!-- STEP 2: DOCK -->
+        <div class="welcome-step" id="w-step-2" style="display:none">
+            <div class="welcome-content">
+                <span class="welcome-title">The Floating Dock</span>
+                <p>The floating dock is your main navigation tool.</p>
+                <ul style="padding-left:20px; margin:10px 0;">
+                    <li><strong>Drag</strong> the glowing handle to move it.</li>
+                    <li><strong>Click</strong> the handle to minimize/expand it.</li>
+                    <li><strong>Reset</strong> it using the ⚓ anchor in the top bar if you lose it.</li>
+                </ul>
+            </div>
+            <div class="welcome-footer">
+                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="setWelcomeStep(1)">Back</button>
+                <button class="cta-btn" onclick="setWelcomeStep(3)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: MODULES -->
+        <div class="welcome-step" id="w-step-3" style="display:none">
+            <div class="welcome-content">
+                <span class="welcome-title">Modules</span>
+                <p>Everything runs in "Modules" (Apps).</p>
+                <p><strong>Terminal:</strong> A full system shell.</p>
+                <p><strong>Files:</strong> Manage and edit files.</p>
+                <p><strong>Shortcuts:</strong> Create one-click scripts.</p>
+                <p>Modules are persistent tabs. You can pop them out into separate windows if needed.</p>
+            </div>
+            <div class="welcome-footer">
+                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="setWelcomeStep(2)">Back</button>
+                <button class="cta-btn" onclick="setWelcomeStep(4)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- STEP 4: FINISH -->
+        <div class="welcome-step" id="w-step-4" style="display:none">
+             <div class="welcome-content">
+                <span class="welcome-title">You are Ready</span>
+                <p>Explore the settings (⚙️) in the dock to customize your theme, font size, and layout.</p>
+                <p>Enjoy your control plane.</p>
+            </div>
+            <div class="welcome-footer">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="chk-hide-welcome" onchange="toggleHideWelcome(this.checked)">
+                    Don't show on startup
+                </label>
+                <div style="display:flex; gap:10px;">
+                    <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="setWelcomeStep(3)">Back</button>
+                    <button class="cta-btn" onclick="closeWelcome()">Get Started</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1989,7 +2042,12 @@
             if(hidden !== 'true') openWelcome();
         }
         function openWelcome() {
+            setWelcomeStep(1);
             document.getElementById('welcome-popup').style.display = 'flex';
+        }
+        function setWelcomeStep(step) {
+            document.querySelectorAll('.welcome-step').forEach(el => el.style.display = 'none');
+            document.getElementById('w-step-' + step).style.display = 'block';
         }
         function closeWelcome() {
             document.getElementById('welcome-popup').style.display = 'none';

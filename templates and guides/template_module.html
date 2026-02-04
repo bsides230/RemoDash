@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module Template</title>
+
+    <!-- Fonts (Optional, but matches system) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+    <style>
+        /* 1. DEFINE DEFAULT VARIABLES (Will be overridden by Parent) */
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-input: #111111;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #333333;
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
+            --font-size-base: 12px;
+        }
+
+        /* 2. BASE STYLES */
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            font-size: var(--font-size-base);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Handle scroll internally */
+        }
+
+        /* 3. LAYOUT STRUCTURE */
+        .toolbar {
+            height: 40px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            background: var(--bg-panel);
+            flex-shrink: 0;
+            gap: 10px;
+        }
+
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* 4. COMMON COMPONENTS */
+        .btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: var(--font-size-base);
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            border-color: var(--brand-color);
+            color: var(--brand-color);
+        }
+
+        input[type="text"] {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 6px;
+            border-radius: 4px;
+            outline: none;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--brand-color);
+        }
+
+        h1, h2, h3 { color: var(--text-head); margin-top: 0; }
+        code { font-family: 'JetBrains Mono'; color: var(--brand-color); background: var(--bg-input); padding: 2px 4px; border-radius: 4px; }
+
+    </style>
+</head>
+<body>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+        <button class="btn" onclick="fetchData()">Reload Data</button>
+        <div style="flex:1"></div>
+        <span style="font-size: 10px; color: var(--text-dim);">My Module v1.0</span>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="content" id="app-content">
+        <h2>Welcome to Your New Module</h2>
+        <p>This is a starting point for creating RemoDash modules.</p>
+
+        <p>Status: <span id="status-text" style="color: var(--text-dim);">Waiting for Token...</span></p>
+
+        <div style="margin-top: 20px; padding: 10px; border: 1px dashed var(--border-color); border-radius: 6px;">
+            <h3>Theme Test</h3>
+            <p>The accent color is: <span style="color: var(--brand-color);">Current Brand Color</span></p>
+        </div>
+    </div>
+
+    <script>
+        // GLOBAL STATE
+        let authToken = null;
+        let coreUrl = ""; // Will be set by dashboard
+
+        // 1. LISTEN FOR MESSAGES
+        window.addEventListener('message', (e) => {
+            const data = e.data;
+            if(!data) return;
+
+            switch (data.type) {
+                case 'TOKEN_UPDATE':
+                    authToken = data.token;
+                    updateStatus("Token Received");
+                    // Automatically fetch data when we get a token
+                    fetchData();
+                    break;
+
+                case 'CORE_URL_CHANGE':
+                    coreUrl = data.url;
+                    break;
+
+                case 'THEME_CHANGE':
+                    // e.g. 'dark' or 'light' - not strictly needed if using CSS vars,
+                    // but useful for JS logic or specific overrides
+                    break;
+
+                case 'COLOR_CHANGE':
+                    document.documentElement.style.setProperty('--brand-color', data.color);
+                    // Update derived colors if needed
+                    break;
+
+                case 'FONT_CHANGE':
+                    document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
+                    break;
+            }
+        });
+
+        // 2. CORE LOGIC
+        async function fetchData() {
+            if(!authToken || !coreUrl) {
+                console.warn("Missing Auth Token or Core URL");
+                return;
+            }
+
+            updateStatus("Fetching...");
+
+            try {
+                // Example API call
+                const res = await fetch(`${coreUrl}/health`);
+                const json = await res.json();
+
+                document.getElementById('app-content').insertAdjacentHTML('beforeend',
+                    `<p>Server Health: <code>${json.status}</code></p>`
+                );
+                updateStatus("Ready");
+
+            } catch (e) {
+                console.error(e);
+                updateStatus("Error Fetching Data");
+            }
+        }
+
+        function updateStatus(msg) {
+            document.getElementById('status-text').innerText = msg;
+        }
+
+    </script>
+</body>
+</html>
