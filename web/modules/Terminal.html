@@ -169,7 +169,22 @@
             switchTab(tabId);
         }
 
-        function connectTerminal(termObj) {
+        async function getSessionKey() {
+            if (!coreUrl || !authToken || authToken === 'NO_AUTH') return null;
+            try {
+                const res = await fetch(coreUrl + '/api/session/terminal', {
+                    method: 'POST',
+                    headers: { 'X-Token': authToken }
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    return data.key;
+                }
+            } catch(e) { console.error("Session key fetch failed", e); }
+            return null;
+        }
+
+        async function connectTerminal(termObj) {
             if(!coreUrl) {
                 termObj.term.write("\r\n\x1b[31mError: No Core URL configured.\x1b[0m\r\n");
                 return;
@@ -179,11 +194,14 @@
             if(wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
             wsUrl += `/api/terminal`;
 
-            // Auth needs to be handled.
-            // FastAPI WebSocket doesn't support custom headers easily in standard JS WebSocket API (it's a limitation of browser API).
-            // We'll pass token in query param or protocol.
-            // server.py should handle query param 'token' if configured
-            if(authToken) wsUrl += `?token=${encodeURIComponent(authToken)}`;
+            // Token Hardening: Try to get session key
+            let key = await getSessionKey();
+
+            if (key) {
+                wsUrl += `?key=${encodeURIComponent(key)}`;
+            } else if(authToken) {
+                wsUrl += `?token=${encodeURIComponent(authToken)}`;
+            }
 
             const socket = new WebSocket(wsUrl);
             termObj.socket = socket;

@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import platform
+import json
 from pathlib import Path
 
 def print_header(title):
@@ -81,6 +82,95 @@ def install_dependencies():
 
 venv_python = sys.executable
 
+def configure_filesystem_mode():
+    print("\n--- Filesystem Access Mode ---")
+    print("[1] FULL SYSTEM ACCESS (DEFAULT)")
+    print("    RemoDash can read, write, delete, and execute files")
+    print("    anywhere on this machine.")
+    print("\n[2] JAILED FILESYSTEM (RESTRICTIVE MODE)")
+    print("    RemoDash is locked to one directory and cannot")
+    print("    access anything outside it.")
+    print("    This may break some modules and workflows.")
+
+    choice = input("\nChoose [1/2]: ").strip()
+
+    mode = "open"
+    root = ""
+    extra_roots = []
+
+    if choice == "2":
+        mode = "jailed"
+        while True:
+            r = input("\nEnter Jail Root Directory: ").strip()
+            if not r:
+                print("Root directory is required for Jailed mode.")
+                continue
+
+            p = Path(r)
+            try:
+                if not p.exists():
+                    create = input(f"Directory '{r}' does not exist. Create it? (Y/n): ").strip().lower()
+                    if create in ['y', 'yes', '']:
+                        p.mkdir(parents=True, exist_ok=True)
+                    else:
+                        print("Please enter a valid directory.")
+                        continue
+                if not p.is_dir():
+                    print("Path exists but is not a directory.")
+                    continue
+                root = str(p.resolve())
+                break
+            except Exception as e:
+                print(f"Error validating path: {e}")
+
+        # Extra Roots
+        print("\n--- Extra Allowed Roots (Optional) ---")
+        print("You can allow access to additional paths (e.g., external drives).")
+        print("Examples: D:\\, /mnt, /media")
+
+        while True:
+            extra = input("Add an extra root path (leave empty to finish): ").strip()
+            if not extra:
+                break
+
+            p_extra = Path(extra)
+            try:
+                if p_extra.exists() and p_extra.is_dir():
+                    extra_roots.append(str(p_extra.resolve()))
+                    print(f"Added: {p_extra.resolve()}")
+                else:
+                    print("Path does not exist or is not a directory. Skipping.")
+            except Exception as e:
+                print(f"Error: {e}")
+
+    # Save to settings.json
+    settings_path = Path("settings.json")
+    data = {"settings": {}, "ui_settings": {}}
+
+    if settings_path.exists():
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+        except: pass
+
+    if "settings" not in data:
+        data["settings"] = {}
+
+    data["settings"]["filesystem_mode"] = mode
+    if mode == "jailed":
+        data["settings"]["filesystem_root"] = root
+        data["settings"]["filesystem_extra_roots"] = extra_roots
+        print(f"\nMode set to JAILED. Root: {root}")
+        if extra_roots:
+            print(f"Extra Roots: {extra_roots}")
+    else:
+        print("\nMode set to OPEN (Full Access).")
+
+    with open(settings_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
 def configure_tailscale():
     print("\n--- Tailscale (Remote Access) ---")
     if platform.system() != "Linux":
@@ -117,7 +207,7 @@ def configure_service():
             # Ensure we have a .bat file to launch
             bat_path = Path("start_remodash.bat").resolve()
             with open(bat_path, "w") as f:
-                f.write(f'@echo off\ncd /d "{os.getcwd()}"\n"{venv_python}" server.py\npause')
+                f.write(f'@echo off\ncd /d "{os.getcwd()}"\n"{venv_python}" server.py\n')
 
             # Create VBS script in startup to launch invisible
             vbs_path = os.path.join(startup_folder, "RemoDash.vbs")
@@ -252,6 +342,7 @@ def main():
 
     configure_port()
     configure_auth()
+    configure_filesystem_mode()
     configure_tailscale()
     configure_service()
 

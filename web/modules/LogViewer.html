@@ -110,7 +110,22 @@
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
         });
 
-        function connect() {
+        async function getSessionKey() {
+            if (!coreUrl || !authToken || authToken === 'NO_AUTH') return null;
+            try {
+                const res = await fetch(coreUrl + '/api/session/terminal', {
+                    method: 'POST',
+                    headers: { 'X-Token': authToken }
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    return data.key;
+                }
+            } catch(e) { console.error("Session key fetch failed", e); }
+            return null;
+        }
+
+        async function connect() {
             if(eventSource) eventSource.close();
             if(!coreUrl || !authToken) return;
 
@@ -118,12 +133,16 @@
             container.innerHTML = '';
             logs = [];
 
-            // EventSource sends cookies but not custom headers easily in standard API.
-            // But we modified backend verify_token to accept query param 'token' too.
-            // Check verify_token implementation in server.py
-            // "auth_token = x_token or token" -> Supports query param named 'token'.
+            let url = `${coreUrl}/api/logs`;
 
-            const url = `${coreUrl}/api/logs?token=${encodeURIComponent(authToken)}`;
+            // Try Session Key
+            let key = await getSessionKey();
+            if(key) {
+                url += `?key=${encodeURIComponent(key)}`;
+            } else {
+                url += `?token=${encodeURIComponent(authToken)}`;
+            }
+
             eventSource = new EventSource(url);
 
             eventSource.onmessage = (e) => {

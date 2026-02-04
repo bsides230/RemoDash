@@ -471,6 +471,49 @@
         input:checked + .toggle-slider { background-color: var(--brand-color); }
         input:checked + .toggle-slider:before { transform: translateX(14px); background-color: white; }
 
+        /* FS Security Modal */
+        #fs-security-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 450px; background: var(--bg-panel);
+            border: 1px solid var(--brand-color);
+            box-shadow: 0 0 50px rgba(0,0,0,0.7);
+            border-radius: 12px; z-index: 22000;
+            display: none; flex-direction: column;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .fs-section {
+            margin-bottom: 15px; border: 1px solid var(--border-color);
+            padding: 10px; border-radius: 6px; background: var(--bg-input);
+        }
+        .fs-label {
+            font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 5px; text-transform: uppercase;
+        }
+        .fs-input {
+            width: 100%; padding: 8px; background: var(--bg-core); border: 1px solid var(--border-color);
+            color: var(--text-head); font-family: 'JetBrains Mono'; font-size: 12px; border-radius: 4px;
+        }
+        .fs-list {
+            display: flex; flex-direction: column; gap: 5px; max-height: 100px; overflow-y: auto;
+        }
+        .fs-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-core); padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-color);
+            font-size: 11px; font-family: 'JetBrains Mono';
+        }
+        .fs-warning {
+            color: #ffaa00; font-size: 11px; margin-top: 5px; line-height: 1.4;
+            background: rgba(255, 170, 0, 0.1); padding: 8px; border-radius: 4px; border: 1px solid rgba(255, 170, 0, 0.3);
+        }
+        .mode-select-btn {
+            flex: 1; padding: 10px; border: 1px solid var(--border-color); background: var(--bg-core);
+            color: var(--text-dim); cursor: pointer; border-radius: 4px; font-family: 'JetBrains Mono';
+            transition: all 0.2s;
+        }
+        .mode-select-btn.active {
+            border-color: var(--brand-color); color: var(--text-head); background: var(--brand-color-dim);
+        }
+
         /* =========================================
            MEDIA QUERIES
            ========================================= */
@@ -686,10 +729,51 @@
         </div>
     </div>
 
+    <!-- New Modal -->
+    <div id="fs-security-modal">
+        <div class="window-header">
+            <span class="window-title">Filesystem Security</span>
+            <button class="win-btn" onclick="closeFsSecurity()">✕</button>
+        </div>
+        <div class="welcome-content" style="max-height: 70vh; overflow-y: auto;">
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btn-mode-open" class="mode-select-btn" onclick="setFsModeUI('open')">OPEN (Full)</button>
+                <button id="btn-mode-jailed" class="mode-select-btn" onclick="setFsModeUI('jailed')">JAILED (Restricted)</button>
+            </div>
+
+            <div id="fs-open-warning" class="fs-warning" style="display:none; margin-bottom:15px;">
+                <strong>WARNING: FULL SYSTEM ACCESS</strong><br>
+                RemoDash will have read/write/delete access to the entire filesystem of the host machine.
+            </div>
+
+            <div id="fs-jailed-config" style="display:none;">
+                <div class="fs-section">
+                    <span class="fs-label">Jail Root Directory (Required)</span>
+                    <input type="text" id="inp-fs-root" class="fs-input" placeholder="/path/to/jail">
+                </div>
+
+                <div class="fs-section">
+                    <span class="fs-label">Extra Allowed Roots (Optional)</span>
+                    <div class="fs-list" id="fs-extra-roots-list"></div>
+                    <div style="display: flex; gap: 5px; margin-top: 8px;">
+                        <input type="text" id="inp-fs-extra" class="fs-input" placeholder="e.g. D:\ or /mnt/data">
+                        <button class="cta-btn" onclick="addExtraRoot()">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="welcome-footer">
+            <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="closeFsSecurity()">Cancel</button>
+            <button class="cta-btn" onclick="saveFsSecurity()">Save Changes</button>
+        </div>
+    </div>
+
     <div id="settings-popup">
         <div class="settings-header">General</div>
         <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
         <button class="btn-full-width" style="margin-bottom:10px;" onclick="openServerConfig()">Edit Server Config</button>
+        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openFsSecurity()">Filesystem Security</button>
+
         <div class="settings-row">
             <span>Dark Mode</span>
             <label class="toggle-switch">
@@ -1919,6 +2003,114 @@
             navigator.serviceWorker.register('/sw.js')
                 .then(reg => console.log('Service Worker Registered', reg))
                 .catch(err => console.log('Service Worker Error', err));
+        }
+
+        // --- Filesystem Security Modal Logic ---
+        let currentFsConfig = {};
+        let tempExtraRoots = [];
+
+        async function openFsSecurity() {
+            document.getElementById('settings-popup').classList.remove('show');
+            document.getElementById('fs-security-modal').style.display = 'flex';
+
+            // Fetch config
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                currentFsConfig = data.settings || {};
+
+                // Defaults
+                const mode = currentFsConfig.filesystem_mode || 'open';
+                const root = currentFsConfig.filesystem_root || '';
+                tempExtraRoots = [...(currentFsConfig.filesystem_extra_roots || [])];
+
+                document.getElementById('inp-fs-root').value = root;
+                setFsModeUI(mode);
+                renderExtraRoots();
+
+            } catch(e) {
+                alert("Failed to load config: " + e.message);
+                closeFsSecurity();
+            }
+        }
+
+        function closeFsSecurity() {
+            document.getElementById('fs-security-modal').style.display = 'none';
+        }
+
+        function setFsModeUI(mode) {
+            document.getElementById('btn-mode-open').classList.toggle('active', mode === 'open');
+            document.getElementById('btn-mode-jailed').classList.toggle('active', mode === 'jailed');
+
+            document.getElementById('fs-open-warning').style.display = (mode === 'open') ? 'block' : 'none';
+            document.getElementById('fs-jailed-config').style.display = (mode === 'jailed') ? 'block' : 'none';
+        }
+
+        function renderExtraRoots() {
+            const list = document.getElementById('fs-extra-roots-list');
+            list.innerHTML = '';
+            tempExtraRoots.forEach((path, idx) => {
+                const div = document.createElement('div');
+                div.className = 'fs-list-item';
+                div.innerHTML = `<span>${path}</span><button class="win-btn" style="width:16px;height:16px;font-size:10px;color:#ff5555;" onclick="removeExtraRoot(${idx})">✕</button>`;
+                list.appendChild(div);
+            });
+        }
+
+        function addExtraRoot() {
+            const inp = document.getElementById('inp-fs-extra');
+            const val = inp.value.trim();
+            if(val && !tempExtraRoots.includes(val)) {
+                tempExtraRoots.push(val);
+                inp.value = '';
+                renderExtraRoots();
+            }
+        }
+
+        function removeExtraRoot(idx) {
+            tempExtraRoots.splice(idx, 1);
+            renderExtraRoots();
+        }
+
+        async function saveFsSecurity() {
+            const isOpen = document.getElementById('btn-mode-open').classList.contains('active');
+            const mode = isOpen ? 'open' : 'jailed';
+
+            if (mode === 'open') {
+                 const confirmMsg = "I UNDERSTAND THIS GIVES FULL SYSTEM ACCESS";
+                 const input = prompt("WARNING: FULL SYSTEM ACCESS\n\nThis allows RemoDash to modify any file on this system.\n\nType EXACTLY:\n" + confirmMsg);
+                 if (input !== confirmMsg) {
+                     alert("Confirmation failed. Mode not changed.");
+                     return;
+                 }
+            }
+
+            const root = document.getElementById('inp-fs-root').value.trim();
+
+            if (mode === 'jailed' && !root) {
+                alert("Jail Root Directory is required for Jailed mode.");
+                return;
+            }
+
+            // Prepare Data
+            const newSettings = {
+                ...currentFsConfig,
+                filesystem_mode: mode,
+                filesystem_root: root,
+                filesystem_extra_roots: tempExtraRoots
+            };
+
+            try {
+                await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ settings: newSettings })
+                });
+                alert("Security settings saved.");
+                closeFsSecurity();
+            } catch(e) {
+                alert("Error saving settings: " + e.message);
+            }
         }
     </script>
 </body>
