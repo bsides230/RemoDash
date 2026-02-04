@@ -37,14 +37,38 @@
              loadImage();
         });
 
-        function loadImage() {
+        async function getSessionKey() {
+            if (!coreUrl || !authToken || authToken === 'NO_AUTH') return null;
+            try {
+                const res = await fetch(coreUrl + '/api/session/terminal', {
+                    method: 'POST',
+                    headers: { 'X-Token': authToken }
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    return data.key;
+                }
+            } catch(e) { console.error("Session key fetch failed", e); }
+            return null;
+        }
+
+        async function loadImage() {
             const params = new URLSearchParams(window.location.search);
             const path = params.get('src');
 
             if(!path || !coreUrl || !authToken) return;
 
             const img = document.getElementById('viewer-img');
-            const fullUrl = `${coreUrl}/api/files/view?path=${encodeURIComponent(path)}&token=${encodeURIComponent(authToken)}`;
+
+            let fullUrl = `${coreUrl}/api/files/view?path=${encodeURIComponent(path)}`;
+
+            // Try Session Key
+            let key = await getSessionKey();
+            if(key) {
+                fullUrl += `&key=${encodeURIComponent(key)}`;
+            } else {
+                fullUrl += `&token=${encodeURIComponent(authToken)}`;
+            }
 
             img.onload = () => { img.style.opacity = 1; };
             img.onerror = () => {
