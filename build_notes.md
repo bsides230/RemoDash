@@ -2,6 +2,15 @@
 
 ## Updates - [Date]
 
+### Documentation
+- **README:** Rewrote `README.md` to adopt a professional, concise tone.
+  - Added "Quick Start" section with OS-specific wizard commands.
+  - Explicitly documented Windows UAC limitations regarding admin access.
+  - Condensed Admin Token and Configuration sections.
+- **License:** Added MIT `LICENSE` file to the repository.
+
+## Updates - [Date]
+
 ### Installation
 - **Split Wizard:** Refactored `wizard.py` into `wizard_linux.py` and `wizard_windows.py` to provide cleaner, OS-specific installation flows.
   - Windows wizard removes Linux-specific checks (Tailscale, systemd, break-system-packages).
