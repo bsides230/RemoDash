@@ -1,0 +1,10 @@
+{
+  "settings": {
+    "allowed_origins": []
+  },
+  "ui_settings": {
+    "font_size": 12,
+    "window_size": "1400x900",
+    "confirmation_preferences": {}
+  }
+}
