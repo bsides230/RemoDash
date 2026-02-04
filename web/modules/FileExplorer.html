@@ -178,9 +178,51 @@
         }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
 
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: fixed; top: 0; left: 0; height: 100%; z-index: 100;
+                transform: translateX(-100%); transition: transform 0.3s;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            }
+            #sidebar.open { transform: translateX(0); }
+
+            #sidebar-overlay {
+                display: none; position: fixed; top:0; left:0; width:100%; height:100%;
+                background: rgba(0,0,0,0.5); z-index: 99;
+            }
+            #sidebar-overlay.visible { display: block; }
+
+            .toolbar { flex-wrap: wrap; }
+            .tool-btn { padding: 8px 12px; } /* Larger touch targets */
+
+            #mobile-menu-btn { display: flex !important; margin-right: 10px; }
+
+            /* Hide non-essential columns on mobile */
+            .col-size, .col-date, .header-col:nth-child(4), .header-col:nth-child(5) { display: none; }
+            .file-row, .file-header { grid-template-columns: 40px 30px 1fr; }
+        }
+
+        #mobile-menu-btn {
+            display: none; width: 32px; height: 32px; align-items: center; justify-content: center;
+            background: transparent; border: 1px solid var(--border-color); border-radius: 4px;
+            color: var(--text-head); cursor: pointer;
+        }
+
+        /* Upload Progress */
+        #upload-status {
+            position: fixed; bottom: 20px; right: 20px; background: var(--bg-panel);
+            border: 1px solid var(--border-color); padding: 10px; border-radius: 6px;
+            display: none; flex-direction: column; gap: 5px; z-index: 200;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5); width: 200px;
+        }
+        #upload-bar-bg { width: 100%; height: 4px; background: var(--bg-core); border-radius: 2px; overflow: hidden; }
+        #upload-bar-fill { width: 0%; height: 100%; background: var(--brand-purple); transition: width 0.2s; }
+
     </style>
 </head>
 <body>
+    <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <div id="sidebar">
         <div class="sidebar-section">
@@ -204,6 +246,7 @@
         </div>
 
         <div class="toolbar">
+            <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
             <button class="nav-btn" onclick="navBack()">◀</button>
             <button class="nav-btn" onclick="navUp()">▲</button>
             <button class="nav-btn" onclick="refreshTab()">↻</button>
@@ -212,6 +255,9 @@
                 <input type="text" class="path-input" id="current-path" onkeydown="if(event.key==='Enter') navigate(this.value)">
             </div>
 
+            <button class="tool-btn" onclick="triggerUpload()">Upload</button>
+            <button class="tool-btn" onclick="triggerDownload()">Download</button>
+            <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="copySelection()">Copy</button>
             <button class="tool-btn" onclick="cutSelection()">Cut</button>
             <button class="tool-btn" onclick="pasteSelection()">Paste</button>
@@ -236,6 +282,16 @@
     </div>
 
     <!-- Modals -->
+    <!-- Upload Status -->
+    <div id="upload-status">
+        <div style="font-size:11px; color:var(--text-head); display:flex; justify-content:space-between;">
+            <span>Uploading...</span>
+            <span id="upload-percent">0%</span>
+        </div>
+        <div id="upload-bar-bg"><div id="upload-bar-fill"></div></div>
+    </div>
+    <input type="file" id="inp-upload" multiple style="display:none;" onchange="handleUpload(this.files)">
+
     <div id="modal-create" class="modal-overlay">
         <div class="modal">
             <h3 id="modal-title">Create New</h3>
@@ -486,11 +542,13 @@
                     <div class="col-date">${date}</div>
                 `;
 
-                // Row click toggles selection? Or just navigates?
-                // User said "check mark" is the only way to select.
-                // So row click handles navigation? Or nothing?
-                // Double click handles open.
-                // Let's make single click highlight for visual feedback but NOT check.
+                // Mobile/Global: Row click toggles selection
+                row.onclick = (e) => {
+                    // Prevent double toggle if clicking the checkbox directly
+                    if(e.target.type !== 'checkbox') {
+                        toggleItemSelect(item.path, e);
+                    }
+                };
 
                 row.ondblclick = () => handleItemDblClick(item);
 
@@ -498,9 +556,24 @@
             });
         }
 
+        // --- Mobile Sidebar ---
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('sidebar-overlay');
+            if(sb.classList.contains('open')) {
+                sb.classList.remove('open');
+                ov.classList.remove('visible');
+            } else {
+                sb.classList.add('open');
+                ov.classList.add('visible');
+            }
+        }
+
         // --- Selection ---
         function toggleItemSelect(path, e) {
-            e.stopPropagation();
+            // If triggered by row click, e is event.
+            // If triggered by checkbox click, e is event.
+            // We just toggle state.
             const tab = tabs[activeTabIndex];
             if(tab.selected.has(path)) {
                 tab.selected.delete(path);
@@ -773,6 +846,130 @@
             if(['zip','rar','7z','tar','gz'].includes(ext)) return '📦';
             if(['py','js','html','css','json','cpp','c','java'].includes(ext)) return '📜';
             return '📄';
+        }
+
+        // --- Upload / Download ---
+        function triggerUpload() {
+            document.getElementById('inp-upload').click();
+        }
+
+        function handleUpload(files) {
+            if(files.length === 0) return;
+            const tab = tabs[activeTabIndex];
+
+            const formData = new FormData();
+            formData.append('path', tab.path);
+            for(let i=0; i<files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            // Show UI
+            const ui = document.getElementById('upload-status');
+            const bar = document.getElementById('upload-bar-fill');
+            const txt = document.getElementById('upload-percent');
+            ui.style.display = 'flex';
+            bar.style.width = '0%';
+            txt.innerText = '0%';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${coreUrl}/api/files/upload`, true);
+
+            // Auth Header
+            if(authToken) xhr.setRequestHeader('X-Token', authToken);
+
+            // Progress
+            xhr.upload.onprogress = (e) => {
+                if(e.lengthComputable) {
+                    const percent = (e.loaded / e.total) * 100;
+                    bar.style.width = percent + '%';
+                    txt.innerText = Math.round(percent) + '%';
+                }
+            };
+
+            xhr.onload = () => {
+                if(xhr.status === 200) {
+                    bar.style.width = '100%';
+                    txt.innerText = '100%';
+                    setTimeout(() => {
+                        ui.style.display = 'none';
+                        reload();
+                    }, 1000);
+                } else {
+                    alert("Upload failed: " + xhr.responseText);
+                    ui.style.display = 'none';
+                }
+                // Reset input
+                document.getElementById('inp-upload').value = '';
+            };
+
+            xhr.onerror = () => {
+                alert("Upload error.");
+                ui.style.display = 'none';
+                document.getElementById('inp-upload').value = '';
+            };
+
+            xhr.send(formData);
+        }
+
+        async function triggerDownload() {
+            const tab = tabs[activeTabIndex];
+            if(tab.selected.size === 0) {
+                alert("Please select files to download.");
+                return;
+            }
+
+            const items = Array.from(tab.selected);
+
+            // Single File Download (Direct)
+            if(items.length === 1) {
+                const path = items[0];
+                // Check if it's a file
+                const isDir = tab.items.find(i => i.path === path)?.type === 'dir';
+                if(!isDir) {
+                    const url = `${coreUrl}/api/files/view?path=${encodeURIComponent(path)}&token=${authToken}`;
+                    window.open(url, '_blank');
+                    return;
+                }
+            }
+
+            // Multiple or Folder (Zip)
+            const payload = { paths: items };
+
+            // Trigger download via blob
+            // Using fetch to handle auth headers cleanly, then create object URL
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "Zipping...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/files/zip`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if(!res.ok) throw new Error(await res.text());
+
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "archive.zip";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+            } catch(e) {
+                alert("Download failed: " + e.message);
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
+            }
         }
 
     </script>

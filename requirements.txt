@@ -8,3 +8,4 @@ websockets
 GitPython
 python-crontab
 sse-starlette
+python-multipart
