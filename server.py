@@ -377,15 +377,19 @@ async def get_sysinfo():
     partitions = []
     try:
         for part in psutil.disk_partitions():
-            usage = psutil.disk_usage(part.mountpoint)
-            partitions.append({
-                "device": part.device,
-                "mountpoint": part.mountpoint,
-                "fstype": part.fstype,
-                "total_gb": usage.total / (1024**3),
-                "used_gb": usage.used / (1024**3),
-                "percent": usage.percent
-            })
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+                partitions.append({
+                    "device": part.device,
+                    "mountpoint": part.mountpoint,
+                    "fstype": part.fstype,
+                    "opts": part.opts,
+                    "total_gb": usage.total / (1024**3),
+                    "used_gb": usage.used / (1024**3),
+                    "percent": usage.percent
+                })
+            except OSError:
+                continue
     except: pass
 
     return {
@@ -597,6 +601,18 @@ async def get_file_content(path: str):
         return {"content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/files/view", dependencies=[Depends(verify_token)])
+async def view_file(path: str):
+    """Serves a file for viewing (e.g. images)."""
+    p = Path(path)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Security check: Prevent traversing above root if necessary?
+    # For this dashboard, we assume full access if authenticated.
+
+    return FileResponse(path)
 
 @app.post("/api/files/save", dependencies=[Depends(verify_token)])
 async def save_file_content(data: FileOpRequest):

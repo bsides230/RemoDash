@@ -34,6 +34,9 @@
         }
         .tab-close:hover { background: #cc3333; color: white; opacity: 1; }
 
+        .tab-popout { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.5; margin-right: 2px; }
+        .tab-popout:hover { color: var(--brand-purple); opacity: 1; }
+
         .new-tab-btn {
             width: 30px; height: 100%; display: flex; align-items: center; justify-content: center;
             cursor: pointer; color: var(--text-dim); font-size: 16px;
@@ -81,21 +84,20 @@
             if (e.data.type === 'TOKEN_UPDATE') {
                 authToken = e.data.token;
             }
-            if (e.data.type === 'THEME_CHANGE') {
-                // Could update xterm theme if needed
+            if (e.data.type === 'CHILD_RETURNING') {
+                // Restore a returned child window as a new tab
+                addTab();
             }
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-             // Initial tab
+             // Check if we are a child window?
+             // If so, maybe we don't need initial tab delay or different logic.
+             // But existing logic is fine.
              setTimeout(() => addTab(), 100);
         });
 
         function addTab() {
-            if(!coreUrl || !authToken) {
-                // Retry if not ready, or just show error in tab
-            }
-
             tabCounter++;
             const tabId = 'term_' + tabCounter;
 
@@ -105,6 +107,7 @@
             tabEl.id = 'tab_' + tabId;
             tabEl.innerHTML = `
                 <span>Terminal ${tabCounter}</span>
+                <div class="tab-popout" title="Pop Out" onclick="popOutTab('${tabId}', event)">⇱</div>
                 <div class="tab-close" onclick="closeTab('${tabId}', event)">✕</div>
             `;
             tabEl.onclick = () => switchTab(tabId);
@@ -271,6 +274,20 @@
                 // Switch to previous
                 switchTab(tabs[Math.max(0, idx - 1)].id);
             }
+        }
+
+        function popOutTab(tabId, e) {
+            if(e) e.stopPropagation();
+            closeTab(tabId);
+
+            window.parent.postMessage({
+                type: 'OPEN_CHILD_WINDOW',
+                parentId: 'mod_terminal',
+                id: 'term_' + Date.now(),
+                title: 'Terminal',
+                url: 'Terminal.html',
+                canMinimize: true
+            }, '*');
         }
 
         window.addEventListener('resize', () => {
