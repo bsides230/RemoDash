@@ -534,6 +534,9 @@ async def git_stash(req: GitRepoRequest):
     if not git: raise HTTPException(status_code=501)
     try:
         r = git.Repo(req.path)
+        try: _ = r.head.commit
+        except ValueError: raise Exception("Cannot stash: No commits yet")
+
         r.git.stash('save', req.message or f"Stash from RemoDash {datetime.datetime.now()}")
         return {"success": True}
     except Exception as e:
@@ -556,25 +559,41 @@ async def git_discard(req: GitRepoRequest):
     if not git: raise HTTPException(status_code=501)
     try:
         r = git.Repo(req.path)
+
+        has_commits = True
+        try: _ = r.head.commit
+        except ValueError: has_commits = False
+
         if req.files and len(req.files) > 0:
             # Discard specific files
-            # For tracked files: checkout HEAD -- file
-            # For untracked files: clean -f file (or manually remove)
-            # GitPython doesn't have a simple "discard" so we use git command
-
-            # Separate untracked
             untracked = set(r.untracked_files)
 
             for f in req.files:
+                fp = os.path.join(req.path, f)
                 if f in untracked:
-                     fp = os.path.join(req.path, f)
                      if os.path.exists(fp):
-                         os.remove(fp)
+                         try:
+                            if os.path.isdir(fp): shutil.rmtree(fp)
+                            else: os.remove(fp)
+                         except: pass
                 else:
-                    r.git.checkout('HEAD', '--', f)
+                    if has_commits:
+                        r.git.checkout('HEAD', '--', f)
+                    else:
+                        # No commits: unstage and delete
+                        try:
+                            r.git.rm('--cached', f)
+                            if os.path.exists(fp): os.remove(fp)
+                        except: pass
         else:
             # Discard all
-            r.git.reset('--hard', 'HEAD')
+            if has_commits:
+                r.git.reset('--hard', 'HEAD')
+            else:
+                # No commits: Unstage all
+                try: r.git.rm('-r', '--cached', '.', ignore_unmatch=True)
+                except: pass
+
             r.git.clean('-fd') # Clean untracked
 
         return {"success": True}

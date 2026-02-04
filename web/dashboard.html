@@ -139,6 +139,7 @@
             transition: box-shadow 0.2s, opacity 0.2s, transform 0.2s;
             opacity: 0; transform: scale(0.95);
             animation: openWin 0.2s forwards ease-out;
+            overflow: hidden; /* Fix iframe corner bleeding */
         }
         @keyframes openWin { to { opacity: 1; transform: scale(1); } }
 
@@ -397,6 +398,27 @@
             transition: all 0.2s;
         }
         .btn-full-width:hover { background: var(--brand-color); border-color: var(--brand-color); }
+
+        /* Settings Page Structure */
+        .settings-page { display: flex; flex-direction: column; gap: 12px; height: 100%; width: 100%; }
+        .settings-page.hidden { display: none; }
+
+        .settings-nav-header {
+            display: flex; align-items: center; gap: 10px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px; font-family: 'JetBrains Mono'; font-size: 12px; text-transform: uppercase; color: var(--text-head);
+        }
+        .settings-back-btn {
+            background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0;
+        }
+        .settings-back-btn:hover { color: var(--brand-color); }
+
+        .custom-color-row { display: flex; gap: 8px; align-items: center; margin-top: 5px; }
+        .custom-slot {
+            width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border-color);
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .custom-slot:hover { transform: scale(1.1); border-color: var(--text-head); }
 
         /* SLIDER STYLES */
         input[type="range"] {
@@ -833,47 +855,72 @@
     </div>
 
     <div id="settings-popup">
-        <div class="settings-header">General</div>
-        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
-        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openServerConfig()">Edit Server Config</button>
-        <button class="btn-full-width" style="margin-bottom:10px;" onclick="openFsSecurity()">Filesystem Security</button>
+        <div id="page-main" class="settings-page">
+            <div class="settings-header">General</div>
+            <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
+            <button class="btn-full-width" style="margin-bottom:10px;" onclick="openServerConfig()">Edit Server Config</button>
+            <button class="btn-full-width" style="margin-bottom:10px;" onclick="openFsSecurity()">Filesystem Security</button>
 
-        <div class="settings-row">
-            <span>Dark Mode</span>
-            <label class="toggle-switch">
-                <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-        <div class="settings-row">
-            <span>Pin Open</span>
-            <label class="toggle-switch">
-                <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-        <div class="settings-row">
-            <span>Theme Windows</span>
-            <label class="toggle-switch">
-                <input type="checkbox" id="setting-theme-windows" onchange="toggleWindowTheming(this.checked)">
-                <span class="toggle-slider"></span>
-            </label>
-        </div>
-        <div class="settings-row">
-            <span>Font Size: <b id="font-size-display">12</b>px</span>
-            <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
+            <div class="settings-row" onclick="openThemeSettings()" style="cursor:pointer; background:var(--bg-input); padding:8px; border-radius:6px; margin-top:10px; border:1px solid var(--border-color);">
+                <span>🎨 Theme & Colors</span>
+                <span>➔</span>
+            </div>
+
+            <div class="settings-row" style="margin-top:10px;">
+                <span>Pin Open</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="settings-row">
+                <span>Font Size: <b id="font-size-display">12</b>px</span>
+                <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
+            </div>
+
+            <div class="settings-header" style="margin-top:5px;">Layout</div>
+            <button class="btn-full-width" onclick="enableEditMode()">Edit Dock Order</button>
+
+            <div class="settings-header" style="margin-top:5px;">Modules</div>
+            <div id="module-list-container"></div>
         </div>
 
-        <div class="settings-row" style="flex-direction:column; align-items:flex-start; margin-top:10px;">
-            <span>Accent Color</span>
+        <div id="page-theme" class="settings-page hidden">
+            <div class="settings-nav-header">
+                <button class="settings-back-btn" onclick="showSettingsPage('main')">⬅</button>
+                <span>Theme Settings</span>
+            </div>
+
+            <div class="settings-row">
+                <span>Dark Mode</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <span>Theme Windows</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-theme-windows" onchange="toggleWindowTheming(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="settings-header" style="margin-top:10px;">Accent Color</div>
             <div class="color-grid" id="color-picker-grid"></div>
+
+            <div class="settings-header" style="margin-top:10px;">Custom Hex</div>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="inp-hex-color" placeholder="#RRGGBB" style="flex:1; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px;">
+                <button class="cta-btn" onclick="applyCustomHex()">Apply</button>
+            </div>
+
+            <div class="settings-header" style="margin-top:10px;">Saved Colors (Right-click to Save)</div>
+            <div class="custom-color-row" id="custom-slots-container">
+                 <!-- Generated by JS -->
+            </div>
         </div>
-
-        <div class="settings-header" style="margin-top:5px;">Layout</div>
-        <button class="btn-full-width" onclick="enableEditMode()">Edit Dock Order</button>
-
-        <div class="settings-header" style="margin-top:5px;">Modules</div>
-        <div id="module-list-container"></div>
     </div>
 
     <div id="floating-dock">
@@ -908,7 +955,8 @@
             theme: 'dark',
             fontSize: 12,
             brandColor: '#10B981',
-            themeWindows: false
+            themeWindows: false,
+            customColors: ['#333333', '#333333', '#333333', '#333333']
         };
 
         let zIndexCounter = 100;
@@ -934,6 +982,7 @@
             checkWelcome();
             checkConnection();
             initColorPicker();
+            initCustomSlots();
 
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
@@ -961,6 +1010,44 @@
                 }
             });
         });
+
+        /* =========================================
+           SETTINGS PAGE LOGIC
+           ========================================= */
+        function showSettingsPage(pageId) {
+            document.querySelectorAll('.settings-page').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + pageId).classList.remove('hidden');
+        }
+
+        function openThemeSettings() { showSettingsPage('theme'); }
+
+        function initCustomSlots() {
+             const container = document.getElementById('custom-slots-container');
+             container.innerHTML = '';
+             (appSettings.customColors || []).forEach((c, i) => {
+                 const div = document.createElement('div');
+                 div.className = 'custom-slot';
+                 div.style.backgroundColor = c;
+                 div.title = "Click to apply, Right-click to save current";
+                 div.onclick = () => updateBrandColor(c);
+                 div.oncontextmenu = (e) => {
+                     e.preventDefault();
+                     appSettings.customColors[i] = appSettings.brandColor;
+                     saveSettings();
+                     initCustomSlots();
+                 };
+                 container.appendChild(div);
+             });
+        }
+
+        function applyCustomHex() {
+            const val = document.getElementById('inp-hex-color').value.trim();
+            if(/^#[0-9A-F]{6}$/i.test(val)) {
+                updateBrandColor(val);
+            } else {
+                alert("Invalid Hex Code (Format: #RRGGBB)");
+            }
+        }
 
         /* =========================================
            DOCK LOGIC
@@ -1023,6 +1110,8 @@
                     popup.classList.remove('show');
                     return;
                 }
+
+                showSettingsPage('main'); // Reset to main
 
                 const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
                 // Estimate height or use fixed
@@ -1614,7 +1703,12 @@
         function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
         function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
         function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
-        function loadSettings() { const s = localStorage.getItem('lyrn-settings'); if(s) appSettings = { ...appSettings, ...JSON.parse(s) }; if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme); }
+        function loadSettings() {
+            const s = localStorage.getItem('lyrn-settings');
+            if(s) appSettings = { ...appSettings, ...JSON.parse(s) };
+            if(!appSettings.customColors) appSettings.customColors = ['#333333', '#333333', '#333333', '#333333'];
+            if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme);
+        }
 
         /* POWER */
         function openPowerModal() { document.getElementById('power-modal').style.display = 'flex'; }
@@ -1681,6 +1775,7 @@
 
             saveSettings();
             initColorPicker(); // Update active state
+            initCustomSlots(); // Update border colors potentially?
 
             // Broadcast
             document.querySelectorAll('iframe').forEach(f => {

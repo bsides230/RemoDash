@@ -85,7 +85,7 @@
         .add-repo-btn:hover { color: var(--brand-color); }
 
         /* Main Area */
-        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-core); }
+        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-core); position: relative; }
 
         /* Toolbar */
         #toolbar {
@@ -181,6 +181,13 @@
             height: 100%; color: var(--text-dim); font-family: var(--font-mono); gap: 10px;
         }
 
+        #mobile-menu-btn {
+            display: none; width: 32px; height: 32px; align-items: center; justify-content: center;
+            background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 4px;
+            color: var(--text-head); cursor: pointer;
+            position: absolute; top: 10px; left: 10px; z-index: 50;
+        }
+
         /* Mobile Sidebar */
         @media (max-width: 768px) {
             #sidebar {
@@ -196,16 +203,11 @@
             }
             #sidebar-overlay.visible { display: block; }
 
-            #mobile-menu-btn { display: flex !important; margin-right: 10px; }
+            #mobile-menu-btn { display: flex !important; }
+            #toolbar { padding-left: 50px; }
 
             #workspace { flex-direction: column; }
             #changes-panel { width: 100%; height: 200px; border-right: none; border-bottom: 1px solid var(--border-color); }
-        }
-
-        #mobile-menu-btn {
-            display: none; width: 32px; height: 32px; align-items: center; justify-content: center;
-            background: transparent; border: 1px solid var(--border-color); border-radius: 4px;
-            color: var(--text-head); cursor: pointer;
         }
 
         /* Dropdown */
@@ -239,6 +241,7 @@
         </div>
 
         <div id="main">
+            <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
             <div id="empty-state">
                 <div style="font-size: 40px; opacity: 0.3;">🐙</div>
                 <div>Select a repository to manage</div>
@@ -247,7 +250,6 @@
             <div id="repo-interface" style="display:none; flex:1; flex-direction:column; overflow:hidden;">
 
                 <div id="toolbar">
-                    <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
                     <div class="current-repo-info">
                         <span id="repo-title">Repo Name</span>
                         <div class="branch-badge" title="Current Branch">
@@ -320,7 +322,14 @@
         });
 
         async function fetchAPI(endpoint, method='GET', body=null) {
-            if(!coreUrl || !authToken) return null;
+            if(!coreUrl || !authToken) return { success: false, error: "Not connected" };
+
+            // Cache busting for GET
+            if(method === 'GET') {
+                const sep = endpoint.includes('?') ? '&' : '?';
+                endpoint += sep + 't=' + Date.now();
+            }
+
             const opts = {
                 method,
                 headers: {
@@ -331,22 +340,28 @@
             if(body) opts.body = JSON.stringify(body);
             try {
                 const res = await fetch(coreUrl + endpoint, opts);
-                if(!res.ok) throw new Error(await res.text());
+                if(!res.ok) {
+                    let err = res.statusText;
+                    try { const j = await res.json(); if(j.detail) err = j.detail; } catch(_) {}
+                    throw new Error(err);
+                }
                 return await res.json();
             } catch(e) {
                 console.error(e);
-                return null;
+                return { success: false, error: e.message };
             }
         }
 
         async function loadRepos() {
             if(!authToken) return;
             const list = document.getElementById('repo-list');
+            list.innerHTML = '<div style="padding:10px; color:var(--text-dim);">Loading...</div>';
+
             const repos = await fetchAPI('/api/git/repos');
 
             list.innerHTML = '';
-            if(!repos) {
-                list.innerHTML = '<div style="padding:10px; color:var(--text-dim)">Failed to load.</div>';
+            if(!repos || !Array.isArray(repos)) {
+                list.innerHTML = '<div style="padding:10px; color:var(--danger);">Failed to load.</div>';
                 return;
             }
 
@@ -385,10 +400,15 @@
         async function loadRepoDetails() {
             if(!currentRepoPath) return;
             const data = await fetchAPI('/api/git/status?path=' + encodeURIComponent(currentRepoPath));
-            if(!data) return;
 
-            document.getElementById('current-branch').innerText = data.branch;
-            document.getElementById('commit-branch-label').innerText = data.branch;
+            if(!data || data.error) {
+                // Silently fail or show error?
+                // console.error("Status load failed", data?.error);
+                return;
+            }
+
+            document.getElementById('current-branch').innerText = data.branch || 'HEAD';
+            document.getElementById('commit-branch-label').innerText = data.branch || 'HEAD';
 
             currentFiles = data.files || [];
             renderFileList();
@@ -485,7 +505,7 @@
                 loadRepoDetails();
                 document.getElementById('diff-content').innerHTML = '';
             } else {
-                alert("Commit Failed.");
+                alert("Commit Failed: " + (res.error || "Unknown Error"));
             }
 
             btn.innerText = "Commit to " + document.getElementById('current-branch').innerText;
@@ -496,7 +516,8 @@
             if(!confirm("Push to origin?")) return;
             const res = await fetchAPI('/api/git/push', 'POST', { path: currentRepoPath });
             if(res && res.success) alert("Push Successful");
-            else alert("Push Failed");
+            else alert("Push Failed: " + (res.error || "Unknown Error"));
+            loadRepoDetails();
         }
 
         async function doPull() {
@@ -504,7 +525,7 @@
              if(res && res.success) {
                  alert("Pull Successful");
                  loadRepoDetails();
-             } else alert("Pull Failed");
+             } else alert("Pull Failed: " + (res.error || "Unknown Error"));
         }
 
         async function doStash() {
@@ -514,7 +535,7 @@
              if(res && res.success) {
                  alert("Stashed.");
                  loadRepoDetails();
-             } else alert("Stash Failed");
+             } else alert("Stash Failed: " + (res.error || "Unknown Error"));
         }
 
         async function doStashPop() {
@@ -522,19 +543,11 @@
              if(res && res.success) {
                  alert("Popped Stash.");
                  loadRepoDetails();
-             } else alert("Pop Failed (Conflicts might exist)");
+             } else alert("Pop Failed: " + (res.error || "Unknown Error"));
         }
 
         async function doDiscard() {
-             if(!confirm("Are you sure you want to discard changes? This cannot be undone.")) return;
-
-             // Get selected files only, or all if user wants?
-             // UI implies "Discard Changes" is a general action, but we could support selective discard.
-             // For simplicity, let's discard ALL changes in the repo if no specific selection logic is separate.
-             // BUT, user might expect only checked files to be discarded?
-             // Let's stick to "Discard All" for the top menu action for safety/simplicity to match "Reset Hard".
-             // Actually, safer to just discard checked files if any are checked.
-
+             // Get selected files only
              const checkboxes = document.querySelectorAll('.file-chk:checked');
              let files = null;
 
@@ -542,13 +555,13 @@
                  files = Array.from(checkboxes).map(cb => cb.dataset.file);
                  if(!confirm(`Discard changes for ${files.length} selected files?`)) return;
              } else {
-                 if(!confirm("Discard ALL changes in repository?")) return;
+                 if(!confirm("Discard ALL changes in repository? This cannot be undone.")) return;
              }
 
              const res = await fetchAPI('/api/git/discard', 'POST', { path: currentRepoPath, files: files });
              if(res && res.success) {
                  loadRepoDetails();
-             } else alert("Discard Failed");
+             } else alert("Discard Failed: " + (res.error || "Unknown Error"));
         }
 
         async function promptAddRepo() {

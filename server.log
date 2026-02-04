@@ -1,48 +1,52 @@
 INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
-INFO:     Finished server process [5639]
-INFO:     Started server process [7007]
+INFO:     Finished server process [3526]
+INFO:     Started server process [4481]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8050 (Press CTRL+C to quit)
-[System] Logging to session: logs/session_20260204_211523
+[System] Logging to session: logs/session_20260204_223541
 Settings loaded successfully
 [System] Allowed Origins: ['http://localhost:8050', 'http://127.0.0.1:8050']
 Starting RemoDash server on port 8050...
 [System] Loaded admin token from admin_token.txt
 [Info] System: RemoDash Server started.
-INFO:     127.0.0.1:45752 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45752 - "GET /sw.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45752 - "GET /manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /favicon.ico HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "POST /api/verify_token HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /sw.js HTTP/1.1" 304 Not Modified
-INFO:     127.0.0.1:45762 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /modules/GitManager.html HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /api/git/repos HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /modules/FileExplorer.html HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45762 - "GET /api/files/list?path=%2F&sort_by=name&order=asc HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45752 - "GET /api/sysinfo HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45752 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45766 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45766 - "GET /sw.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45766 - "GET /manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET /favicon.ico HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "POST /api/verify_token HTTP/1.1" 200 OK
-INFO:     127.0.0.1:45774 - "GET /sw.js HTTP/1.1" 304 Not Modified
-INFO:     127.0.0.1:45774 - "GET /health HTTP/1.1" 200 OK
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [7007]
+INFO:     127.0.0.1:57406 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57420 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "POST /api/verify_token HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45478 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45478 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45478 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "POST /api/verify_token HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /modules/FileExplorer.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /api/sysinfo HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45478 - "GET /api/files/list?path=%2F&sort_by=name&order=asc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45478 - "GET /api/files/list?path=%2F&sort_by=name&order=asc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /api/sysinfo HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45486 - "GET /sw.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:45486 - "GET /health HTTP/1.1" 200 OK

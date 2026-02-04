@@ -272,7 +272,7 @@
             <button class="tool-btn" onclick="triggerDownload()">Download</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="copySelection()">Copy</button>
-            <button class="tool-btn" onclick="cutSelection()">Cut</button>
+            <button class="tool-btn" onclick="addToGit()">+ Git</button>
             <button class="tool-btn" onclick="pasteSelection()">Paste</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="showCreateModal('file')">+ File</button>
@@ -280,7 +280,7 @@
             <button class="tool-btn" id="btn-create-shortcut" onclick="showShortcutModal()" style="display:none;">Create Shortcut</button>
             <button class="tool-btn" onclick="deleteSelection()" style="color:#ff5555;">Delete</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
-            <button class="tool-btn" onclick="addToGit()">+ Git</button>
+            <button class="tool-btn" onclick="cutSelection()">Cut</button>
         </div>
 
         <div id="file-scroll-container">
@@ -377,7 +377,11 @@
         });
 
         async function initSidebar() {
-            const favs = [ { name: "Root", path: "/" }, { name: "Home", path: "/home" } ];
+            const favs = [
+                { name: "My Computer", path: "computer://" },
+                { name: "Root", path: "/" },
+                { name: "Home", path: "/home" }
+            ];
             const favList = document.getElementById('fav-list');
             favList.innerHTML = '';
             favs.forEach(f => {
@@ -481,6 +485,23 @@
             if(!coreUrl || !authToken) return;
 
             try {
+                if (tab.path === 'computer://') {
+                     // Load drives
+                     const res = await fetch(`${coreUrl}/api/sysinfo`, { headers: { 'X-Token': authToken } });
+                     const data = await res.json();
+                     tab.items = (data.partitions || []).map(p => ({
+                         name: p.mountpoint || p.device,
+                         path: p.mountpoint || p.device,
+                         type: 'dir',
+                         size: 0,
+                         mtime: Date.now()/1000
+                     }));
+                     tab.selected.clear();
+                     renderFileList(tab);
+                     renderTabs();
+                     return;
+                }
+
                 const res = await fetch(`${coreUrl}/api/files/list?path=${encodeURIComponent(tab.path)}&sort_by=${sortMode}&order=${sortOrder}`, {
                     headers: { 'X-Token': authToken }
                 });
@@ -519,7 +540,7 @@
                 const date = new Date(item.mtime * 1000).toLocaleDateString();
 
                 row.innerHTML = `
-                    <div class="col-check"><input type="checkbox" ${tab.selected.has(item.path) ? 'checked' : ''} onclick="toggleItemSelect('${item.path}', event)"></div>
+                    <div class="col-check"><input type="checkbox" ${tab.selected.has(item.path) ? 'checked' : ''}></div>
                     <div class="col-icon">${icon}</div>
                     <div class="col-name">${item.name}</div>
                     <div class="col-size">${size}</div>
@@ -527,7 +548,7 @@
                 `;
 
                 row.onclick = (e) => {
-                    if(e.target.type !== 'checkbox') toggleItemSelect(item.path, e);
+                    toggleItemSelect(item.path, e);
                 };
                 row.ondblclick = () => handleItemDblClick(item);
                 view.appendChild(row);
@@ -613,7 +634,6 @@
 
             if(images.includes(ext) || media.includes(ext) || pdf.includes(ext)) {
                  // Use ImageViewer (generic viewer)
-                 // Note: We might want to rename ImageViewer to FileViewer, but for now reuse.
                  window.parent.postMessage({
                      type: 'OPEN_CHILD_WINDOW',
                      id: 'view_' + Date.now(),
