@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Code Editor</title>
     <!-- CodeMirror 5 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -40,7 +41,7 @@
         /* Tabs */
         #tabs-bar {
             height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center; padding: 0 5px; overflow-x: auto;
+            display: flex; align-items: center; padding: 0 5px; overflow-x: auto; flex-shrink: 0;
         }
         .tab {
             height: 28px; background: var(--bg-core); border: 1px solid var(--border-color);
@@ -56,7 +57,7 @@
         /* Toolbar */
         #toolbar {
             height: 32px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center; padding: 0 10px; gap: 10px;
+            display: flex; align-items: center; padding: 0 10px; gap: 10px; flex-shrink: 0;
         }
         .btn {
             background: transparent; border: 1px solid var(--border-color); color: var(--text-head);
@@ -66,7 +67,11 @@
         .status { margin-left: auto; font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim); }
 
         /* Editor Area */
-        #editor-container { flex: 1; position: relative; }
+        #editor-container {
+            flex: 1; position: relative; overflow: hidden;
+            /* Fix mobile scroll */
+            -webkit-overflow-scrolling: touch;
+        }
         .CodeMirror { height: 100%; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
 
         /* Empty State */
@@ -109,7 +114,10 @@
                 mode: 'javascript',
                 indentUnit: 4,
                 tabSize: 4,
-                lineWrapping: false
+                lineWrapping: false,
+                // Better mobile support
+                inputStyle: 'contenteditable',
+                viewportMargin: Infinity
             });
 
             // Hide initially
@@ -131,6 +139,9 @@
             if (e.data.type === 'THEME_CHANGE') setTheme(e.data.theme);
             if (e.data.type === 'FONT_CHANGE') setFont(e.data.fontSize);
             if (e.data.type === 'OPEN_FILE') openFile(e.data.path, e.data.name);
+            if (e.data.type === 'COLOR_CHANGE') {
+                document.documentElement.style.setProperty('--brand-purple', e.data.color);
+            }
         });
 
         function setTheme(theme) {
