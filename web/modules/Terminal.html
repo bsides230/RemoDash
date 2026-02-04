@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-dim: #666666;
+            --border-color: #222222;
+            --brand-purple: #7c5cff;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg-core); font-family: sans-serif; }
+
+        #tabs-bar {
+            height: 32px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; padding-left: 5px; user-select: none;
+        }
+
+        .tab {
+            padding: 0 10px; height: 100%; display: flex; align-items: center; gap: 8px;
+            font-size: 11px; color: var(--text-dim); cursor: pointer; border-right: 1px solid var(--border-color);
+            background: var(--bg-panel); min-width: 100px; max-width: 200px;
+        }
+        .tab:hover { background: #111; color: #ccc; }
+        .tab.active { background: var(--bg-core); color: #fff; border-bottom: 2px solid var(--brand-purple); }
+
+        .tab-close {
+            width: 14px; height: 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; opacity: 0.5;
+        }
+        .tab-close:hover { background: #cc3333; color: white; opacity: 1; }
+
+        .tab-popout { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.5; margin-right: 2px; }
+        .tab-popout:hover { color: var(--brand-purple); opacity: 1; }
+
+        .new-tab-btn {
+            width: 30px; height: 100%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text-dim); font-size: 16px;
+        }
+        .new-tab-btn:hover { color: #fff; background: #111; }
+
+        #terminals-container {
+            position: absolute; top: 32px; bottom: 0; left: 0; right: 0;
+        }
+
+        .term-wrapper {
+            width: 100%; height: 100%; display: none;
+        }
+        .term-wrapper.active { display: block; }
+
+        /* Scrollbar adjustment for xterm */
+        .xterm-viewport::-webkit-scrollbar { width: 8px; }
+        .xterm-viewport::-webkit-scrollbar-thumb { background: #333; }
+    </style>
+</head>
+<body>
+
+    <div id="tabs-bar">
+        <div class="new-tab-btn" onclick="addTab()">+</div>
+    </div>
+
+    <div id="terminals-container"></div>
+
+    <!-- Load xterm.js -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+
+        let tabs = [];
+        let activeTabId = null;
+        let tabCounter = 0;
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+            }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                authToken = e.data.token;
+            }
+            if (e.data.type === 'CHILD_RETURNING') {
+                // Restore a returned child window as a new tab
+                addTab();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+             // Check if we are a child window?
+             // If so, maybe we don't need initial tab delay or different logic.
+             // But existing logic is fine.
+             setTimeout(() => addTab(), 100);
+        });
+
+        function addTab() {
+            tabCounter++;
+            const tabId = 'term_' + tabCounter;
+
+            // Create DOM
+            const tabEl = document.createElement('div');
+            tabEl.className = 'tab';
+            tabEl.id = 'tab_' + tabId;
+            tabEl.innerHTML = `
+                <span>Terminal ${tabCounter}</span>
+                <div class="tab-popout" title="Pop Out" onclick="popOutTab('${tabId}', event)">⇱</div>
+                <div class="tab-close" onclick="closeTab('${tabId}', event)">✕</div>
+            `;
+            tabEl.onclick = () => switchTab(tabId);
+
+            // Insert before the new button
+            const bar = document.getElementById('tabs-bar');
+            bar.insertBefore(tabEl, bar.lastElementChild);
+
+            const container = document.getElementById('terminals-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'term-wrapper';
+            wrapper.id = 'wrap_' + tabId;
+            container.appendChild(wrapper);
+
+            // Init XTerm
+            const term = new Terminal({
+                cursorBlink: true,
+                fontSize: 13,
+                fontFamily: '"JetBrains Mono", monospace',
+                theme: {
+                    background: '#050505',
+                    foreground: '#cccccc'
+                }
+            });
+            const fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(wrapper);
+            fitAddon.fit();
+
+            // Connect WS
+            const termObj = {
+                id: tabId,
+                term: term,
+                fitAddon: fitAddon,
+                socket: null,
+                connected: false
+            };
+            tabs.push(termObj);
+
+            connectTerminal(termObj);
+
+            // Handle resizing
+            new ResizeObserver(() => {
+                if(wrapper.classList.contains('active')) {
+                     fitAddon.fit();
+                     if(termObj.socket && termObj.connected) {
+                         termObj.socket.send(JSON.stringify({
+                             type: 'resize',
+                             cols: term.cols,
+                             rows: term.rows
+                         }));
+                     }
+                }
+            }).observe(wrapper);
+
+            switchTab(tabId);
+        }
+
+        function connectTerminal(termObj) {
+            if(!coreUrl) {
+                termObj.term.write("\r\n\x1b[31mError: No Core URL configured.\x1b[0m\r\n");
+                return;
+            }
+
+            let wsUrl = coreUrl.replace('http', 'ws');
+            if(wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
+            wsUrl += `/api/terminal`;
+
+            // Auth needs to be handled.
+            // FastAPI WebSocket doesn't support custom headers easily in standard JS WebSocket API (it's a limitation of browser API).
+            // We'll pass token in query param or protocol.
+            // server.py should handle query param 'token' if configured
+            if(authToken) wsUrl += `?token=${encodeURIComponent(authToken)}`;
+
+            const socket = new WebSocket(wsUrl);
+            termObj.socket = socket;
+
+            socket.onopen = () => {
+                termObj.connected = true;
+                termObj.term.write("\r\n\x1b[32mConnected to System Terminal\x1b[0m\r\n");
+                termObj.fitAddon.fit();
+                // Send initial resize
+                socket.send(JSON.stringify({
+                    type: 'resize',
+                    cols: termObj.term.cols,
+                    rows: termObj.term.rows
+                }));
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if(msg.type === 'output') {
+                        termObj.term.write(msg.data);
+                    }
+                } catch(e) {}
+            };
+
+            socket.onclose = () => {
+                termObj.connected = false;
+                termObj.term.write("\r\n\x1b[31mConnection Closed\x1b[0m\r\n");
+            };
+
+            socket.onerror = (e) => {
+                termObj.term.write("\r\n\x1b[31mConnection Error\x1b[0m\r\n");
+            };
+
+            termObj.term.onData(data => {
+                if(termObj.connected) {
+                    socket.send(JSON.stringify({ type: 'input', data: data }));
+                }
+            });
+
+            // Resize handler on term
+            termObj.term.onResize(size => {
+                if(termObj.connected) {
+                    socket.send(JSON.stringify({
+                        type: 'resize',
+                        cols: size.cols,
+                        rows: size.rows
+                    }));
+                }
+            });
+        }
+
+        function switchTab(tabId) {
+            activeTabId = tabId;
+
+            // Update UI
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab_' + tabId).classList.add('active');
+
+            document.querySelectorAll('.term-wrapper').forEach(w => w.classList.remove('active'));
+            document.getElementById('wrap_' + tabId).classList.add('active');
+
+            // Fit
+            const t = tabs.find(x => x.id === tabId);
+            if(t) {
+                t.term.focus();
+                setTimeout(() => t.fitAddon.fit(), 50); // Small delay for layout
+            }
+        }
+
+        function closeTab(tabId, e) {
+            if(e) e.stopPropagation();
+
+            const idx = tabs.findIndex(x => x.id === tabId);
+            if(idx === -1) return;
+
+            const t = tabs[idx];
+            if(t.socket) t.socket.close();
+            t.term.dispose();
+
+            document.getElementById('tab_' + tabId).remove();
+            document.getElementById('wrap_' + tabId).remove();
+
+            tabs.splice(idx, 1);
+
+            if(tabs.length === 0) {
+                // Add new one? Or leave empty?
+                // Let's add new one if user closed last
+                addTab();
+            } else if(activeTabId === tabId) {
+                // Switch to previous
+                switchTab(tabs[Math.max(0, idx - 1)].id);
+            }
+        }
+
+        function popOutTab(tabId, e) {
+            if(e) e.stopPropagation();
+            closeTab(tabId);
+
+            window.parent.postMessage({
+                type: 'OPEN_CHILD_WINDOW',
+                parentId: 'mod_terminal',
+                id: 'term_' + Date.now(),
+                title: 'Terminal',
+                url: 'Terminal.html',
+                canMinimize: true
+            }, '*');
+        }
+
+        window.addEventListener('resize', () => {
+            if(activeTabId) {
+                const t = tabs.find(x => x.id === activeTabId);
+                if(t) t.fitAddon.fit();
+            }
+        });
+
+    </script>
+</body>
+</html>

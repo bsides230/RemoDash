@@ -111,6 +111,7 @@
     <div class="tabs">
         <button class="tab-btn active" id="btn-tab-sys" onclick="switchTab('sys')">System</button>
         <button class="tab-btn" id="btn-tab-gpu" onclick="switchTab('gpu')">GPU</button>
+        <button class="tab-btn" id="btn-tab-info" onclick="switchTab('info')">Info</button>
     </div>
 
     <!-- System Tab -->
@@ -144,6 +145,14 @@
         <button class="pop-out-btn" onclick="popOut('gpu')">⬈ POP OUT</button>
         <h2>GPU Status</h2>
         <div id="gpu-container">Loading...</div>
+    </div>
+
+    <!-- Info Tab -->
+    <div id="tab-info" class="tab-content">
+        <h2>System Information</h2>
+        <div id="info-container" style="font-family:'JetBrains Mono'; font-size:12px; display:flex; flex-direction:column; gap:8px;">
+            Loading...
+        </div>
     </div>
 
     <script>
@@ -187,6 +196,7 @@
             if (e.data.type === 'CORE_URL_CHANGE') {
                 coreUrl = e.data.url;
                 startMonitoring();
+                fetchSysInfo();
             }
             if (e.data.type === 'THEME_CHANGE') {
                 document.body.setAttribute('data-theme', e.data.theme);
@@ -197,7 +207,10 @@
             if (e.data.type === 'TOKEN_UPDATE') {
                 const wasNull = !authToken;
                 authToken = e.data.token;
-                if(wasNull) startMonitoring();
+                if(wasNull) {
+                    startMonitoring();
+                    fetchSysInfo();
+                }
             }
         });
 
@@ -206,6 +219,41 @@
             if(!coreUrl || !authToken) return;
             fetchStats();
             intervalId = setInterval(fetchStats, 2000);
+            fetchSysInfo();
+        }
+
+        async function fetchSysInfo() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(coreUrl + '/api/sysinfo', {
+                    headers: { 'X-Token': authToken }
+                });
+                if(res.ok) {
+                    const data = await res.json();
+                    let html = `
+                        <div class="stat-row"><span class="stat-label">Hostname</span><span class="stat-value">${data.hostname}</span></div>
+                        <div class="stat-row"><span class="stat-label">IP Address</span><span class="stat-value">${data.ip_address}</span></div>
+                        <div class="stat-row"><span class="stat-label">OS</span><span class="stat-value">${data.os}</span></div>
+                        <div class="stat-row"><span class="stat-label">CPU Model</span><span class="stat-value">${data.cpu_model}</span></div>
+                        <div style="margin-top:10px; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:4px;">DRIVES</div>
+                    `;
+                    data.partitions.forEach(p => {
+                         html += `
+                            <div style="background:rgba(128,128,128,0.05); padding:8px; border-radius:4px; margin-bottom:5px;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                    <span>${p.mountpoint} (${p.fstype})</span>
+                                    <span>${p.percent}%</span>
+                                </div>
+                                <div class="progress-bg"><div class="progress-fill" style="width:${p.percent}%"></div></div>
+                                <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">
+                                    ${p.used_gb.toFixed(1)} GB used / ${p.total_gb.toFixed(1)} GB total
+                                </div>
+                            </div>
+                         `;
+                    });
+                    document.getElementById('info-container').innerHTML = html;
+                }
+            } catch(e) {}
         }
 
         async function fetchStats() {

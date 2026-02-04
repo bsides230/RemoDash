@@ -525,6 +525,7 @@
             .window-header { cursor: default !important; }
             .win-controls .win-btn:first-child { display: none; } /* Hide Maximize */
         }
+
     </style>
 </head>
 <body data-theme="dark">
@@ -666,13 +667,15 @@
            CONFIG & STATE
            ========================================================================= */
         const MODULE_REGISTRY = [
-            { id: "mod_logs", file: "LogViewer.html", name: "System Logs", icon: "📜" },
-            { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "🔧" },
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
+            { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "📁" },
+            { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "💻" },
+            { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "📝" },
+            { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "⚙️" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_logs', 'mod_settings', 'mod_server_status'],
+            activeModules: ['mod_server_status', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_settings'],
             dockPinned: true,
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -680,7 +683,8 @@
         };
 
         let zIndexCounter = 100;
-        let activeWindows = new Set();
+        // Map: modId -> Array of { id: windowId, title: string }
+        let runningInstances = {};
         let isEditMode = false;
 
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -760,7 +764,7 @@
                     if(isEditMode) {
                         openEditPopup(e, mod);
                     } else {
-                        toggleWindow(mod);
+                        handleDockClick(mod, btn);
                     }
                 };
                 container.appendChild(btn);
@@ -1008,29 +1012,51 @@
         /* =========================================
            HELPERS
            ========================================= */
-        function toggleWindow(mod) {
-            const id = 'win_' + mod.id;
-            const el = document.getElementById(id);
-            if(el) {
-                if(el.style.display === 'none') {
-                    el.style.display = 'flex'; el.style.zIndex = ++zIndexCounter;
+
+        function handleDockClick(mod, btn) {
+            const instanceId = 'win_' + mod.id;
+            const el = document.getElementById(instanceId);
+
+            if (el) {
+                // Toggle logic
+                if (el.style.display === 'none') {
+                    // Show
+                    el.style.display = 'flex';
+                    el.style.zIndex = ++zIndexCounter;
                     el.classList.remove('minimized');
                 } else {
-                    el.style.display = 'none';
+                    // It's visible, but is it on top?
+                    const topZ = zIndexCounter;
+                    if (parseInt(el.style.zIndex) === topZ) {
+                        // It is on top, so minimize it
+                        el.style.display = 'none';
+                    } else {
+                        // Bring to front
+                        el.style.zIndex = ++zIndexCounter;
+                    }
                 }
             } else {
+                // Create
                 createWindow(mod);
             }
             updateDockIndicators();
         }
 
-        function createWindow(mod) {
-            const id = 'win_' + mod.id;
+        // Parent tracking for child windows
+        let childParentMap = {};
+
+        function createWindow(mod, instanceId, isChild = false, parentId = null, options = {}) {
+            if(!instanceId) instanceId = 'win_' + mod.id;
+
             const area = document.getElementById('desktop-area');
             const win = document.createElement('div');
             win.className = 'lyrn-window active';
-            win.id = id;
+            win.id = instanceId;
             win.style.zIndex = ++zIndexCounter;
+
+            if (isChild && parentId) {
+                childParentMap[instanceId] = parentId;
+            }
 
             const isMobileWidth = window.innerWidth <= 600;
             const startW = isMobileWidth ? '100%' : (isTouch ? '90%' : '800px');
@@ -1039,25 +1065,50 @@
             win.style.width = startW;
             win.style.height = startH;
 
-            const offset = (activeWindows.size * 30) + 50;
-            if(!isMobileWidth) {
+            // Offset based on total windows
+            const totalWins = document.querySelectorAll('.lyrn-window').length;
+            const offset = (totalWins * 30) + 50;
+            if(!isMobileWidth && !options.center) {
                  win.style.left = isTouch ? '5%' : offset + 'px';
                  win.style.top = isTouch ? '10%' : offset + 'px';
+            } else if (options.center) {
+                // Logic to center already handled by caller or default CSS (needs absolute positioning though)
+                win.style.left = (window.innerWidth / 2 - 400) + 'px'; // Approx
+                win.style.top = (window.innerHeight / 2 - 300) + 'px';
             }
+
+            // Controls
+            let controlsHtml = `
+                 <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${instanceId}', this)">📌</button>
+            `;
+
+            // Minimize Button: Main apps minimize to dock (Hide). Child apps minimize to parent (Return).
+            // Image Viewer (type 'widget') has no minimize.
+            if (options.canMinimize !== false) {
+                 const minAction = isChild ? `returnChildToParent('${instanceId}')` : `minimizeWindow('${instanceId}')`;
+                 controlsHtml += `<button class="win-btn" onclick="${minAction}">_</button>`;
+            }
+
+            controlsHtml += `
+                 <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
+                 <button class="win-btn close-btn" onclick="closeWindow('${instanceId}')">✕</button>
+            `;
+
+            let src = mod.file;
+            if (options.url) src = options.url; // Override for specific URLs (child windows)
+            // Ensure path
+            if(!src.includes('/') && !src.startsWith('http')) src = 'modules/' + src;
 
             win.innerHTML = `
                 <div class="window-header">
                     <span class="window-title">${mod.name}</span>
                     <div class="win-controls">
-                         <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${mod.id}', this)">📌</button>
-                         <button class="win-btn" onclick="minimizeWindow('${mod.id}')">_</button>
-                         <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
-                         <button class="win-btn close-btn" onclick="closeWindow('${mod.id}')">✕</button>
+                         ${controlsHtml}
                     </div>
                 </div>
                 <div class="window-content">
                     <div class="iframe-shield"></div>
-                    <iframe src="modules/${mod.file}"></iframe>
+                    <iframe src="${src}"></iframe>
                 </div>
                 <div class="resize-handle"></div>
                 <div class="mobile-resize-handle"></div>
@@ -1070,6 +1121,11 @@
                 iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
                 iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
                 if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
+
+                // Pass extra context if needed
+                if(options.payload) {
+                    iframe.contentWindow.postMessage(options.payload, '*');
+                }
             };
 
             setupWindowDrag(win);
@@ -1078,21 +1134,57 @@
             win.onmousedown = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
             win.ontouchstart = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
             area.appendChild(win);
-            activeWindows.add(mod.id);
+
+            // Register Instance
+            if(!runningInstances[mod.id]) runningInstances[mod.id] = [];
+            runningInstances[mod.id].push({ id: instanceId, title: mod.name });
+
             updateDockIndicators();
         }
 
-        function closeWindow(modId) {
-            const win = document.getElementById('win_' + modId);
+        function closeWindow(instanceId) {
+            const win = document.getElementById(instanceId);
             if(win) win.remove();
-            activeWindows.delete(modId);
+
+            // Remove from registry
+            for (const modId in runningInstances) {
+                runningInstances[modId] = runningInstances[modId].filter(inst => inst.id !== instanceId);
+                if(runningInstances[modId].length === 0) delete runningInstances[modId];
+            }
+
+            // Clean up child map
+            if (childParentMap[instanceId]) delete childParentMap[instanceId];
+
             updateDockIndicators();
         }
 
-        function minimizeWindow(modId) {
-            const win = document.getElementById('win_' + modId);
+        function minimizeWindow(instanceId) {
+            const win = document.getElementById(instanceId);
             if(win) win.style.display = 'none';
             updateDockIndicators();
+        }
+
+        function returnChildToParent(childId) {
+            const parentId = childParentMap[childId];
+            if (parentId) {
+                // Find parent window iframe
+                // parentId is like 'mod_terminal' or 'win_mod_terminal'
+                // Wait, runningInstances stores 'win_mod_terminal'
+                // We need to find the DOM element for parent
+                // Ideally parentId passed in OPEN_CHILD_WINDOW is the DOM ID of the parent window
+
+                // However, parentId in logic might be just the module ID.
+                // Let's assume parentId is the window ID.
+
+                const parentWin = document.getElementById(parentId);
+                if (parentWin) {
+                     const iframe = parentWin.querySelector('iframe');
+                     if (iframe) {
+                         iframe.contentWindow.postMessage({ type: 'CHILD_RETURNING', childId: childId }, '*');
+                     }
+                }
+            }
+            closeWindow(childId);
         }
 
         function setupWindowResize(win) {
@@ -1187,18 +1279,17 @@
                 btn.classList.remove('is-running');
                 const dot = btn.querySelector('.active-dot');
                 if(dot) dot.classList.remove('minimized-dot');
-            });
 
-            activeWindows.forEach(id => {
-                const btn = document.getElementById('btn_' + id);
-                const win = document.getElementById('win_' + id);
-
-                if(btn && win) {
-                    btn.classList.add('is-running');
-                    const dot = btn.querySelector('.active-dot');
-                    if(dot && win.style.display === 'none') {
-                        dot.classList.add('minimized-dot');
-                    }
+                // Check running
+                const modId = btn.id.replace('btn_', '');
+                if (runningInstances[modId] && runningInstances[modId].length > 0) {
+                     btn.classList.add('is-running');
+                     // If all minimized, show minimized dot
+                     const allMin = runningInstances[modId].every(inst => {
+                         const el = document.getElementById(inst.id);
+                         return el && el.style.display === 'none';
+                     });
+                     if(allMin && dot) dot.classList.add('minimized-dot');
                 }
             });
         }
@@ -1252,8 +1343,8 @@
             saveSettings();
         }
 
-        function togglePin(modId, btn) {
-            const win = document.getElementById('win_' + modId);
+        function togglePin(instanceId, btn) {
+            const win = document.getElementById(instanceId);
             if(win) {
                 win.classList.toggle('always-on-top');
                 if(win.classList.contains('always-on-top')) {
@@ -1528,32 +1619,89 @@
         function closeDashboard() { window.parent.postMessage({ type: 'CLOSE_DASHBOARD' }, '*'); }
 
         window.addEventListener('message', (e) => {
-            if(e.data.type === 'OPEN_WIDGET') {
-                // Check if widget already exists
-                const existing = document.getElementById('win_' + e.data.id);
+            if (e.data.type === 'OPEN_CHILD_WINDOW') {
+                // Logic for pop-outs (Terminal, etc)
+                const { parentId, id, title, url, canMinimize } = e.data;
+
+                const existing = document.getElementById(id);
                 if(existing) {
-                    // Bring to front
                     existing.style.display = 'flex';
                     existing.style.zIndex = ++zIndexCounter;
                     return;
                 }
 
-                // Create synthetic module
+                const mod = { id: id, name: title, file: url };
+                // We treat the child ID as a distinct module ID for registry purposes, or better yet, just use a generic 'child' type
+                // But createWindow expects a mod object.
+
+                createWindow(mod, id, true, parentId, {
+                    canMinimize: canMinimize,
+                    url: url,
+                    center: true
+                });
+            }
+
+            if (e.data.type === 'OPEN_FILE') {
+                // Opening a file in the File Editor
+                const editorMod = MODULE_REGISTRY.find(m => m.id === 'mod_file_editor');
+                if(!editorMod) return;
+
+                const instanceId = 'win_' + editorMod.id;
+                let win = document.getElementById(instanceId);
+
+                if (!win) {
+                    createWindow(editorMod, instanceId);
+                    win = document.getElementById(instanceId); // grab ref
+                } else {
+                    if (win.style.display === 'none') {
+                        win.style.display = 'flex';
+                        win.style.zIndex = ++zIndexCounter;
+                        win.classList.remove('minimized');
+                    } else {
+                        win.style.zIndex = ++zIndexCounter;
+                    }
+                }
+                updateDockIndicators();
+
+                // Send payload
+                const iframe = win.querySelector('iframe');
+                // If it was just created, we need to wait for load.
+                // We already handle this in onload with options.payload, but here we might be reusing existing.
+                // It's safe to send immediately if it's already loaded, or queue it.
+                // But simpler: just send it. If iframe is loading, it won't receive it yet.
+                // Retrying slightly is safer.
+                setTimeout(() => {
+                    iframe.contentWindow.postMessage({ type: 'OPEN_FILE', path: e.data.path, name: e.data.name }, '*');
+                }, 500);
+                // Also send immediately in case it's already hot
+                iframe.contentWindow.postMessage({ type: 'OPEN_FILE', path: e.data.path, name: e.data.name }, '*');
+            }
+
+            if(e.data.type === 'OPEN_WIDGET') {
+                 // Legacy Widget Support (Image Viewer uses this or OPEN_CHILD_WINDOW?
+                 // Let's migrate Image Viewer to use OPEN_CHILD_WINDOW for consistency, or keep this.)
+                 // The prompt said "popup widget".
+
+                // Check if widget already exists
+                const existing = document.getElementById('win_' + e.data.id);
+                if(existing) {
+                    existing.style.display = 'flex';
+                    existing.style.zIndex = ++zIndexCounter;
+                    return;
+                }
+
                 const mod = {
                     id: e.data.id,
                     name: e.data.name,
                     file: e.data.file
                 };
-                createWindow(mod);
+                // Treat widgets as Child Windows with no parent return logic (or just close)
+                createWindow(mod, 'win_' + mod.id, false, null, { canMinimize: false, center: true });
 
-                // Customize for widget (smaller size default)
                 const win = document.getElementById('win_' + mod.id);
                 if(win) {
-                    win.style.width = '300px';
-                    win.style.height = '200px';
-                    // Center it
-                    win.style.left = (window.innerWidth/2 - 150) + 'px';
-                    win.style.top = (window.innerHeight/2 - 100) + 'px';
+                    win.style.width = '500px';
+                    win.style.height = '400px';
                 }
             }
         });
