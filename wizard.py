@@ -11,11 +11,66 @@ def print_header(title):
 
 def install_dependencies():
     print("--- Dependencies ---")
-    choice = input("Install/Update Dependencies? (Y/n): ").strip().lower()
+
+    # Check if we are already in a venv
+    in_venv = (sys.prefix != sys.base_prefix)
+
+    use_venv = False
+    break_system = False
+
+    if not in_venv:
+        print("You are not running in a virtual environment.")
+        v_choice = input("Would you like to create/use a local virtual environment (venv)? (Y/n): ").strip().lower()
+        if v_choice in ['y', 'yes', '']:
+            use_venv = True
+        else:
+            # If they decline venv, ask about break-system-packages (mostly for Linux/PEP 668)
+            bs_choice = input("Install globally? This may require '--break-system-packages' on some systems. Proceed? (Y/n): ").strip().lower()
+            if bs_choice in ['y', 'yes', '']:
+                break_system = True
+            else:
+                print("Aborting dependency installation.")
+                return False
+
+    choice = input("Install/Update Dependencies now? (Y/n): ").strip().lower()
     if choice in ['y', 'yes', '']:
         print("\nInstalling dependencies...")
+
+        pip_cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
+
+        if use_venv:
+            # Create venv if not exists
+            venv_path = Path("venv")
+            if not venv_path.exists():
+                print("Creating virtual environment...")
+                try:
+                    subprocess.check_call([sys.executable, "-m", "venv", "venv"])
+                except subprocess.CalledProcessError:
+                    print("Failed to create venv.")
+                    return False
+
+            # Adjust pip command to use venv
+            if platform.system() == "Windows":
+                pip_exe = venv_path / "Scripts" / "pip.exe"
+                python_exe = venv_path / "Scripts" / "python.exe"
+            else:
+                pip_exe = venv_path / "bin" / "pip"
+                python_exe = venv_path / "bin" / "python"
+
+            if pip_exe.exists():
+                pip_cmd = [str(pip_exe), "install", "-r", "requirements.txt"]
+                # Update sys.executable for the rest of the script/launch
+                global venv_python
+                venv_python = str(python_exe)
+            else:
+                print("Error: venv created but pip not found.")
+                return False
+
+        elif break_system:
+            pip_cmd.append("--break-system-packages")
+
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+            subprocess.check_call(pip_cmd)
             print("Dependencies installed successfully.")
         except subprocess.CalledProcessError:
             print("Error installing dependencies.")
@@ -23,6 +78,8 @@ def install_dependencies():
     else:
         print("Skipping dependencies.")
     return True
+
+venv_python = sys.executable
 
 def configure_tailscale():
     print("\n--- Tailscale (Remote Access) ---")
@@ -86,7 +143,7 @@ def configure_auth():
 
 def run_token_gen():
     try:
-        subprocess.check_call([sys.executable, "token_generator.py"])
+        subprocess.check_call([venv_python, "token_generator.py"])
     except Exception as e:
         print(f"Error generating token: {e}")
 
@@ -96,7 +153,8 @@ def start_server():
     if choice in ['y', 'yes', '']:
         print("\nStarting Server...")
         try:
-            subprocess.run([sys.executable, "server.py"])
+            # Use the python executable determined during dependency install (venv or system)
+            subprocess.run([venv_python, "server.py"])
         except KeyboardInterrupt:
             print("\nServer stopped.")
         except Exception as e:

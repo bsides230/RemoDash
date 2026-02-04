@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-purple: #7c5cff;
+            --border-color: #222222;
+            --bg-input: #111;
+            --danger: #EF4444;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --brand-purple: #6a4ce0;
+            --bg-input: #f3f4f6;
+        }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            font-size: 12px;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        #toolbar {
+            padding: 10px; display: flex; gap: 10px; border-bottom: 1px solid var(--border-color);
+            background: var(--bg-panel); align-items: center;
+        }
+
+        input[type="text"] {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 6px; border-radius: 4px;
+            font-size: 11px; font-family: 'JetBrains Mono'; flex: 1;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: var(--brand-purple); }
+
+        table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono'; font-size: 11px; }
+
+        th {
+            text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-color);
+            color: var(--text-dim); cursor: pointer; user-select: none; position: sticky; top: 0;
+            background: var(--bg-core); /* Sticky header needs bg */
+        }
+        th:hover { color: var(--text-head); }
+
+        td { padding: 6px 10px; border-bottom: 1px solid rgba(128,128,128,0.1); color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        tr:hover td { background: rgba(128,128,128,0.05); color: var(--text-head); }
+
+        .numeric { text-align: right; }
+
+        .action-btn {
+            background: transparent; border: 1px solid var(--border-color);
+            color: var(--danger); cursor: pointer; font-size: 10px;
+            padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono';
+            transition: all 0.2s;
+        }
+        .action-btn:hover { border-color: var(--danger); background: var(--danger); color: white; }
+
+        #loading-overlay {
+            position: absolute; top: 45px; left: 0; width: 100%; height: calc(100% - 45px);
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            color: var(--text-head); pointer-events: none; opacity: 0; transition: opacity 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <input type="text" id="search" placeholder="Search processes (PID or Name)..." oninput="renderTable()">
+        <span id="proc-count" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-dim);">0 procs</span>
+        <button onclick="fetchTasks()" class="action-btn" style="color:var(--text-head); border-color:var(--border-color);">Refresh</button>
+    </div>
+
+    <div id="table-container" style="overflow-y:auto; height:calc(100vh - 55px);">
+        <table id="proc-table">
+            <thead>
+                <tr>
+                    <th onclick="setSort('pid')">PID</th>
+                    <th onclick="setSort('name')">Name</th>
+                    <th onclick="setSort('username')">User</th>
+                    <th onclick="setSort('cpu_percent')" class="numeric">CPU%</th>
+                    <th onclick="setSort('memory_percent')" class="numeric">MEM%</th>
+                    <th style="text-align:right">Action</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
+
+    <div id="loading-overlay">Loading...</div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+        let tasks = [];
+        let sortKey = 'cpu_percent';
+        let sortDesc = true;
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') { coreUrl = e.data.url; fetchTasks(); }
+            if (e.data.type === 'TOKEN_UPDATE') { authToken = e.data.token; fetchTasks(); }
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+        });
+
+        async function fetchTasks() {
+            if(!coreUrl || !authToken) return;
+            // show loading? maybe subtle
+
+            try {
+                const res = await fetch(coreUrl + '/api/tasks', {
+                    headers: { 'X-Token': authToken }
+                });
+                if(res.ok) {
+                    tasks = await res.json();
+                    renderTable();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tbody');
+            const search = document.getElementById('search').value.toLowerCase();
+
+            let filtered = tasks.filter(p => {
+                return (p.name && p.name.toLowerCase().includes(search)) ||
+                       (p.pid && p.pid.toString().includes(search));
+            });
+
+            document.getElementById('proc-count').innerText = filtered.length + " procs";
+
+            // Sort
+            filtered.sort((a, b) => {
+                let valA = a[sortKey];
+                let valB = b[sortKey];
+
+                if(valA === undefined) valA = 0;
+                if(valB === undefined) valB = 0;
+
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return sortDesc ? 1 : -1;
+                if (valA > valB) return sortDesc ? -1 : 1;
+                return 0;
+            });
+
+            let html = "";
+            filtered.forEach(p => {
+                html += `
+                    <tr>
+                        <td>${p.pid}</td>
+                        <td title="${p.name}">${p.name}</td>
+                        <td>${p.username || '-'}</td>
+                        <td class="numeric">${p.cpu_percent.toFixed(1)}%</td>
+                        <td class="numeric">${p.memory_percent.toFixed(1)}%</td>
+                        <td style="text-align:right">
+                            <button class="action-btn" onclick="killTask(${p.pid})">KILL</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function setSort(key) {
+            if(sortKey === key) {
+                sortDesc = !sortDesc;
+            } else {
+                sortKey = key;
+                sortDesc = true; // default desc for new col? usually desc for numbers, asc for text.
+                if(key === 'name' || key === 'username') sortDesc = false;
+            }
+            renderTable();
+        }
+
+        async function killTask(pid) {
+            if(!confirm(`Are you sure you want to kill process ${pid}?`)) return;
+            try {
+                const res = await fetch(coreUrl + '/api/tasks/kill', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken
+                    },
+                    body: JSON.stringify({ pid: pid })
+                });
+                if(res.ok) {
+                    fetchTasks(); // refresh
+                } else {
+                    alert("Failed to kill process.");
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // Init
+        if(coreUrl && authToken) {
+            fetchTasks();
+            setInterval(fetchTasks, 3000); // Auto refresh every 3s
+        }
+    </script>
+</body>
+</html>

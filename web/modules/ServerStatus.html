@@ -133,11 +133,8 @@
             </div>
         </div>
 
-        <div class="stat-row" style="margin-top:15px;">
-            <span class="stat-label">Disk Usage</span>
-            <span class="stat-value" id="val-disk">--%</span>
-        </div>
-        <div class="progress-bg"><div class="progress-fill" id="bar-disk"></div></div>
+        <div style="margin-top:15px; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px; font-family:'JetBrains Mono'; font-size:11px; color:var(--text-dim);">DRIVES</div>
+        <div id="drives-container"></div>
     </div>
 
     <!-- GPU Tab -->
@@ -235,22 +232,7 @@
                         <div class="stat-row"><span class="stat-label">IP Address</span><span class="stat-value">${data.ip_address}</span></div>
                         <div class="stat-row"><span class="stat-label">OS</span><span class="stat-value">${data.os}</span></div>
                         <div class="stat-row"><span class="stat-label">CPU Model</span><span class="stat-value">${data.cpu_model}</span></div>
-                        <div style="margin-top:10px; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:4px;">DRIVES</div>
                     `;
-                    data.partitions.forEach(p => {
-                         html += `
-                            <div style="background:rgba(128,128,128,0.05); padding:8px; border-radius:4px; margin-bottom:5px;">
-                                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                                    <span>${p.mountpoint} (${p.fstype})</span>
-                                    <span>${p.percent}%</span>
-                                </div>
-                                <div class="progress-bg"><div class="progress-fill" style="width:${p.percent}%"></div></div>
-                                <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">
-                                    ${p.used_gb.toFixed(1)} GB used / ${p.total_gb.toFixed(1)} GB total
-                                </div>
-                            </div>
-                         `;
-                    });
                     document.getElementById('info-container').innerHTML = html;
                 }
             } catch(e) {}
@@ -282,8 +264,34 @@
             document.getElementById('bar-ram').style.width = data.ram.percent + '%';
             document.getElementById('sub-ram').innerText = `${data.ram.used_gb.toFixed(1)} / ${data.ram.total_gb.toFixed(1)} GB`;
 
-            document.getElementById('val-disk').innerText = data.disk.percent + '%';
-            document.getElementById('bar-disk').style.width = data.disk.percent + '%';
+            // Drives
+            if (data.disk && data.disk.partitions) {
+                let drivesHtml = "";
+                data.disk.partitions.forEach(p => {
+                     drivesHtml += `
+                        <div style="background:rgba(128,128,128,0.05); padding:8px; border-radius:4px; margin-bottom:5px;">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:11px;">
+                                <span style="font-family:'JetBrains Mono'">${p.mountpoint}</span>
+                                <span>${p.percent}%</span>
+                            </div>
+                            <div class="progress-bg"><div class="progress-fill" style="width:${p.percent}%"></div></div>
+                            <div style="font-size:10px; color:var(--text-dim); margin-top:2px; display:flex; justify-content:space-between;">
+                                <span>${p.fstype}</span>
+                                <span>${p.used_gb.toFixed(1)} / ${p.total_gb.toFixed(1)} GB</span>
+                            </div>
+                        </div>
+                     `;
+                });
+                document.getElementById('drives-container').innerHTML = drivesHtml;
+            } else {
+                 // Fallback if no detailed partitions
+                 document.getElementById('drives-container').innerHTML = `
+                    <div style="background:rgba(128,128,128,0.05); padding:8px; border-radius:4px;">
+                         <div style="display:flex; justify-content:space-between;"><span>Root</span><span>${data.disk.percent}%</span></div>
+                         <div class="progress-bg"><div class="progress-fill" style="width:${data.disk.percent}%"></div></div>
+                    </div>
+                 `;
+            }
 
             // GPU
             const gpuContainer = document.getElementById('gpu-container');

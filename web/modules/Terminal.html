@@ -76,6 +76,7 @@
         let tabs = [];
         let activeTabId = null;
         let tabCounter = 0;
+        let currentTheme = 'dark';
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
@@ -87,6 +88,11 @@
             if (e.data.type === 'CHILD_RETURNING') {
                 // Restore a returned child window as a new tab
                 addTab();
+            }
+            if (e.data.type === 'THEME_CHANGE') {
+                currentTheme = e.data.theme;
+                document.body.setAttribute('data-theme', e.data.theme);
+                updateAllTerminalsTheme();
             }
         });
 
@@ -127,10 +133,7 @@
                 cursorBlink: true,
                 fontSize: 13,
                 fontFamily: '"JetBrains Mono", monospace',
-                theme: {
-                    background: '#050505',
-                    foreground: '#cccccc'
-                }
+                theme: getTermTheme()
             });
             const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
@@ -288,6 +291,31 @@
                 url: 'Terminal.html',
                 canMinimize: true
             }, '*');
+        }
+
+        function getTermTheme() {
+            if(currentTheme === 'light') {
+                return {
+                    background: '#eef0f4', // Match --bg-core light
+                    foreground: '#333333',
+                    cursor: '#333333',
+                    selection: 'rgba(0,0,0,0.1)'
+                };
+            } else {
+                return {
+                    background: '#050505', // Match --bg-core dark
+                    foreground: '#cccccc',
+                    cursor: '#ffffff',
+                    selection: 'rgba(255,255,255,0.1)'
+                };
+            }
+        }
+
+        function updateAllTerminalsTheme() {
+            const th = getTermTheme();
+            tabs.forEach(t => {
+                t.term.options.theme = th;
+            });
         }
 
         window.addEventListener('resize', () => {
