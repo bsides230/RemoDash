@@ -5,12 +5,14 @@ import asyncio
 import json
 import datetime
 import shutil
+import socket
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
 import platform
+import subprocess
 
-from fastapi import FastAPI, Request, HTTPException, Header, Depends
+from fastapi import FastAPI, Request, HTTPException, Header, Depends, Body, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
@@ -23,6 +25,13 @@ try:
     import pynvml
 except ImportError:
     pynvml = None
+
+# Platform-specific imports for Terminal
+if platform.system() != "Windows":
+    import pty
+    import termios
+    import struct
+    import fcntl
 
 # Global reference to the main event loop
 main_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -172,6 +181,11 @@ class PresetModel(BaseModel):
 
 class ActiveConfigModel(BaseModel):
     config: Dict[str, Any]
+
+class FileOpRequest(BaseModel):
+    path: str
+    content: Optional[str] = None
+    new_path: Optional[str] = None
 
 # --- App Setup ---
 
@@ -331,6 +345,303 @@ async def health_check():
         "battery": battery_info,
         "os": os_info
     }
+
+@app.get("/api/sysinfo", dependencies=[Depends(verify_token)])
+async def get_sysinfo():
+    """Returns static system information."""
+    hostname = socket.gethostname()
+    try:
+        ip_address = socket.gethostbyname(hostname)
+    except:
+        ip_address = "Unknown"
+
+    # CPU Model
+    cpu_model = "Unknown"
+    if platform.system() == "Windows":
+        try:
+            cpu_model = subprocess.check_output(["wmic", "cpu", "get", "name"]).decode().split("\n")[1].strip()
+        except: pass
+    elif platform.system() == "Linux":
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if "model name" in line:
+                        cpu_model = line.split(":")[1].strip()
+                        break
+        except: pass
+
+    if cpu_model == "Unknown":
+        cpu_model = platform.processor()
+
+    # Partitions
+    partitions = []
+    try:
+        for part in psutil.disk_partitions():
+            usage = psutil.disk_usage(part.mountpoint)
+            partitions.append({
+                "device": part.device,
+                "mountpoint": part.mountpoint,
+                "fstype": part.fstype,
+                "total_gb": usage.total / (1024**3),
+                "used_gb": usage.used / (1024**3),
+                "percent": usage.percent
+            })
+    except: pass
+
+    return {
+        "hostname": hostname,
+        "ip_address": ip_address,
+        "os": f"{platform.system()} {platform.release()}",
+        "cpu_model": cpu_model,
+        "partitions": partitions
+    }
+
+# --- Terminal Logic ---
+
+class TerminalSession:
+    def __init__(self):
+        self.process = None
+        self.master_fd = None
+        self.os_type = platform.system()
+        self.loop = asyncio.get_running_loop()
+
+    def start(self, cols=80, rows=24):
+        if self.os_type == "Windows":
+            self.process = subprocess.Popen(
+                ["cmd.exe"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0,
+                shell=False
+            )
+        else:
+            # Linux PTY
+            self.master_fd, slave_fd = pty.openpty()
+            shell = os.environ.get("SHELL", "/bin/bash")
+
+            # Set initial size
+            self.resize(cols, rows)
+
+            self.process = subprocess.Popen(
+                [shell],
+                preexec_fn=os.setsid,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                universal_newlines=False
+            )
+            os.close(slave_fd)
+
+    def resize(self, cols, rows):
+        if self.os_type != "Windows" and self.master_fd is not None:
+            try:
+                winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+            except: pass
+
+    async def read_output(self):
+        """Reads from the process and returns bytes."""
+        if self.os_type == "Windows":
+            return await self.loop.run_in_executor(None, self._read_windows)
+        else:
+            return await self.loop.run_in_executor(None, self._read_linux)
+
+    def _read_windows(self):
+        # Read from stdout (blocking)
+        # Note: This simple implementation merges stdout and stderr roughly
+        # For a better Windows shell, pywinpty is recommended but we are using stdlib
+        if self.process and self.process.stdout:
+            return self.process.stdout.read(1024)
+        return b""
+
+    def _read_linux(self):
+        if self.master_fd:
+            try:
+                return os.read(self.master_fd, 1024)
+            except OSError:
+                return b""
+        return b""
+
+    def write_input(self, data: str):
+        if self.os_type == "Windows":
+            if self.process and self.process.stdin:
+                try:
+                    self.process.stdin.write(data.encode())
+                    self.process.stdin.flush()
+                except: pass
+        else:
+            if self.master_fd:
+                os.write(self.master_fd, data.encode())
+
+    def close(self):
+        if self.process:
+            self.process.terminate()
+        if self.os_type != "Windows" and self.master_fd:
+            os.close(self.master_fd)
+
+
+@app.websocket("/api/terminal")
+async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None):
+    # Verify Auth manually
+    if Path("global_flags/no_auth").exists():
+        pass # No Auth required
+    elif not REMODASH_TOKEN or not token or token != REMODASH_TOKEN:
+        await websocket.close(code=4003)
+        return
+
+    await websocket.accept()
+
+    session = TerminalSession()
+    try:
+        session.start()
+
+        # Reader Task
+        async def sender():
+            while True:
+                data = await session.read_output()
+                if not data:
+                    break
+                try:
+                    # Send as text (decode with replacement)
+                    text = data.decode(errors="replace")
+                    await websocket.send_text(json.dumps({"type": "output", "data": text}))
+                except:
+                    break
+
+        sender_task = asyncio.create_task(sender())
+
+        # Receiver Loop
+        while True:
+            try:
+                msg_text = await websocket.receive_text()
+                msg = json.loads(msg_text)
+
+                if msg["type"] == "input":
+                    session.write_input(msg["data"])
+                elif msg["type"] == "resize":
+                    session.resize(msg.get("cols", 80), msg.get("rows", 24))
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                print(f"Terminal error: {e}")
+                break
+
+        sender_task.cancel()
+
+    finally:
+        session.close()
+
+# --- File System Endpoints ---
+
+@app.get("/api/files/list", dependencies=[Depends(verify_token)])
+async def list_files(path: str, sort_by: str = "name", order: str = "asc"):
+    """Lists files in the given directory with sorting."""
+    # Ensure path exists
+    target_path = Path(path)
+    if not target_path.exists():
+         raise HTTPException(status_code=404, detail="Path not found")
+
+    if not target_path.is_dir():
+         raise HTTPException(status_code=400, detail="Path is not a directory")
+
+    items = []
+    try:
+        with os.scandir(target_path) as it:
+            for entry in it:
+                try:
+                    stat = entry.stat()
+                    item_type = "dir" if entry.is_dir() else "file"
+                    items.append({
+                        "name": entry.name,
+                        "path": entry.path,
+                        "type": item_type,
+                        "size": stat.st_size,
+                        "mtime": stat.st_mtime
+                    })
+                except OSError:
+                    continue # Skip permission denied etc
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission Denied")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Sorting
+    reverse = (order == "desc")
+    if sort_by == "name":
+        items.sort(key=lambda x: x["name"].lower(), reverse=reverse)
+    elif sort_by == "size":
+        items.sort(key=lambda x: x["size"], reverse=reverse)
+    elif sort_by == "date":
+        items.sort(key=lambda x: x["mtime"], reverse=reverse)
+    elif sort_by == "type":
+        items.sort(key=lambda x: (x["type"], x["name"].lower()), reverse=reverse)
+
+    # Always put directories first if sorting by name or type
+    if sort_by == "name":
+         items.sort(key=lambda x: 0 if x["type"] == "dir" else 1)
+
+    return {"path": str(target_path), "items": items}
+
+@app.get("/api/files/content", dependencies=[Depends(verify_token)])
+async def get_file_content(path: str):
+    p = Path(path)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        # Read as text, binary handling might be needed later for other types
+        # For now assuming text editing as per requirement
+        async with asyncio.Lock(): # Simple lock not strictly needed for read but good practice
+             with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                 content = f.read()
+        return {"content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/save", dependencies=[Depends(verify_token)])
+async def save_file_content(data: FileOpRequest):
+    p = Path(data.path)
+    try:
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(data.content if data.content else "")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/create_folder", dependencies=[Depends(verify_token)])
+async def create_folder(data: FileOpRequest):
+    p = Path(data.path)
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/delete", dependencies=[Depends(verify_token)])
+async def delete_item(data: FileOpRequest):
+    p = Path(data.path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Path not found")
+    try:
+        if p.is_dir():
+            shutil.rmtree(p)
+        else:
+            p.unlink()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/rename", dependencies=[Depends(verify_token)])
+async def rename_item(data: FileOpRequest):
+    if not data.new_path:
+        raise HTTPException(status_code=400, detail="new_path required")
+    src = Path(data.path)
+    dst = Path(data.new_path)
+    try:
+        src.rename(dst)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Logging Endpoints
 @app.get("/api/logs", dependencies=[Depends(verify_token)])

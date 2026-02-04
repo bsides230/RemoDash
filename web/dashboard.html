@@ -525,9 +525,65 @@
             .window-header { cursor: default !important; }
             .win-controls .win-btn:first-child { display: none; } /* Hide Maximize */
         }
+
+        /* Instance Picker */
+        .instance-picker {
+            position: fixed;
+            bottom: 80px; /* Above dock */
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 20005;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            animation: fadeUp 0.2s ease-out;
+            align-items: center;
+        }
+        .instance-card {
+            width: 100px;
+            height: 70px;
+            background: var(--bg-core);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .instance-card:hover { border-color: var(--brand-purple); }
+        .instance-card.active-card { border-color: var(--brand-purple); background: var(--brand-purple-dim); }
+        .instance-title { font-size: 10px; color: var(--text-dim); margin-top: 5px; text-align: center; width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;}
+        .instance-icon { font-size: 18px; pointer-events: none; }
+        .instance-close {
+            position: absolute; top: -6px; right: -6px;
+            width: 18px; height: 18px; background: #ff4444; color: white;
+            border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.2s;
+            cursor: pointer; z-index: 10;
+        }
+        .instance-card:hover .instance-close { opacity: 1; }
+
+        .instance-add {
+            width: 40px; height: 70px;
+            border: 1px dashed var(--text-dim);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: var(--text-dim);
+            cursor: pointer; transition: all 0.2s;
+        }
+        .instance-add:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+        .instance-picker-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%; z-index:20004; display:none;
+        }
     </style>
 </head>
 <body data-theme="dark">
+    <div class="instance-picker-overlay" onclick="closeInstancePicker()"></div>
 
     <div id="top-system-bar">
         <div class="bar-section">
@@ -666,13 +722,14 @@
            CONFIG & STATE
            ========================================================================= */
         const MODULE_REGISTRY = [
-            { id: "mod_logs", file: "LogViewer.html", name: "System Logs", icon: "📜" },
-            { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "🔧" },
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
+            { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "📁" },
+            { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "💻" },
+            { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "⚙️" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_logs', 'mod_settings', 'mod_server_status'],
+            activeModules: ['mod_server_status', 'mod_file_explorer', 'mod_terminal', 'mod_settings'],
             dockPinned: true,
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -680,7 +737,8 @@
         };
 
         let zIndexCounter = 100;
-        let activeWindows = new Set();
+        // Map: modId -> Array of { id: windowId, title: string }
+        let runningInstances = {};
         let isEditMode = false;
 
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -760,7 +818,7 @@
                     if(isEditMode) {
                         openEditPopup(e, mod);
                     } else {
-                        toggleWindow(mod);
+                        handleDockClick(mod, btn);
                     }
                 };
                 container.appendChild(btn);
@@ -1008,9 +1066,82 @@
         /* =========================================
            HELPERS
            ========================================= */
-        function toggleWindow(mod) {
-            const id = 'win_' + mod.id;
-            const el = document.getElementById(id);
+
+        function handleDockClick(mod, btn) {
+            const instances = runningInstances[mod.id] || [];
+
+            if (instances.length === 0) {
+                createNewInstance(mod);
+            } else if (instances.length === 1) {
+                toggleWindow(instances[0].id);
+            } else {
+                showInstancePicker(mod, btn, instances);
+            }
+        }
+
+        function showInstancePicker(mod, btn, instances) {
+             closeInstancePicker(); // Close existing
+
+             const picker = document.createElement('div');
+             picker.className = 'instance-picker';
+             picker.id = 'active-picker';
+
+             // Add Instance Cards
+             instances.forEach(inst => {
+                 const card = document.createElement('div');
+                 card.className = 'instance-card';
+                 if(document.getElementById(inst.id).style.display !== 'none') card.classList.add('active-card');
+
+                 card.innerHTML = `
+                    <div class="instance-icon">${mod.icon}</div>
+                    <div class="instance-title">${inst.title || mod.name}</div>
+                    <div class="instance-close" onclick="event.stopPropagation(); closeWindow('${inst.id}')">✕</div>
+                 `;
+                 card.onclick = () => {
+                     toggleWindow(inst.id);
+                     closeInstancePicker();
+                 };
+                 picker.appendChild(card);
+             });
+
+             // Add "New" Button
+             const addBtn = document.createElement('div');
+             addBtn.className = 'instance-add';
+             addBtn.innerHTML = '+';
+             addBtn.onclick = () => {
+                 createNewInstance(mod);
+                 closeInstancePicker();
+             };
+             picker.appendChild(addBtn);
+
+             document.body.appendChild(picker);
+             document.querySelector('.instance-picker-overlay').style.display = 'block';
+
+             // Position
+             const rect = btn.getBoundingClientRect();
+             const pickerRect = picker.getBoundingClientRect();
+             let left = rect.left + (rect.width/2) - (pickerRect.width/2);
+             if(left < 10) left = 10;
+             if(left + pickerRect.width > window.innerWidth - 10) left = window.innerWidth - pickerRect.width - 10;
+
+             picker.style.left = left + 'px';
+             picker.style.bottom = (window.innerHeight - rect.top + 15) + 'px';
+        }
+
+        function closeInstancePicker() {
+            const p = document.getElementById('active-picker');
+            if(p) p.remove();
+            document.querySelector('.instance-picker-overlay').style.display = 'none';
+        }
+
+        function createNewInstance(mod) {
+             const rand = Math.floor(Math.random() * 10000);
+             const instanceId = 'win_' + mod.id + '_' + rand;
+             createWindow(mod, instanceId);
+        }
+
+        function toggleWindow(instanceId) {
+            const el = document.getElementById(instanceId);
             if(el) {
                 if(el.style.display === 'none') {
                     el.style.display = 'flex'; el.style.zIndex = ++zIndexCounter;
@@ -1018,18 +1149,18 @@
                 } else {
                     el.style.display = 'none';
                 }
-            } else {
-                createWindow(mod);
             }
             updateDockIndicators();
         }
 
-        function createWindow(mod) {
-            const id = 'win_' + mod.id;
+        function createWindow(mod, instanceId) {
+            // Check if ID passed, else legacy fallback (shouldn't happen with new logic but good for safety)
+            if(!instanceId) instanceId = 'win_' + mod.id;
+
             const area = document.getElementById('desktop-area');
             const win = document.createElement('div');
             win.className = 'lyrn-window active';
-            win.id = id;
+            win.id = instanceId;
             win.style.zIndex = ++zIndexCounter;
 
             const isMobileWidth = window.innerWidth <= 600;
@@ -1039,7 +1170,9 @@
             win.style.width = startW;
             win.style.height = startH;
 
-            const offset = (activeWindows.size * 30) + 50;
+            // Offset based on total windows
+            const totalWins = document.querySelectorAll('.lyrn-window').length;
+            const offset = (totalWins * 30) + 50;
             if(!isMobileWidth) {
                  win.style.left = isTouch ? '5%' : offset + 'px';
                  win.style.top = isTouch ? '10%' : offset + 'px';
@@ -1049,10 +1182,10 @@
                 <div class="window-header">
                     <span class="window-title">${mod.name}</span>
                     <div class="win-controls">
-                         <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${mod.id}', this)">📌</button>
-                         <button class="win-btn" onclick="minimizeWindow('${mod.id}')">_</button>
+                         <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${instanceId}', this)">📌</button>
+                         <button class="win-btn" onclick="minimizeWindow('${instanceId}')">_</button>
                          <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
-                         <button class="win-btn close-btn" onclick="closeWindow('${mod.id}')">✕</button>
+                         <button class="win-btn close-btn" onclick="closeWindow('${instanceId}')">✕</button>
                     </div>
                 </div>
                 <div class="window-content">
@@ -1078,19 +1211,34 @@
             win.onmousedown = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
             win.ontouchstart = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
             area.appendChild(win);
-            activeWindows.add(mod.id);
+
+            // Register Instance
+            if(!runningInstances[mod.id]) runningInstances[mod.id] = [];
+            runningInstances[mod.id].push({ id: instanceId, title: mod.name });
+
             updateDockIndicators();
         }
 
-        function closeWindow(modId) {
-            const win = document.getElementById('win_' + modId);
+        function closeWindow(instanceId) {
+            const win = document.getElementById(instanceId);
             if(win) win.remove();
-            activeWindows.delete(modId);
+
+            // Remove from registry
+            for (const modId in runningInstances) {
+                runningInstances[modId] = runningInstances[modId].filter(inst => inst.id !== instanceId);
+                if(runningInstances[modId].length === 0) delete runningInstances[modId];
+            }
+
+            // If picker is open, refresh it or close it
+            if(document.getElementById('active-picker')) {
+                 closeInstancePicker();
+            }
+
             updateDockIndicators();
         }
 
-        function minimizeWindow(modId) {
-            const win = document.getElementById('win_' + modId);
+        function minimizeWindow(instanceId) {
+            const win = document.getElementById(instanceId);
             if(win) win.style.display = 'none';
             updateDockIndicators();
         }
@@ -1187,18 +1335,17 @@
                 btn.classList.remove('is-running');
                 const dot = btn.querySelector('.active-dot');
                 if(dot) dot.classList.remove('minimized-dot');
-            });
 
-            activeWindows.forEach(id => {
-                const btn = document.getElementById('btn_' + id);
-                const win = document.getElementById('win_' + id);
-
-                if(btn && win) {
-                    btn.classList.add('is-running');
-                    const dot = btn.querySelector('.active-dot');
-                    if(dot && win.style.display === 'none') {
-                        dot.classList.add('minimized-dot');
-                    }
+                // Check running
+                const modId = btn.id.replace('btn_', '');
+                if (runningInstances[modId] && runningInstances[modId].length > 0) {
+                     btn.classList.add('is-running');
+                     // If all minimized, show minimized dot
+                     const allMin = runningInstances[modId].every(inst => {
+                         const el = document.getElementById(inst.id);
+                         return el && el.style.display === 'none';
+                     });
+                     if(allMin && dot) dot.classList.add('minimized-dot');
                 }
             });
         }
@@ -1252,8 +1399,8 @@
             saveSettings();
         }
 
-        function togglePin(modId, btn) {
-            const win = document.getElementById('win_' + modId);
+        function togglePin(instanceId, btn) {
+            const win = document.getElementById(instanceId);
             if(win) {
                 win.classList.toggle('always-on-top');
                 if(win.classList.contains('always-on-top')) {

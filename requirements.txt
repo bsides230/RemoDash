@@ -4,3 +4,4 @@ psutil
 aiofiles
 aiohttp
 nvidia-ml-py
+websockets

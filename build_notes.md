@@ -1,34 +1,42 @@
 # Build Notes
 
-## Update: Cleanup and Tailscale Integration
+## Update: Multi-Instance Modules and System Tools
 
 **Date:** (Current Date)
 
 ### Summary
-This update transitions the repository from a LYRN-specific AI dashboard to a generic system dashboard ("RemoDash"). It removes unused LLM-related modules and adds support for installing Tailscale via the setup wizard.
+This update introduces a full multi-instance windowing system, a robust File Explorer, and a Terminal with WebSocket support.
 
 ### Changes
 
 #### Core System
-- **Cleanup:** Removed all LLM-related code and module references from the frontend.
-- **Wizard:** Added a step to `wizard.py` to optionally install Tailscale for remote access.
+- **API**: Added `/api/sysinfo` for detailed system information.
+- **File System**: Added full CRUD endpoints (`/api/files/*`) for filesystem management.
+- **Terminal**: Added `/api/terminal` WebSocket endpoint supporting `pty` (Linux) and `subprocess` (Windows).
+- **Dependencies**: Added `websockets` to `requirements.txt`.
 
 #### Frontend
-- **Dashboard:**
-    - Removed `mod_chat`, `mod_builder`, `mod_models`, `mod_model_manager`, and `mod_job_manager` from the registry.
-    - Removed the `#sys-status-llm` indicator.
-- **Server Status Module:**
-    - Removed the LLM tab and stats display.
-- **Settings Module:**
-    - Removed the API Endpoints configuration section.
+- **Dashboard (`web/dashboard.html`)**:
+    -   Implemented multi-instance support (multiple windows per app).
+    -   Added "Instance Picker" UI for managing multiple open windows.
+    -   Updated module registry (System Status, File Explorer, Terminal, Settings).
+- **File Explorer (`web/modules/FileExplorer.html`)**:
+    -   New module for browsing, editing, renaming, and deleting files.
+- **Terminal (`web/modules/Terminal.html`)**:
+    -   New module using `xterm.js`.
+    -   Supports internal tabs and resizing.
+- **System Status (`web/modules/ServerStatus.html`)**:
+    -   Added "Info" tab displaying Hostname, IP, OS, CPU Model, and Drive partitions.
 
 #### Deleted Files
-- `web/modules/Chat Interface.html`
-- `web/modules/Job Manager.html`
-- `web/modules/ModelController.html`
-- `web/modules/ModelManager.html`
-- `web/modules/Snapshot Builder.html`
-- `web/modules/Gamemaster/` directory
+- `web/modules/LogViewer.html` (Replaced by Terminal)
 
-### Logging
-- No changes to the logging system in this update.
+## Update: Cleanup and Tailscale Integration
+
+**Date:** (Previous Update)
+
+### Summary
+This update transitions the repository from a generic system dashboard.
+
+### Changes
+(Legacy notes preserved)

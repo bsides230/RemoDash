@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>File Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-hover: #111;
+            --brand-purple: #7c5cff;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #222222;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --bg-hover: #f0f0f0;
+            --brand-purple: #6a4ce0;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            font-size: 13px;
+            display: flex; flex-direction: column; height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-panel);
+            display: flex; align-items: center; gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .path-bar {
+            flex: 1;
+            display: flex; align-items: center; gap: 5px;
+            background: var(--bg-core);
+            border: 1px solid var(--border-color);
+            padding: 4px 8px; border-radius: 4px;
+        }
+
+        .path-input {
+            background: transparent; border: none; color: var(--text-head);
+            font-family: 'JetBrains Mono', monospace; width: 100%; outline: none;
+            font-size: 12px;
+        }
+
+        button {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 5px 10px; border-radius: 4px;
+            cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;
+            transition: all 0.2s;
+        }
+        button:hover { border-color: var(--brand-purple); color: var(--brand-purple); }
+
+        /* File List */
+        .file-list-header {
+            display: grid;
+            grid-template-columns: 30px 2fr 100px 150px 100px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-dim); font-size: 11px; text-transform: uppercase;
+            font-family: 'JetBrains Mono'; user-select: none;
+        }
+        .header-cell { cursor: pointer; }
+        .header-cell:hover { color: var(--text-head); }
+
+        #file-list {
+            flex: 1; overflow-y: auto;
+        }
+
+        .file-row {
+            display: grid;
+            grid-template-columns: 30px 2fr 100px 150px 100px;
+            padding: 8px 10px;
+            border-bottom: 1px solid transparent;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .file-row:hover { background: var(--bg-hover); }
+        .file-row.selected { background: rgba(124, 92, 255, 0.1); border-bottom-color: var(--brand-purple); }
+
+        .icon { font-size: 16px; display: flex; justify-content: center; }
+        .name { color: var(--text-head); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'Inter'; font-weight: 500; }
+        .meta { color: var(--text-dim); font-family: 'JetBrains Mono'; font-size: 11px; }
+
+        .actions { display: flex; gap: 5px; opacity: 0; transition: opacity 0.2s; }
+        .file-row:hover .actions { opacity: 1; }
+
+        .action-btn {
+            border: none; background: transparent; padding: 2px;
+            color: var(--text-dim); cursor: pointer; font-size: 14px;
+        }
+        .action-btn:hover { color: var(--brand-purple); }
+        .action-btn.danger:hover { color: #ff4444; }
+
+        /* Editor Overlay */
+        #editor-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg-core); z-index: 100;
+            display: none; flex-direction: column;
+        }
+        #editor-header {
+            padding: 10px; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-panel);
+        }
+        #editor-content {
+            flex: 1; background: var(--bg-core); color: var(--text-body);
+            font-family: 'JetBrains Mono', monospace; font-size: 13px;
+            border: none; padding: 15px; outline: none; resize: none;
+            line-height: 1.5;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+            z-index: 200; display: none; align-items: center; justify-content: center;
+        }
+        .modal {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            padding: 20px; border-radius: 8px; width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .modal h3 { margin-top: 0; color: var(--text-head); font-family: 'JetBrains Mono'; font-size: 14px; }
+        .modal input {
+            width: 100%; padding: 8px; background: var(--bg-core);
+            border: 1px solid var(--border-color); color: var(--text-head);
+            margin: 10px 0; font-family: 'JetBrains Mono'; outline: none;
+        }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--brand-purple); }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <button onclick="goUp()">⬆</button>
+        <button onclick="reload()">↻</button>
+        <div class="path-bar">
+            <span style="color:var(--text-dim)">Path:</span>
+            <input type="text" class="path-input" id="current-path" onkeydown="if(event.key==='Enter') navigate(this.value)">
+        </div>
+        <button onclick="showCreateModal('file')">+ File</button>
+        <button onclick="showCreateModal('folder')">+ Folder</button>
+    </div>
+
+    <div class="file-list-header">
+        <div class="header-cell"></div>
+        <div class="header-cell" onclick="setSort('name')">Name</div>
+        <div class="header-cell" onclick="setSort('size')">Size</div>
+        <div class="header-cell" onclick="setSort('date')">Date</div>
+        <div class="header-cell">Actions</div>
+    </div>
+
+    <div id="file-list"></div>
+
+    <!-- Modals -->
+    <div id="modal-create" class="modal-overlay">
+        <div class="modal">
+            <h3 id="modal-title">Create New</h3>
+            <input type="text" id="inp-create-name" placeholder="Name...">
+            <div class="modal-footer">
+                <button onclick="closeModal('modal-create')">Cancel</button>
+                <button id="btn-create-confirm" class="active">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-rename" class="modal-overlay">
+        <div class="modal">
+            <h3>Rename</h3>
+            <input type="text" id="inp-rename-name">
+            <div class="modal-footer">
+                <button onclick="closeModal('modal-rename')">Cancel</button>
+                <button id="btn-rename-confirm" class="active">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Editor -->
+    <div id="editor-overlay">
+        <div id="editor-header">
+            <span id="editor-filename" style="color:var(--text-head); font-family:'JetBrains Mono'">filename.txt</span>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeEditor()">Close</button>
+                <button onclick="saveEditor()" style="border-color:var(--brand-purple); color:var(--brand-purple);">Save</button>
+            </div>
+        </div>
+        <textarea id="editor-content" spellcheck="false"></textarea>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+
+        let currentPath = "/";
+        let sortMode = "name";
+        let sortOrder = "asc";
+        let items = [];
+
+        // Windows vs Linux root handling
+        // We'll rely on backend to handle "/" correctly or "C:/"
+
+        document.addEventListener('DOMContentLoaded', () => {
+             // Try to restore path? Nah start at root or home
+             loadFiles(currentPath);
+        });
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') {
+                coreUrl = e.data.url;
+                loadFiles(currentPath);
+            }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                authToken = e.data.token;
+                loadFiles(currentPath);
+            }
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+        });
+
+        async function loadFiles(path) {
+            if(!coreUrl || !authToken) return;
+
+            document.getElementById('file-list').innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">Loading...</div>';
+            document.getElementById('current-path').value = path;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/files/list?path=${encodeURIComponent(path)}&sort_by=${sortMode}&order=${sortOrder}`, {
+                    headers: { 'X-Token': authToken }
+                });
+                if(!res.ok) throw new Error(res.statusText);
+
+                const data = await res.json();
+                currentPath = data.path; // Canonical path from backend
+                document.getElementById('current-path').value = currentPath;
+                items = data.items;
+                renderList();
+            } catch(e) {
+                document.getElementById('file-list').innerHTML = `<div style="padding:20px; text-align:center; color:var(--error-color)">Error: ${e.message}</div>`;
+            }
+        }
+
+        function renderList() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = '';
+
+            if(items.length === 0) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim)">Empty Directory</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'file-row';
+
+                const icon = item.type === 'dir' ? '📁' : '📄';
+                const date = new Date(item.mtime * 1000).toLocaleString();
+                const size = item.type === 'dir' ? '--' : formatSize(item.size);
+
+                row.innerHTML = `
+                    <div class="icon">${icon}</div>
+                    <div class="name">${item.name}</div>
+                    <div class="meta">${size}</div>
+                    <div class="meta">${date}</div>
+                    <div class="actions">
+                        <button class="action-btn" title="Rename" onclick="event.stopPropagation(); promptRename('${item.path}', '${item.name}')">✏️</button>
+                        <button class="action-btn danger" title="Delete" onclick="event.stopPropagation(); deleteItem('${item.path}')">🗑</button>
+                    </div>
+                `;
+
+                row.onclick = () => {
+                    if(item.type === 'dir') {
+                        navigate(item.path);
+                    } else {
+                        openFile(item.path, item.name);
+                    }
+                };
+
+                list.appendChild(row);
+            });
+        }
+
+        function navigate(path) {
+            loadFiles(path);
+        }
+
+        function goUp() {
+            // Simple string manipulation for parent, backend handles '..' usually but strictly easier to chop last segment
+            // but let's just pass '..' if it works or calculate parent
+            // Better to rely on logic:
+            if(currentPath.endsWith('/') && currentPath.length > 1) currentPath = currentPath.slice(0, -1);
+            const parent = currentPath.substring(0, currentPath.lastIndexOf((currentPath.includes('/') ? '/' : '\\'))) || (currentPath.includes('\\') ? 'C:\\' : '/');
+            // If we are at root, parent is same
+            if(parent === currentPath) return; // Already root
+            loadFiles(parent);
+        }
+
+        function reload() {
+            loadFiles(currentPath);
+        }
+
+        function setSort(mode) {
+            if(sortMode === mode) {
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortMode = mode;
+                sortOrder = 'asc';
+            }
+            loadFiles(currentPath);
+        }
+
+        // --- Actions ---
+
+        async function deleteItem(path) {
+            if(!confirm("Are you sure you want to delete this item?")) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/files/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ path: path })
+                });
+                if(res.ok) reload();
+                else alert("Failed to delete");
+            } catch(e) { alert(e); }
+        }
+
+        // --- Rename ---
+        let renameTarget = null;
+        function promptRename(path, name) {
+            renameTarget = path;
+            document.getElementById('inp-rename-name').value = name;
+            document.getElementById('modal-rename').style.display = 'flex';
+            document.getElementById('inp-rename-name').focus();
+        }
+
+        document.getElementById('btn-rename-confirm').onclick = async () => {
+             const newName = document.getElementById('inp-rename-name').value;
+             if(!newName) return;
+
+             // Construct new path
+             const sep = currentPath.includes('\\') ? '\\' : '/';
+             let parent = currentPath;
+             if(!parent.endsWith(sep)) parent += sep;
+             const newPath = parent + newName;
+
+             try {
+                const res = await fetch(`${coreUrl}/api/files/rename`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ path: renameTarget, new_path: newPath })
+                });
+                if(res.ok) {
+                    closeModal('modal-rename');
+                    reload();
+                } else alert("Failed to rename");
+             } catch(e) { alert(e); }
+        };
+
+        // --- Create ---
+        let createType = 'file';
+        function showCreateModal(type) {
+            createType = type;
+            document.getElementById('modal-title').innerText = type === 'file' ? 'New File' : 'New Folder';
+            document.getElementById('inp-create-name').value = '';
+            document.getElementById('modal-create').style.display = 'flex';
+            document.getElementById('inp-create-name').focus();
+        }
+
+        document.getElementById('btn-create-confirm').onclick = async () => {
+             const name = document.getElementById('inp-create-name').value;
+             if(!name) return;
+
+             const sep = currentPath.includes('\\') ? '\\' : '/';
+             let parent = currentPath;
+             if(!parent.endsWith(sep)) parent += sep;
+             const newPath = parent + name;
+
+             const endpoint = createType === 'file' ? '/api/files/save' : '/api/files/create_folder';
+             const body = createType === 'file' ? { path: newPath, content: "" } : { path: newPath };
+
+             try {
+                const res = await fetch(`${coreUrl}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify(body)
+                });
+                if(res.ok) {
+                    closeModal('modal-create');
+                    reload();
+                } else alert("Failed to create");
+             } catch(e) { alert(e); }
+        };
+
+        // --- Editor ---
+        let editingPath = null;
+        async function openFile(path, name) {
+            try {
+                const res = await fetch(`${coreUrl}/api/files/content?path=${encodeURIComponent(path)}`, {
+                    headers: { 'X-Token': authToken }
+                });
+                if(!res.ok) {
+                    alert("Cannot read file (maybe binary or restricted).");
+                    return;
+                }
+                const data = await res.json();
+
+                editingPath = path;
+                document.getElementById('editor-filename').innerText = name;
+                document.getElementById('editor-content').value = data.content;
+                document.getElementById('editor-overlay').style.display = 'flex';
+            } catch(e) { alert("Error opening file"); }
+        }
+
+        async function saveEditor() {
+            if(!editingPath) return;
+            const content = document.getElementById('editor-content').value;
+            try {
+                const res = await fetch(`${coreUrl}/api/files/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ path: editingPath, content: content })
+                });
+                if(res.ok) {
+                    // Flash success?
+                    alert("Saved!");
+                    // closeEditor(); // Optional, maybe keep open
+                } else alert("Failed to save");
+             } catch(e) { alert(e); }
+        }
+
+        function closeEditor() {
+            document.getElementById('editor-overlay').style.display = 'none';
+            editingPath = null;
+        }
+
+        // --- Helpers ---
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function formatSize(bytes) {
+            if(bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
