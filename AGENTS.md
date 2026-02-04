@@ -3,11 +3,9 @@
 This file contains critical architectural rules that must be followed during development.
 
 
- - Always Version the LYRN_GUI from v*.* to v*.* , or v*.*.* example v6.1 to v6.2 and then save the old version to deprecated/Old/ in the directory
-
  - Always update the build_notes.md file with detailed notes about the work done in the update. This should include a section on logging.
  
- - All python dependencies should be added to the `dependencies/requirements.txt` file.
+ - All python dependencies should be added to the `requirements.txt` file.
  
  - This system was designed after 90s text based game parser scripts and the simplicity of those triggers. We bring that same energy to this system.
  

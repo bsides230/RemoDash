@@ -532,7 +532,6 @@
     <div id="top-system-bar">
         <div class="bar-section">
             <div id="sys-status-server" class="status-light" title="Server Status: Disconnected" onclick="openConnectionPopup()"></div>
-            <div id="sys-status-llm" class="status-light" title="LLM Status: Unknown" style="display:none"></div>
             <span class="system-text" id="sys-cpu"></span>
             <span class="system-text" id="sys-date">...</span>
             <span class="system-text" id="sys-clock">...</span>
@@ -667,18 +666,13 @@
            CONFIG & STATE
            ========================================================================= */
         const MODULE_REGISTRY = [
-            { id: "mod_chat", file: "Chat Interface.html", name: "Chat", icon: "💬" },
-            { id: "mod_builder", file: "Snapshot Builder.html", name: "Snapshot Builder", icon: "🛠️" },
-            { id: "mod_models", file: "ModelController.html", name: "Model Controller", icon: "🧠" },
-            { id: "mod_model_manager", file: "ModelManager.html", name: "Model Manager", icon: "📦" },
-            { id: "mod_job_manager", file: "Job Manager.html", name: "Job Automation", icon: "🤖" },
             { id: "mod_logs", file: "LogViewer.html", name: "System Logs", icon: "📜" },
             { id: "mod_settings", file: "Settings.html", name: "System Settings", icon: "🔧" },
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
         ];
 
         let appSettings = {
-            activeModules: ['mod_chat', 'mod_builder', 'mod_models', 'mod_model_manager', 'mod_job_manager', 'mod_logs', 'mod_settings', 'mod_server_status'],
+            activeModules: ['mod_logs', 'mod_settings', 'mod_server_status'],
             dockPinned: true,
             dockPos: null, // Initial null to trigger center calculation
             theme: 'dark',
@@ -1480,7 +1474,6 @@
 
         async function fetchStats() {
             const srvLight = 'sys-status-server';
-            const llmLight = 'sys-status-llm';
 
             if(!coreUrl) {
                 setLight(srvLight, 'red', 'No Connection Configured');
@@ -1499,32 +1492,13 @@
                 // Trigger Auth Check if connected and not done yet
                 if(!hasCheckedAuth) checkAuth();
 
-                const cpuText = `CPU: ${data.cpu}%`;
+                const cpuText = `CPU: ${data.cpu.percent}%`;
                 const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
                 document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
-
-                // LLM Status Logic
-                const llmEl = document.getElementById(llmLight);
-                llmEl.style.display = 'block';
-
-                if (data.worker) {
-                    if (!data.worker.running) {
-                        setLight(llmLight, 'orange', 'Worker Stopped');
-                    } else {
-                        const s = data.worker.llm_status;
-                        if (s === 'busy') setLight(llmLight, 'blue pulse', 'LLM Generating...');
-                        else if (s === 'loading') setLight(llmLight, 'yellow pulse', 'Loading Model...');
-                        else if (s === 'error') setLight(llmLight, 'red pulse', 'Model Error');
-                        else setLight(llmLight, 'green', 'Worker Idle / Ready');
-                    }
-                } else {
-                    setLight(llmLight, 'red', 'Worker Status Unknown');
-                }
 
             } catch (e) {
                 document.getElementById('sys-cpu').innerText = "";
                 setLight(srvLight, 'red', 'Disconnected / Offline');
-                document.getElementById(llmLight).style.display = 'none';
             }
         }
 

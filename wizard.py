@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import platform
 from pathlib import Path
 
 def print_header(title):
@@ -22,6 +23,24 @@ def install_dependencies():
     else:
         print("Skipping dependencies.")
     return True
+
+def configure_tailscale():
+    print("\n--- Tailscale (Remote Access) ---")
+    if platform.system() != "Linux":
+        print("Note: Automated Tailscale installation is only supported on Linux.")
+        return
+
+    choice = input("Install Tailscale? (y/N): ").strip().lower()
+    if choice in ['y', 'yes']:
+        print("Installing Tailscale...")
+        try:
+            # Using the official install script for better compatibility
+            subprocess.check_call("curl -fsSL https://tailscale.com/install.sh | sh", shell=True)
+            print("Tailscale installed. You may need to run 'sudo tailscale up' to connect.")
+        except subprocess.CalledProcessError:
+             print("Tailscale installation failed. Please install manually.")
+    else:
+        print("Skipping Tailscale.")
 
 def configure_port():
     print("\n--- Server Port ---")
@@ -93,6 +112,7 @@ def main():
 
     configure_port()
     configure_auth()
+    configure_tailscale()
 
     print("\nSetup Complete!")
     start_server()

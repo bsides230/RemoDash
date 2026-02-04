@@ -111,7 +111,6 @@
     <div class="tabs">
         <button class="tab-btn active" id="btn-tab-sys" onclick="switchTab('sys')">System</button>
         <button class="tab-btn" id="btn-tab-gpu" onclick="switchTab('gpu')">GPU</button>
-        <button class="tab-btn" id="btn-tab-llm" onclick="switchTab('llm')">LLM</button>
     </div>
 
     <!-- System Tab -->
@@ -145,57 +144,6 @@
         <button class="pop-out-btn" onclick="popOut('gpu')">⬈ POP OUT</button>
         <h2>GPU Status</h2>
         <div id="gpu-container">Loading...</div>
-    </div>
-
-    <!-- LLM Tab -->
-    <div id="tab-llm" class="tab-content">
-        <button class="pop-out-btn" onclick="popOut('llm')">⬈ POP OUT</button>
-        <h2>Model Statistics</h2>
-
-        <div class="chart-card" style="margin-bottom:10px;">
-            <div class="sub-stat">MODEL STATUS</div>
-            <div class="big-stat" id="llm-status" style="font-size:16px;">Unknown</div>
-        </div>
-
-        <!-- Timings -->
-        <div class="stat-row">
-            <span class="stat-label">Load Time</span>
-            <span class="stat-value" id="llm-load-time">0 ms</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Total Time</span>
-            <span class="stat-value" id="llm-total-time">0.00 s</span>
-        </div>
-
-        <div style="height:1px; background:var(--border-color); margin:10px 0;"></div>
-
-        <!-- Token Counts -->
-        <div class="chart-grid">
-            <div class="chart-card">
-                <div class="sub-stat">PROMPT (SPEED)</div>
-                <div class="big-stat" id="llm-prompt-tokens">0</div>
-                <div class="sub-stat" id="llm-prompt-speed">0 T/s</div>
-            </div>
-            <div class="chart-card">
-                <div class="sub-stat">RESPONSE (SPEED)</div>
-                <div class="big-stat" id="llm-eval-tokens">0</div>
-                <div class="sub-stat" id="llm-eval-speed">0 T/s</div>
-            </div>
-        </div>
-
-        <div class="stat-row" style="margin-top:10px;">
-            <span class="stat-label">KV Cache Reused</span>
-            <span class="stat-value" id="llm-kv-reused">0</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Total Tokens</span>
-            <span class="stat-value" id="llm-total-tokens">0</span>
-        </div>
-
-        <div class="stat-row" style="margin-top:15px;">
-            <span class="stat-label">Active Model</span>
-            <span class="stat-value" id="llm-model" style="font-size:10px; word-break:break-all;">--</span>
-        </div>
     </div>
 
     <script>
@@ -279,8 +227,8 @@
 
         function updateUI(data) {
             // System
-            document.getElementById('val-cpu').innerText = data.cpu + '%';
-            document.getElementById('bar-cpu').style.width = data.cpu + '%';
+            document.getElementById('val-cpu').innerText = data.cpu.percent + '%';
+            document.getElementById('bar-cpu').style.width = data.cpu.percent + '%';
 
             document.getElementById('val-ram').innerText = Math.round(data.ram.percent) + '%';
             document.getElementById('bar-ram').style.width = data.ram.percent + '%';
@@ -292,7 +240,6 @@
             // GPU
             const gpuContainer = document.getElementById('gpu-container');
             const gpuBtn = document.getElementById('btn-tab-gpu');
-            const llmBtn = document.getElementById('btn-tab-llm');
 
             if(data.gpu && data.gpu.vram_percent !== undefined) {
                 gpuBtn.style.display = 'block';
@@ -312,39 +259,6 @@
                 } else {
                     gpuBtn.style.display = 'none';
                 }
-            }
-
-            // LLM Stats
-            if(data.llm_stats) {
-                const s = data.llm_stats;
-                // Basic
-                document.getElementById('llm-model').innerText = s.model_name || "--";
-
-                // Extended
-                document.getElementById('llm-load-time').innerText = (s.load_time || 0).toFixed(0) + " ms";
-                document.getElementById('llm-total-time').innerText = (s.total_time || 0).toFixed(2) + " s";
-
-                document.getElementById('llm-prompt-tokens').innerText = s.prompt_tokens || 0;
-                document.getElementById('llm-prompt-speed').innerText = (s.prompt_speed || 0).toFixed(1) + " T/s";
-
-                document.getElementById('llm-eval-tokens').innerText = s.eval_tokens || (s.last_tokens || 0);
-                // Use eval_speed if available, otherwise tps from legacy
-                const evalSpeed = s.eval_speed || s.tps || 0;
-                document.getElementById('llm-eval-speed').innerText = evalSpeed.toFixed(1) + " T/s";
-
-                document.getElementById('llm-kv-reused').innerText = s.kv_cache_reused || 0;
-                document.getElementById('llm-total-tokens').innerText = s.total_tokens || 0;
-            }
-
-            if(data.worker) {
-                const s = data.worker.llm_status;
-                const statusEl = document.getElementById('llm-status');
-                statusEl.innerText = s.toUpperCase();
-
-                if(s === 'busy') statusEl.style.color = '#7c5cff'; // Blue
-                else if(s === 'loading') statusEl.style.color = '#ffbb33'; // Yellow
-                else if(s === 'error') statusEl.style.color = '#ff4444'; // Red
-                else statusEl.style.color = '#00cc66'; // Green
             }
         }
 
