@@ -1,3 +1,3 @@
 @echo off
-python wizard.py
+python wizard_windows.py
 pause

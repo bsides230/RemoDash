@@ -333,7 +333,7 @@ def start_server():
             print(f"Error starting server: {e}")
 
 def main():
-    print_header("REMODASH SETUP WIZARD")
+    print_header("REMODASH LINUX WIZARD")
 
     if not install_dependencies():
         print("Dependency installation failed. Aborting.")
