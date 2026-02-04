@@ -819,6 +819,7 @@
            ========================================================================= */
         const MODULE_REGISTRY = [
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
+            { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "🚀" },
             { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "📁" },
             { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "💻" },
             { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "📝" },
@@ -830,7 +831,7 @@
         ];
 
         let appSettings = {
-            activeModules: ['mod_server_status', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git'],
+            activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git'],
             dockPinned: true,
             dockPos: null,
             theme: 'dark',
@@ -1340,16 +1341,12 @@
         function returnChildToParent(childId) {
             const parentId = childParentMap[childId];
             if (parentId) {
-                // Find parent window iframe
-                // parentId is like 'mod_terminal' or 'win_mod_terminal'
-                // Wait, runningInstances stores 'win_mod_terminal'
-                // We need to find the DOM element for parent
-                // Ideally parentId passed in OPEN_CHILD_WINDOW is the DOM ID of the parent window
+                // Try both direct ID and 'win_' prefix
+                let parentWin = document.getElementById(parentId);
+                if (!parentWin && !parentId.startsWith('win_')) {
+                    parentWin = document.getElementById('win_' + parentId);
+                }
 
-                // However, parentId in logic might be just the module ID.
-                // Let's assume parentId is the window ID.
-
-                const parentWin = document.getElementById(parentId);
                 if (parentWin) {
                      const iframe = parentWin.querySelector('iframe');
                      if (iframe) {
@@ -1946,6 +1943,42 @@
                     win.style.width = '500px';
                     win.style.height = '400px';
                 }
+            }
+
+            if (e.data.type === 'OPEN_TERMINAL_TAB') {
+                const termMod = MODULE_REGISTRY.find(m => m.id === 'mod_terminal');
+                if(!termMod) return;
+
+                const instanceId = 'win_' + termMod.id;
+                let win = document.getElementById(instanceId);
+
+                if (!win) {
+                    createWindow(termMod, instanceId);
+                    win = document.getElementById(instanceId);
+                } else {
+                    if (win.style.display === 'none') {
+                        win.style.display = 'flex';
+                        win.style.zIndex = ++zIndexCounter;
+                        win.classList.remove('minimized');
+                    } else {
+                        win.style.zIndex = ++zIndexCounter;
+                    }
+                }
+                updateDockIndicators();
+
+                const iframe = win.querySelector('iframe');
+                // Pass command data
+                const payload = {
+                    type: 'ADD_TAB',
+                    cwd: e.data.cwd,
+                    command: e.data.command
+                };
+
+                // If iframe is loading, wait a bit (handled by onload in createWindow too, but here we might be live)
+                setTimeout(() => {
+                    iframe.contentWindow.postMessage(payload, '*');
+                }, 500);
+                iframe.contentWindow.postMessage(payload, '*');
             }
         });
 

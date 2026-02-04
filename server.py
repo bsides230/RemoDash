@@ -13,6 +13,8 @@ import platform
 import subprocess
 import secrets
 import time
+import uuid
+import shlex
 
 from fastapi import FastAPI, Request, HTTPException, Header, Depends, Body, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -188,9 +190,87 @@ class DiskJournalLogger:
             return []
         return lines
 
+# --- Pydantic Models (Forward) ---
+class Shortcut(BaseModel):
+    id: Optional[str] = None
+    name: str
+    path: str
+    type: str = "auto"
+    args: Optional[str] = ""
+    cwd: Optional[str] = ""
+    confirm: bool = False
+    capture_output: bool = True
+    run_mode: str = "output"
+
+class ShortcutRunRequest(BaseModel):
+    run_mode: Optional[str] = None # Allow override
+
+# --- Shortcuts Manager ---
+class ShortcutsManager:
+    def __init__(self, data_file="data/shortcuts.json"):
+        self.data_file = Path(data_file)
+        self.shortcuts = []
+        self._load()
+
+    def _load(self):
+        if not self.data_file.exists():
+            # Create parent dir if needed
+            try:
+                self.data_file.parent.mkdir(parents=True, exist_ok=True)
+            except: pass
+            self.shortcuts = []
+            self._save()
+            return
+        try:
+            with open(self.data_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                self.shortcuts = [Shortcut(**s) for s in data.get("shortcuts", [])]
+        except Exception as e:
+            print(f"Failed to load shortcuts: {e}")
+            self.shortcuts = []
+
+    def _save(self):
+        try:
+            data = {"shortcuts": [s.dict() for s in self.shortcuts]}
+            with open(self.data_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"Failed to save shortcuts: {e}")
+
+    def list(self):
+        return self.shortcuts
+
+    def get(self, sid):
+        for s in self.shortcuts:
+            if s.id == sid:
+                return s
+        return None
+
+    def add(self, s: Shortcut):
+        # Generate ID if missing
+        if not s.id:
+            s.id = str(uuid.uuid4())
+        self.shortcuts.append(s)
+        self._save()
+        return s
+
+    def update(self, sid, updates: Dict[str, Any]):
+        for i, s in enumerate(self.shortcuts):
+            if s.id == sid:
+                updated = s.copy(update=updates)
+                self.shortcuts[i] = updated
+                self._save()
+                return updated
+        return None
+
+    def delete(self, sid):
+        self.shortcuts = [s for s in self.shortcuts if s.id != sid]
+        self._save()
+
 # Global Logger
 logger = DiskJournalLogger()
 settings_manager = SettingsManager()
+shortcuts_manager = ShortcutsManager()
 
 # --- Pydantic Models ---
 class PresetModel(BaseModel):
@@ -506,6 +586,146 @@ async def save_cron(req: CronRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Shortcuts Endpoints ---
+
+def build_command(s: Shortcut) -> str:
+    # Construct a shell string command for Terminal injection
+    # Simple join for now, might need quoting
+    base = s.path
+    if " " in base: base = f'"{base}"'
+
+    args = s.args
+
+    # Determine prefix based on type/ext
+    ext = os.path.splitext(s.path)[1].lower()
+    prefix = ""
+
+    if s.type == "auto":
+        if ext == ".py": prefix = "python "
+        elif ext == ".js": prefix = "node "
+        elif ext == ".sh": prefix = "bash "
+        elif ext == ".ps1": prefix = "powershell -ExecutionPolicy Bypass -File "
+        elif ext == ".bat": prefix = "" # cmd handles it
+    elif s.type == "python": prefix = "python "
+    elif s.type == "node": prefix = "node "
+    elif s.type == "bash": prefix = "bash "
+
+    # For Terminal, we just type it in
+    return f"{prefix}{base} {args}".strip()
+
+def build_command_list(s: Shortcut) -> List[str]:
+    # Construct list for subprocess
+    path = s.path
+    try:
+        args = shlex.split(s.args) if s.args else []
+    except:
+        args = s.args.split(" ") if s.args else []
+
+    ext = os.path.splitext(path)[1].lower()
+
+    # Defaults
+    cmd = [path] + args
+
+    if s.type == "auto":
+        if ext == ".py": cmd = [sys.executable, path] + args
+        elif ext == ".js": cmd = ["node", path] + args
+        elif ext == ".sh": cmd = ["bash", path] + args
+        elif ext == ".ps1": cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File", path] + args
+        elif ext == ".bat": cmd = ["cmd.exe", "/c", path] + args
+    elif s.type == "python":
+        cmd = [sys.executable, path] + args
+    elif s.type == "node":
+        cmd = ["node", path] + args
+    elif s.type == "bash":
+        cmd = ["bash", path] + args
+
+    return cmd
+
+@app.get("/api/shortcuts", dependencies=[Depends(verify_token)])
+async def list_shortcuts():
+    return shortcuts_manager.list()
+
+@app.post("/api/shortcuts", dependencies=[Depends(verify_token)])
+async def add_shortcut(s: Shortcut):
+    # Validate Access
+    try:
+        check_path_access(s.path)
+        if s.cwd:
+            check_path_access(s.cwd)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=f"Access Denied: {str(e)}")
+
+    return shortcuts_manager.add(s)
+
+@app.put("/api/shortcuts/{sid}", dependencies=[Depends(verify_token)])
+async def update_shortcut(sid: str, s: Shortcut):
+    # Validate Access
+    try:
+        check_path_access(s.path)
+        if s.cwd:
+            check_path_access(s.cwd)
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=f"Access Denied: {str(e)}")
+
+    data = s.dict()
+    data['id'] = sid # Enforce ID persistence
+    updated = shortcuts_manager.update(sid, data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Shortcut not found")
+    return updated
+
+@app.delete("/api/shortcuts/{sid}", dependencies=[Depends(verify_token)])
+async def delete_shortcut(sid: str):
+    shortcuts_manager.delete(sid)
+    return {"success": True}
+
+@app.post("/api/shortcuts/{sid}/run", dependencies=[Depends(verify_token)])
+async def run_shortcut_endpoint(sid: str, req: ShortcutRunRequest):
+    s = shortcuts_manager.get(sid)
+    if not s:
+        raise HTTPException(status_code=404, detail="Shortcut not found")
+
+    # Validate Access (Double check at runtime)
+    check_path_access(s.path)
+    if s.cwd:
+        check_path_access(s.cwd)
+
+    run_mode = req.run_mode or s.run_mode
+
+    if run_mode == "terminal":
+        # Client should handle terminal opening via websocket, using data from the shortcut.
+        return {"action": "terminal", "cwd": s.cwd, "command": build_command(s)}
+
+    # Output Mode (Server Execution)
+    cmd_list = build_command_list(s)
+    cwd = s.cwd if s.cwd else os.path.dirname(s.path)
+    if not cwd: cwd = None
+
+    try:
+        # Bounded execution
+        proc = subprocess.run(
+            cmd_list,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30 # 30s timeout
+        )
+
+        stdout = proc.stdout[:200000] # Cap at ~200KB
+        stderr = proc.stderr[:200000]
+
+        return {
+            "action": "output",
+            "exit_code": proc.returncode,
+            "stdout": stdout,
+            "stderr": stderr
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"action": "output", "exit_code": -1, "stdout": "", "stderr": "Execution Timeout (30s)"}
+    except Exception as e:
+        return {"action": "output", "exit_code": -1, "stdout": "", "stderr": f"Error: {str(e)}"}
+
 # --- Git Manager Endpoints ---
 
 def check_path_access(path: str) -> Path:
@@ -807,7 +1027,14 @@ class TerminalSession:
         self.os_type = platform.system()
         self.loop = asyncio.get_running_loop()
 
-    def start(self, cols=80, rows=24):
+    def start(self, cols=80, rows=24, cwd=None):
+        # Validate CWD if provided
+        if cwd:
+            try:
+                check_path_access(cwd)
+            except:
+                cwd = None # Fallback if invalid/denied
+
         if self.os_type == "Windows":
             self.process = subprocess.Popen(
                 ["cmd.exe"],
@@ -815,7 +1042,8 @@ class TerminalSession:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 bufsize=0,
-                shell=False
+                shell=False,
+                cwd=cwd
             )
         else:
             # Linux PTY
@@ -831,7 +1059,8 @@ class TerminalSession:
                 stdin=slave_fd,
                 stdout=slave_fd,
                 stderr=slave_fd,
-                universal_newlines=False
+                universal_newlines=False,
+                cwd=cwd
             )
             os.close(slave_fd)
 
@@ -884,7 +1113,7 @@ class TerminalSession:
 
 
 @app.websocket("/api/terminal")
-async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None):
+async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None, cwd: Optional[str] = None, command: Optional[str] = None):
     # Verify Auth manually
     if Path("global_flags/no_auth").exists():
         pass # No Auth required
@@ -905,7 +1134,13 @@ async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, 
 
     session = TerminalSession()
     try:
-        session.start()
+        session.start(cwd=cwd)
+
+        # Inject initial command if provided
+        if command:
+            # Small delay to ensure shell is ready
+            await asyncio.sleep(0.1)
+            session.write_input(command + "\r\n")
 
         # Reader Task
         async def sender():

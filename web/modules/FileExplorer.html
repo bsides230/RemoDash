@@ -218,6 +218,7 @@
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="showCreateModal('file')">+ File</button>
             <button class="tool-btn" onclick="showCreateModal('folder')">+ Folder</button>
+            <button class="tool-btn" id="btn-create-shortcut" onclick="showShortcutModal()" style="display:none;">Create Shortcut</button>
             <button class="tool-btn" onclick="deleteSelection()" style="color:#ff5555;">Delete</button>
         </div>
 
@@ -242,6 +243,37 @@
             <div class="modal-footer">
                 <button class="tool-btn" onclick="closeModal('modal-create')">Cancel</button>
                 <button class="tool-btn primary" id="btn-create-confirm">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-shortcut" class="modal-overlay">
+        <div class="modal">
+            <h3>Create Shortcut</h3>
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Name</label>
+            <input type="text" id="sc-name" placeholder="Shortcut Name">
+
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Target</label>
+            <input type="text" id="sc-path" readonly style="color:var(--text-dim);">
+
+            <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                <label style="display:flex; align-items:center; gap:5px; font-size:11px; cursor:pointer;">
+                    <input type="checkbox" id="sc-confirm" checked> Confirm
+                </label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:11px; cursor:pointer;">
+                    <input type="checkbox" id="sc-capture" checked> Capture Output
+                </label>
+            </div>
+
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase; margin-top:10px; display:block;">Run Mode</label>
+            <select id="sc-mode" style="width:100%; padding:8px; margin-top:5px; background:var(--bg-core); color:var(--text-head); border:1px solid var(--border-color); font-family:'JetBrains Mono'; outline:none;">
+                <option value="terminal">Run in Terminal</option>
+                <option value="output">Show Output</option>
+            </select>
+
+            <div class="modal-footer">
+                <button class="tool-btn" onclick="closeModal('modal-shortcut')">Cancel</button>
+                <button class="tool-btn primary" onclick="saveShortcut()">Save</button>
             </div>
         </div>
     </div>
@@ -475,8 +507,7 @@
             } else {
                 tab.selected.add(path);
             }
-            // Re-render only class and check? Or full list?
-            // Simple DOM update
+            updateToolbar();
             renderFileList(tab);
         }
 
@@ -487,7 +518,24 @@
             } else {
                 tab.selected.clear();
             }
+            updateToolbar();
             renderFileList(tab);
+        }
+
+        function updateToolbar() {
+            const tab = tabs[activeTabIndex];
+            const btn = document.getElementById('btn-create-shortcut');
+            const runnable = ['.py', '.js', '.bat', '.ps1', '.sh', '.exe'];
+
+            if(tab.selected.size === 1) {
+                const path = Array.from(tab.selected)[0];
+                const ext = '.' + path.split('.').pop().toLowerCase();
+                if(runnable.includes(ext)) {
+                    btn.style.display = 'flex';
+                    return;
+                }
+            }
+            btn.style.display = 'none';
         }
 
         // --- Navigation ---
@@ -659,6 +707,53 @@
              if(sortMode === mode) sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
              else { sortMode = mode; sortOrder = 'asc'; }
              refreshTab();
+        }
+
+        // --- Shortcut Logic ---
+        function showShortcutModal() {
+            const tab = tabs[activeTabIndex];
+            if(tab.selected.size !== 1) return;
+            const path = Array.from(tab.selected)[0];
+            const filename = path.split(/[/\\]/).pop();
+            const name = filename.split('.').slice(0, -1).join('.') || filename; // Remove ext
+
+            document.getElementById('sc-name').value = name;
+            document.getElementById('sc-path').value = path;
+            document.getElementById('sc-mode').value = 'terminal';
+            document.getElementById('modal-shortcut').style.display = 'flex';
+        }
+
+        async function saveShortcut() {
+            const tab = tabs[activeTabIndex];
+            const path = document.getElementById('sc-path').value;
+            // Get CWD from tab path
+            const cwd = tab.path;
+
+            const payload = {
+                name: document.getElementById('sc-name').value,
+                path: path,
+                type: 'auto',
+                cwd: cwd,
+                confirm: document.getElementById('sc-confirm').checked,
+                capture_output: document.getElementById('sc-capture').checked,
+                run_mode: document.getElementById('sc-mode').value
+            };
+
+            if (!payload.name) { alert("Name required"); return; }
+
+            try {
+                const res = await fetch(`${coreUrl}/api/shortcuts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify(payload)
+                });
+                if(res.ok) {
+                    closeModal('modal-shortcut');
+                    alert("Shortcut created!");
+                } else {
+                    alert("Error: " + await res.text());
+                }
+            } catch(e) { alert("Error: " + e.message); }
         }
 
         // --- Utils ---

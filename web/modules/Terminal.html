@@ -94,16 +94,20 @@
                 document.body.setAttribute('data-theme', e.data.theme);
                 updateAllTerminalsTheme();
             }
+            if (e.data.type === 'ADD_TAB') {
+                addTab({ cwd: e.data.cwd, command: e.data.command });
+            }
         });
 
         document.addEventListener('DOMContentLoaded', () => {
              // Check if we are a child window?
              // If so, maybe we don't need initial tab delay or different logic.
              // But existing logic is fine.
+             // If URL has params (from popout), we might want to respect them or default
              setTimeout(() => addTab(), 100);
         });
 
-        function addTab() {
+        function addTab(options = {}) {
             tabCounter++;
             const tabId = 'term_' + tabCounter;
 
@@ -150,7 +154,7 @@
             };
             tabs.push(termObj);
 
-            connectTerminal(termObj);
+            connectTerminal(termObj, options);
 
             // Handle resizing
             new ResizeObserver(() => {
@@ -184,7 +188,7 @@
             return null;
         }
 
-        async function connectTerminal(termObj) {
+        async function connectTerminal(termObj, options = {}) {
             if(!coreUrl) {
                 termObj.term.write("\r\n\x1b[31mError: No Core URL configured.\x1b[0m\r\n");
                 return;
@@ -197,11 +201,17 @@
             // Token Hardening: Try to get session key
             let key = await getSessionKey();
 
+            let query = [];
             if (key) {
-                wsUrl += `?key=${encodeURIComponent(key)}`;
+                query.push(`key=${encodeURIComponent(key)}`);
             } else if(authToken) {
-                wsUrl += `?token=${encodeURIComponent(authToken)}`;
+                query.push(`token=${encodeURIComponent(authToken)}`);
             }
+
+            if(options.cwd) query.push(`cwd=${encodeURIComponent(options.cwd)}`);
+            if(options.command) query.push(`command=${encodeURIComponent(options.command)}`);
+
+            if(query.length > 0) wsUrl += `?${query.join('&')}`;
 
             const socket = new WebSocket(wsUrl);
             termObj.socket = socket;
