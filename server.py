@@ -6,6 +6,8 @@ import json
 import datetime
 import shutil
 import socket
+import zipfile
+import tempfile
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -16,7 +18,7 @@ import time
 import uuid
 import shlex
 
-from fastapi import FastAPI, Request, HTTPException, Header, Depends, Body, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, HTTPException, Header, Depends, Body, WebSocket, WebSocketDisconnect, UploadFile, File, Form, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
@@ -284,6 +286,9 @@ class FileOpRequest(BaseModel):
     path: str
     content: Optional[str] = None
     new_path: Optional[str] = None
+
+class FilesListRequest(BaseModel):
+    paths: List[str]
 
 class GitRepoRequest(BaseModel):
     path: str
@@ -1344,6 +1349,74 @@ async def rename_item(data: FileOpRequest):
 
         src.rename(dst)
         return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/upload", dependencies=[Depends(verify_token)])
+async def upload_files(path: str = Form(...), files: List[UploadFile] = File(...)):
+    """Uploads multiple files to the specified path."""
+    target_dir = check_path_access(path)
+    if not target_dir.is_dir():
+         raise HTTPException(status_code=400, detail="Target path is not a directory")
+
+    results = []
+    try:
+        for file in files:
+            # Sanitize filename (prevent path traversal)
+            safe_name = os.path.basename(file.filename)
+            file_path = target_dir / safe_name
+
+            # Security check: ensure final path is still within jail if applicable
+            # (Already covered by check_path_access(path) + normal path join, but good to be safe)
+
+            with open(file_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+            results.append(file.filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"success": True, "uploaded": results}
+
+@app.post("/api/files/zip", dependencies=[Depends(verify_token)])
+async def download_zip(req: FilesListRequest, background_tasks: BackgroundTasks):
+    """Creates a temporary zip of requested files/folders and serves it."""
+    if not req.paths:
+        raise HTTPException(status_code=400, detail="No paths provided")
+
+    # Validate all paths first
+    valid_paths = []
+    for p in req.paths:
+        try:
+            valid_paths.append(check_path_access(p))
+        except HTTPException:
+            continue # Skip invalid/denied paths
+
+    if not valid_paths:
+        raise HTTPException(status_code=400, detail="No valid paths found")
+
+    try:
+        # Create temp file
+        # We use delete=False so we can serve it, then cleanup in background task
+        fd, temp_path = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+
+        with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in valid_paths:
+                if p.is_file():
+                    zf.write(p, arcname=p.name)
+                elif p.is_dir():
+                    # Recursive add
+                    parent_len = len(str(p.parent))
+                    for root, dirs, files in os.walk(p):
+                        for file in files:
+                            abs_path = Path(root) / file
+                            # Relative path inside zip
+                            rel_path = str(abs_path)[parent_len:].strip(os.sep)
+                            zf.write(abs_path, arcname=rel_path)
+
+        background_tasks.add_task(os.unlink, temp_path)
+        return FileResponse(temp_path, filename="archive.zip", media_type="application/zip")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

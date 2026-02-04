@@ -73,3 +73,22 @@
 ### Backend
 - Updated `requirements.txt` to include `GitPython` and `python-crontab`.
 - Expanded `/health` endpoint to include partition information.
+
+## Updates - [Date]
+
+### File Explorer Enhancements
+- **Mobile Optimization:**
+  - Implemented a responsive layout for mobile devices.
+  - Added a collapsible sidebar (drawer) for Favorites/Drives on mobile.
+  - Reorganized the toolbar for better reachability on small screens.
+  - Improved row selection: Tapping anywhere on a file row now toggles selection.
+- **File Transfer:**
+  - **Upload:** Added multi-file upload support with a real-time progress bar. (Securely sanitized filenames).
+  - **Download:** Added a "Download" button. Single files download directly; multiple files or folders are automatically zipped server-side before download.
+
+### Backend
+- **Server:**
+  - Added `/api/files/upload` endpoint (POST) supporting `multipart/form-data`.
+  - Added `/api/files/zip` endpoint (POST) for creating temporary zip archives of selected files/folders.
+  - Added `python-multipart` dependency.
+  - Implemented filename sanitization to prevent path traversal attacks during upload.
