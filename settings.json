@@ -1,6 +1,7 @@
 {
   "settings": {
-    "allowed_origins": []
+    "allowed_origins": [],
+    "filesystem_mode": "open"
   },
   "ui_settings": {
     "font_size": 12,
