@@ -1405,19 +1405,32 @@ async def get_sysinfo():
 # --- Terminal Logic ---
 
 class TerminalSession:
-    def __init__(self):
+    def __init__(self, session_id: str, cwd: Optional[str] = None):
+        self.id = session_id
+        self.created_at = time.time()
+        self.cwd = cwd
+        self.cols = 80
+        self.rows = 24
+
         self.process = None
         self.master_fd = None
         self.os_type = platform.system()
         self.loop = asyncio.get_running_loop()
 
-    def start(self, cols=80, rows=24, cwd=None):
+        self.history = [] # List of strings
+        self.subscribers: set[WebSocket] = set()
+        self.reader_task = None
+        self.closed = False
+
+        self._start()
+
+    def _start(self):
         # Validate CWD if provided
-        if cwd:
+        if self.cwd:
             try:
-                check_path_access(cwd)
+                check_path_access(self.cwd)
             except:
-                cwd = None # Fallback if invalid/denied
+                self.cwd = None # Fallback
 
         if self.os_type == "Windows":
             self.process = subprocess.Popen(
@@ -1427,15 +1440,12 @@ class TerminalSession:
                 stderr=subprocess.PIPE,
                 bufsize=0,
                 shell=False,
-                cwd=cwd
+                cwd=self.cwd
             )
         else:
             # Linux PTY
             self.master_fd, slave_fd = pty.openpty()
             shell = os.environ.get("SHELL", "/bin/bash")
-
-            # Set initial size
-            self.resize(cols, rows)
 
             self.process = subprocess.Popen(
                 [shell],
@@ -1444,28 +1454,52 @@ class TerminalSession:
                 stdout=slave_fd,
                 stderr=slave_fd,
                 universal_newlines=False,
-                cwd=cwd
+                cwd=self.cwd
             )
             os.close(slave_fd)
 
-    def resize(self, cols, rows):
-        if self.os_type != "Windows" and self.master_fd is not None:
-            try:
-                winsize = struct.pack("HHHH", rows, cols, 0, 0)
-                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
-            except: pass
+        # Start Reader Task
+        self.reader_task = asyncio.create_task(self._read_loop())
 
-    async def read_output(self):
-        """Reads from the process and returns bytes."""
+    async def _read_loop(self):
+        while not self.closed:
+            data = await self._read_output()
+            if not data:
+                # Process likely died
+                break
+
+            try:
+                text = data.decode(errors="replace")
+                self.history.append(text)
+                # Optional: Cap history size?
+                if len(self.history) > 1000:
+                     self.history = self.history[-1000:]
+
+                await self._broadcast(text)
+            except Exception as e:
+                print(f"Terminal Read Error: {e}")
+                break
+
+        self.close()
+
+    async def _broadcast(self, text: str):
+        msg = json.dumps({"type": "output", "data": text})
+        to_remove = []
+        for ws in self.subscribers:
+            try:
+                await ws.send_text(msg)
+            except:
+                to_remove.append(ws)
+        for ws in to_remove:
+            self.subscribers.discard(ws)
+
+    async def _read_output(self):
         if self.os_type == "Windows":
             return await self.loop.run_in_executor(None, self._read_windows)
         else:
             return await self.loop.run_in_executor(None, self._read_linux)
 
     def _read_windows(self):
-        # Read from stdout (blocking)
-        # Note: This simple implementation merges stdout and stderr roughly
-        # For a better Windows shell, pywinpty is recommended but we are using stdlib
         if self.process and self.process.stdout:
             return self.process.stdout.read(1024)
         return b""
@@ -1479,6 +1513,7 @@ class TerminalSession:
         return b""
 
     def write_input(self, data: str):
+        if self.closed: return
         if self.os_type == "Windows":
             if self.process and self.process.stdin:
                 try:
@@ -1487,80 +1522,164 @@ class TerminalSession:
                 except: pass
         else:
             if self.master_fd:
-                os.write(self.master_fd, data.encode())
+                try:
+                    os.write(self.master_fd, data.encode())
+                except: pass
+
+    def resize(self, cols, rows):
+        self.cols = cols
+        self.rows = rows
+        if self.os_type != "Windows" and self.master_fd is not None:
+            try:
+                winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+            except: pass
 
     def close(self):
+        self.closed = True
         if self.process:
             self.process.terminate()
         if self.os_type != "Windows" and self.master_fd:
-            os.close(self.master_fd)
+            try: os.close(self.master_fd)
+            except: pass
+        # Cancel reader?
+        # if self.reader_task: self.reader_task.cancel()
 
+class TerminalManager:
+    def __init__(self):
+        self.sessions: Dict[str, TerminalSession] = {}
+        self.event_subscribers: set[WebSocket] = set()
 
-@app.websocket("/api/terminal")
-async def terminal_websocket(websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None, cwd: Optional[str] = None, command: Optional[str] = None):
-    # Verify Auth manually
-    if Path("global_flags/no_auth").exists():
-        pass # No Auth required
-    else:
-        # Check session key first
+    def create_session(self, cwd=None) -> str:
+        sid = str(uuid.uuid4())
+        session = TerminalSession(sid, cwd)
+        self.sessions[sid] = session
+        asyncio.create_task(self.broadcast_event("create", {"id": sid, "cwd": cwd}))
+        return sid
+
+    def get_session(self, sid: str) -> Optional[TerminalSession]:
+        return self.sessions.get(sid)
+
+    def kill_session(self, sid: str):
+        if sid in self.sessions:
+            s = self.sessions.pop(sid)
+            s.close()
+            asyncio.create_task(self.broadcast_event("kill", {"id": sid}))
+
+    def list_sessions(self):
+        return [{"id": k, "created": v.created_at} for k, v in self.sessions.items()]
+
+    async def broadcast_event(self, event_type: str, data: Any):
+        msg = json.dumps({"type": event_type, "data": data})
+        to_remove = []
+        for ws in self.event_subscribers:
+            try:
+                await ws.send_text(msg)
+            except:
+                to_remove.append(ws)
+        for ws in to_remove:
+            self.event_subscribers.discard(ws)
+
+    async def subscribe_events(self, websocket: WebSocket):
+        await websocket.accept()
+        self.event_subscribers.add(websocket)
+        try:
+            # Send initial list
+            current = self.list_sessions()
+            await websocket.send_text(json.dumps({"type": "init", "data": current}))
+            while True:
+                await websocket.receive_text() # Keep alive / wait for close
+        except:
+            pass
+        finally:
+            self.event_subscribers.discard(websocket)
+
+terminal_manager = TerminalManager()
+
+class CreateTerminalRequest(BaseModel):
+    cwd: Optional[str] = None
+    command: Optional[str] = None # Ignored for now, or could implement "run and hold"
+
+@app.get("/api/terminals", dependencies=[Depends(verify_token)])
+async def list_terminals():
+    return terminal_manager.list_sessions()
+
+@app.post("/api/terminals", dependencies=[Depends(verify_token)])
+async def create_terminal(req: CreateTerminalRequest):
+    sid = terminal_manager.create_session(req.cwd)
+    # If command provided, maybe inject it?
+    if req.command:
+        s = terminal_manager.get_session(sid)
+        if s:
+             await asyncio.sleep(0.1)
+             s.write_input(req.command + "\r\n")
+    return {"id": sid}
+
+@app.delete("/api/terminals/{sid}", dependencies=[Depends(verify_token)])
+async def kill_terminal(sid: str):
+    terminal_manager.kill_session(sid)
+    return {"success": True}
+
+@app.websocket("/api/terminal/events")
+async def terminal_events_ws(websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None):
+    # Verify Auth (Copy-paste verify logic or factor out)
+    if not Path("global_flags/no_auth").exists():
         if key:
             expiry = SESSION_KEYS.get(key)
             if not expiry or time.time() > expiry:
                  await websocket.close(code=4003)
                  return
         else:
-            # Fallback to token
             if not REMODASH_TOKEN or not token or token != REMODASH_TOKEN:
                 await websocket.close(code=4003)
                 return
 
+    await terminal_manager.subscribe_events(websocket)
+
+@app.websocket("/api/terminal/{sid}")
+async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None):
+    # Verify Auth
+    if not Path("global_flags/no_auth").exists():
+        if key:
+            expiry = SESSION_KEYS.get(key)
+            if not expiry or time.time() > expiry:
+                 await websocket.close(code=4003)
+                 return
+        else:
+            if not REMODASH_TOKEN or not token or token != REMODASH_TOKEN:
+                await websocket.close(code=4003)
+                return
+
+    session = terminal_manager.get_session(sid)
+    if not session:
+        await websocket.close(code=4004, reason="Session not found")
+        return
+
     await websocket.accept()
+    session.subscribers.add(websocket)
 
-    session = TerminalSession()
     try:
-        session.start(cwd=cwd)
+        # Send history
+        for chunk in session.history:
+             await websocket.send_text(json.dumps({"type": "output", "data": chunk}))
 
-        # Inject initial command if provided
-        if command:
-            # Small delay to ensure shell is ready
-            await asyncio.sleep(0.1)
-            session.write_input(command + "\r\n")
-
-        # Reader Task
-        async def sender():
-            while True:
-                data = await session.read_output()
-                if not data:
-                    break
-                try:
-                    # Send as text (decode with replacement)
-                    text = data.decode(errors="replace")
-                    await websocket.send_text(json.dumps({"type": "output", "data": text}))
-                except:
-                    break
-
-        sender_task = asyncio.create_task(sender())
-
-        # Receiver Loop
+        # Loop for input
         while True:
-            try:
-                msg_text = await websocket.receive_text()
-                msg = json.loads(msg_text)
+            msg_text = await websocket.receive_text()
+            msg = json.loads(msg_text)
 
-                if msg["type"] == "input":
-                    session.write_input(msg["data"])
-                elif msg["type"] == "resize":
-                    session.resize(msg.get("cols", 80), msg.get("rows", 24))
-            except WebSocketDisconnect:
-                break
-            except Exception as e:
-                print(f"Terminal error: {e}")
-                break
+            if msg["type"] == "input":
+                session.write_input(msg["data"])
+            elif msg["type"] == "resize":
+                session.resize(msg.get("cols", 80), msg.get("rows", 24))
 
-        sender_task.cancel()
-
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        pass
     finally:
-        session.close()
+        session.subscribers.discard(websocket)
+
 
 # --- File System Endpoints ---
 
