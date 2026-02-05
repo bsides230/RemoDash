@@ -809,9 +809,32 @@
             <span class="window-title">Server Configuration</span>
             <button class="win-btn" onclick="closeServerConfig()">✕</button>
         </div>
-        <div class="welcome-content">
-             <p>Edit <code>settings.json</code> directly. Use caution.</p>
-             <textarea id="sys-config-editor" style="width:100%; height:300px; font-family:'JetBrains Mono'; font-size:12px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; padding:10px; resize:vertical;"></textarea>
+        <div class="welcome-content" style="max-height:70vh; overflow-y:auto;">
+             <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+                 <button class="cta-btn" id="btn-cfg-wizard" onclick="setCfgMode('wizard')">Wizard</button>
+                 <button class="cta-btn" id="btn-cfg-raw" style="background:transparent; border:1px solid var(--border-color);" onclick="setCfgMode('raw')">Raw JSON</button>
+             </div>
+
+             <div id="cfg-view-wizard">
+                 <div class="fs-section">
+                     <span class="fs-label">Device Name</span>
+                     <input type="text" id="cfg-dev-name" class="fs-input" placeholder="My Server">
+                 </div>
+                 <div class="fs-section">
+                     <span class="fs-label">Server Port</span>
+                     <input type="number" id="cfg-port" class="fs-input" placeholder="8000">
+                     <div class="fs-warning" style="margin-top:5px; font-size:10px; background:none; border:none; padding:0; color:#ffaa00;">* Requires Restart</div>
+                 </div>
+                 <div class="fs-section">
+                     <span class="fs-label">VLC Path (Optional)</span>
+                     <input type="text" id="cfg-vlc-path" class="fs-input" placeholder="/usr/bin/vlc">
+                 </div>
+             </div>
+
+             <div id="cfg-view-raw" style="display:none;">
+                 <p>Edit <code>settings.json</code> directly. Use caution.</p>
+                 <textarea id="sys-config-editor" style="width:100%; height:300px; font-family:'JetBrains Mono'; font-size:12px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; padding:10px; resize:vertical;"></textarea>
+             </div>
         </div>
         <div class="welcome-footer">
              <button class="cta-btn" onclick="saveServerConfig()">Save & Apply</button>
@@ -916,11 +939,15 @@
                 </label>
             </div>
 
+            <div class="settings-header" style="margin-top:10px;">Theme Presets</div>
+            <div id="theme-presets-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;"></div>
+
             <div class="settings-header" style="margin-top:10px;">Accent Color</div>
             <div class="color-grid" id="color-picker-grid"></div>
 
-            <div class="settings-header" style="margin-top:10px;">Custom Hex</div>
-            <div style="display:flex; gap:5px;">
+            <div class="settings-header" style="margin-top:10px;">Custom Color</div>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <input type="color" id="inp-color-picker" style="width:40px; height:32px; border:none; background:none; cursor:pointer; padding:0;" onchange="updateBrandColor(this.value)">
                 <input type="text" id="inp-hex-color" placeholder="#RRGGBB" style="flex:1; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px;">
                 <button class="cta-btn" onclick="applyCustomHex()">Apply</button>
             </div>
@@ -962,11 +989,64 @@
             activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
             dockPinned: true,
             dockPos: null,
-            theme: 'dark',
+            theme: 'dark', // 'light' or 'dark' (base mode)
+            activeThemePreset: 'default', // ID of active preset
             fontSize: 12,
             brandColor: '#10B981',
             themeWindows: false,
             customColors: ['#333333', '#333333', '#333333', '#333333']
+        };
+
+        const THEME_PRESETS = {
+            'default': {
+                name: 'Default',
+                colors: {
+                    '--bg-core': '#050505',
+                    '--bg-panel': '#0a0a0a',
+                    '--border-color': '#333333',
+                    '--text-body': '#b0b0b0'
+                }
+            },
+            'cyberpunk': {
+                name: 'Cyberpunk',
+                colors: {
+                    '--bg-core': '#000b1e',
+                    '--bg-panel': '#02122b',
+                    '--border-color': '#00f0ff',
+                    '--text-body': '#a0c0ff'
+                },
+                brand: '#fce300'
+            },
+            'ocean': {
+                name: 'Ocean Deep',
+                colors: {
+                    '--bg-core': '#001e26',
+                    '--bg-panel': '#002b36',
+                    '--border-color': '#073642',
+                    '--text-body': '#839496'
+                },
+                brand: '#2aa198'
+            },
+            'midnight': {
+                name: 'Midnight',
+                colors: {
+                    '--bg-core': '#000000',
+                    '--bg-panel': '#050505',
+                    '--border-color': '#222222',
+                    '--text-body': '#888888'
+                },
+                brand: '#7c5cff'
+            },
+            'forest': {
+                name: 'Forest',
+                colors: {
+                    '--bg-core': '#051005',
+                    '--bg-panel': '#0a1a0a',
+                    '--border-color': '#1a331a',
+                    '--text-body': '#a0b0a0'
+                },
+                brand: '#4caf50'
+            }
         };
 
         let zIndexCounter = 100;
@@ -991,6 +1071,7 @@
             checkIfIframe();
             checkWelcome();
             checkConnection();
+            initThemePresets();
             initColorPicker();
             initCustomSlots();
 
@@ -1002,7 +1083,8 @@
             document.getElementById('setting-font-size').value = appSettings.fontSize;
             updateFontSize(appSettings.fontSize, false);
 
-            // Apply Brand Color & Window Theme
+            // Apply Theme & Brand Color
+            if(appSettings.activeThemePreset) applyThemePreset(appSettings.activeThemePreset, false);
             if(appSettings.brandColor) updateBrandColor(appSettings.brandColor);
             toggleWindowTheming(appSettings.themeWindows || false, false);
 
@@ -1030,6 +1112,43 @@
         }
 
         function openThemeSettings() { showSettingsPage('theme'); }
+
+        function initThemePresets() {
+            const container = document.getElementById('theme-presets-container');
+            if(!container) return;
+            container.innerHTML = '';
+            for(const [id, preset] of Object.entries(THEME_PRESETS)) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-full-width';
+                btn.style.textAlign = 'center';
+                btn.style.border = (appSettings.activeThemePreset === id) ? '1px solid var(--brand-color)' : '1px solid var(--border-color)';
+                btn.innerText = preset.name;
+                btn.onclick = () => applyThemePreset(id);
+                container.appendChild(btn);
+            }
+        }
+
+        function applyThemePreset(id, save = true) {
+            const preset = THEME_PRESETS[id];
+            if(!preset) return;
+
+            appSettings.activeThemePreset = id;
+
+            // Apply CSS variables
+            for(const [key, val] of Object.entries(preset.colors)) {
+                document.documentElement.style.setProperty(key, val);
+            }
+
+            // Apply Brand if included
+            if(preset.brand) {
+                updateBrandColor(preset.brand);
+            }
+
+            // Update UI
+            initThemePresets();
+
+            if(save) saveSettings();
+        }
 
         function initCustomSlots() {
              const container = document.getElementById('custom-slots-container');
@@ -1783,6 +1902,12 @@
             document.documentElement.style.setProperty('--brand-color-glow', `rgba(${r},${g},${b}, 0.4)`);
             document.documentElement.style.setProperty('--brand-bg-gradient', `rgba(${r},${g},${b}, 0.3)`); // Brighter
 
+            // Update inputs
+            const hexInp = document.getElementById('inp-hex-color');
+            const colInp = document.getElementById('inp-color-picker');
+            if(hexInp && document.activeElement !== hexInp) hexInp.value = color;
+            if(colInp) colInp.value = color;
+
             saveSettings();
             initColorPicker(); // Update active state
             initCustomSlots(); // Update border colors potentially?
@@ -2211,13 +2336,36 @@
         }
 
         // Server Config Logic
+        let currentFullConfig = {};
+
         function openServerConfig() {
             document.getElementById('server-config-popup').style.display = 'flex';
             document.getElementById('settings-popup').classList.remove('show');
+            setCfgMode('wizard');
             fetchServerConfig();
         }
         function closeServerConfig() {
              document.getElementById('server-config-popup').style.display = 'none';
+        }
+
+        function setCfgMode(mode) {
+            document.getElementById('cfg-view-wizard').style.display = (mode === 'wizard') ? 'block' : 'none';
+            document.getElementById('cfg-view-raw').style.display = (mode === 'raw') ? 'block' : 'none';
+
+            const btnWiz = document.getElementById('btn-cfg-wizard');
+            const btnRaw = document.getElementById('btn-cfg-raw');
+
+            if(mode === 'wizard') {
+                btnWiz.style.background = 'var(--brand-color)';
+                btnWiz.style.border = 'none';
+                btnRaw.style.background = 'transparent';
+                btnRaw.style.border = '1px solid var(--border-color)';
+            } else {
+                btnRaw.style.background = 'var(--brand-color)';
+                btnRaw.style.border = 'none';
+                btnWiz.style.background = 'transparent';
+                btnWiz.style.border = '1px solid var(--border-color)';
+            }
         }
 
         async function fetchServerConfig() {
@@ -2225,21 +2373,51 @@
             try {
                 const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
                 const json = await res.json();
+                currentFullConfig = json;
+
+                // Populate Raw
                 document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
+
+                // Populate Wizard
+                const s = json.settings || {};
+                document.getElementById('cfg-dev-name').value = s.device_name || '';
+                document.getElementById('cfg-vlc-path').value = s.vlc_path || '';
+                document.getElementById('cfg-port').value = json.port || 8000;
+
             } catch(e) { console.error(e); }
         }
 
         async function saveServerConfig() {
             try {
-                const text = document.getElementById('sys-config-editor').value;
-                const json = JSON.parse(text);
+                let payload = {};
+                if (document.getElementById('cfg-view-raw').style.display !== 'none') {
+                    // Raw Mode
+                    const text = document.getElementById('sys-config-editor').value;
+                    payload = JSON.parse(text);
+                } else {
+                    // Wizard Mode
+                    // Update currentFullConfig with form values
+                    if(!currentFullConfig.settings) currentFullConfig.settings = {};
+                    currentFullConfig.settings.device_name = document.getElementById('cfg-dev-name').value.trim();
+                    currentFullConfig.settings.vlc_path = document.getElementById('cfg-vlc-path').value.trim();
+                    currentFullConfig.port = parseInt(document.getElementById('cfg-port').value);
+                    payload = currentFullConfig;
+                }
+
                 await fetch(coreUrl + '/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
-                    body: JSON.stringify(json)
+                    body: JSON.stringify(payload)
                 });
-                alert("Saved. Restart server to apply some changes.");
+                alert("Saved. Restart server to apply port changes.");
                 closeServerConfig();
+
+                // Update local device name if changed
+                if(payload.settings && payload.settings.device_name) {
+                    document.title = payload.settings.device_name + " | RemoDash";
+                    document.getElementById('setting-device-name').value = payload.settings.device_name;
+                }
+
             } catch(e) { alert("Error: " + e.message); }
         }
 
