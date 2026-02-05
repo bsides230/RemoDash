@@ -369,6 +369,32 @@
         </div>
     </div>
 
+    <div id="modal-ssh" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:500px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Git Identity (SSH)</h3>
+
+            <div id="ssh-loading" style="display:none; color:var(--text-dim); padding:20px; text-align:center;">Checking SSH Configuration...</div>
+
+            <div id="ssh-no-key" style="display:none; text-align:center; padding:10px;">
+                <p style="color:var(--text-body); margin-bottom:15px;">No SSH key found. Generate one to authenticate with private repositories.</p>
+                <button class="tool-btn" style="background:var(--brand-color); color:#fff; border:none; margin:0 auto; padding:8px 16px;" onclick="generateSSHKey()">Generate SSH Key</button>
+            </div>
+
+            <div id="ssh-key-info" style="display:none;">
+                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Public Key (Copy to GitHub/GitLab)</label>
+                <textarea id="ssh-pub-key" readonly style="width:100%; height:80px; margin:5px 0 10px 0; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-body); font-family:var(--font-mono); font-size:11px; padding:8px; resize:none;"></textarea>
+                <button class="tool-btn" onclick="copySSHKey()" style="width:100%; justify-content:center; margin-bottom:15px;">Copy to Clipboard</button>
+
+                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Key Fingerprint</label>
+                <pre id="ssh-fingerprint" style="background:var(--bg-core); border:1px solid var(--border-color); color:var(--brand-color); font-family:var(--font-mono); font-size:11px; padding:10px; overflow-x:auto;"></pre>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-ssh').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
         let authToken = localStorage.getItem('lyrn_admin_token');
@@ -801,14 +827,54 @@
             }
         }
 
-        function setupSSH() {
-            const cmd = `echo "Generating SSH Key..."; ssh-keygen -t ed25519 -C "remodash@local" -f ~/.ssh/id_ed25519 -N ""; echo ""; echo "Public Key (Copy this to GitHub/GitLab):"; cat ~/.ssh/id_ed25519.pub; echo ""; echo "Done."; read -p "Press Enter to close..."`;
+        async function setupSSH() {
+            document.getElementById('modal-ssh').style.display = 'flex';
+            document.getElementById('ssh-loading').style.display = 'block';
+            document.getElementById('ssh-no-key').style.display = 'none';
+            document.getElementById('ssh-key-info').style.display = 'none';
 
-            window.parent.postMessage({
-                type: 'OPEN_TERMINAL_TAB',
-                command: cmd,
-                cwd: currentRepoPath || '/'
-            }, '*');
+            try {
+                const res = await fetchAPI('/api/git/ssh_key');
+                document.getElementById('ssh-loading').style.display = 'none';
+
+                if (res && res.exists) {
+                    document.getElementById('ssh-key-info').style.display = 'block';
+                    document.getElementById('ssh-pub-key').value = res.public_key;
+                    document.getElementById('ssh-fingerprint').innerText = res.fingerprint;
+                } else {
+                    document.getElementById('ssh-no-key').style.display = 'block';
+                }
+            } catch(e) {
+                alert("Error checking SSH: " + e.message);
+                document.getElementById('modal-ssh').style.display = 'none';
+            }
+        }
+
+        async function generateSSHKey() {
+            const btn = event.target;
+            btn.innerText = "Generating...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetchAPI('/api/git/ssh_key/generate', 'POST');
+                if (res && res.success) {
+                    setupSSH(); // Reload
+                } else {
+                    alert("Generation Failed: " + (res.error || "Unknown"));
+                }
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = "Generate SSH Key";
+                btn.disabled = false;
+            }
+        }
+
+        function copySSHKey() {
+            const el = document.getElementById('ssh-pub-key');
+            el.select();
+            document.execCommand('copy');
+            alert("Public Key copied to clipboard.");
         }
 
         function toggleSidebar() {
