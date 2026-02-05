@@ -573,11 +573,31 @@ async def create_session_token():
 
 @app.get("/health")
 async def health_check():
-    cpu_percent = psutil.cpu_percent()
-    ram = psutil.virtual_memory()
+    # Wrap psutil calls for Android/PermissionError compatibility
+    try:
+        cpu_percent = psutil.cpu_percent()
+    except (PermissionError, Exception):
+        cpu_percent = 0
+
+    try:
+        ram = psutil.virtual_memory()
+    except (PermissionError, Exception):
+        # Mock object if access denied
+        class MockRAM:
+            percent = 0
+            used = 0
+            total = 0
+        ram = MockRAM()
 
     # Disk Usage (Root)
-    disk = psutil.disk_usage('.')
+    try:
+        disk = psutil.disk_usage('.')
+    except (PermissionError, Exception):
+        class MockDisk:
+            percent = 0
+            used = 0
+            total = 0
+        disk = MockDisk()
 
     # Detailed Partitions (New)
     partitions_info = []
@@ -603,8 +623,8 @@ async def health_check():
     # CPU Info
     cpu_info = {
         "percent": cpu_percent,
-        "count_logical": psutil.cpu_count(logical=True),
-        "count_physical": psutil.cpu_count(logical=False),
+        "count_logical": psutil.cpu_count(logical=True) or 1,
+        "count_physical": psutil.cpu_count(logical=False) or 1,
         "freq_current": 0,
         "freq_max": 0
     }
@@ -658,6 +678,14 @@ async def health_check():
         "node": platform.node()
     }
 
+    # Net IO
+    net_io = {}
+    try:
+        if psutil:
+            net_io = psutil.net_io_counters()._asdict()
+    except (PermissionError, Exception):
+        pass
+
     return {
         "status": "ok",
         "cpu": cpu_info,
@@ -675,7 +703,7 @@ async def health_check():
         "gpu": gpu_stats,
         "battery": battery_info,
         "os": os_info,
-        "net": psutil.net_io_counters()._asdict() if psutil else {}
+        "net": net_io
     }
 
 # --- Power Endpoints ---
@@ -809,7 +837,10 @@ async def kill_task(req: TaskKillRequest):
 # --- Network Monitor Endpoints ---
 @app.get("/api/network", dependencies=[Depends(verify_token)])
 async def get_network_stats():
-    return psutil.net_io_counters()._asdict()
+    try:
+        return psutil.net_io_counters()._asdict()
+    except (PermissionError, Exception):
+        return {}
 
 # --- Cron Manager Endpoints ---
 @app.get("/api/cron", dependencies=[Depends(verify_token)])
