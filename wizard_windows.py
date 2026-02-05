@@ -28,6 +28,15 @@ def install_dependencies():
     if choice in ['y', 'yes', '']:
         print("\nInstalling dependencies...")
 
+        # Check for offline packages
+        offline_dir = Path("offline_packages")
+        use_offline = False
+        if offline_dir.exists() and offline_dir.is_dir():
+            print(f"\n[!] Offline packages detected in '{offline_dir}'.")
+            off_choice = input("Install from local offline packages? (Y/n): ").strip().lower()
+            if off_choice in ['y', 'yes', '']:
+                use_offline = True
+
         pip_cmd = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
 
         if use_venv:
@@ -53,6 +62,9 @@ def install_dependencies():
             else:
                 print("Error: venv created but pip not found.")
                 return False
+
+        if use_offline:
+            pip_cmd.extend(["--no-index", f"--find-links={offline_dir}"])
 
         try:
             subprocess.check_call(pip_cmd)
