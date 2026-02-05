@@ -22,6 +22,7 @@ import secrets
 import time
 import uuid
 import shlex
+from urllib.parse import quote_plus
 
 from fastapi import FastAPI, Request, HTTPException, Header, Depends, Body, WebSocket, WebSocketDisconnect, UploadFile, File, Form, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
@@ -522,6 +523,8 @@ class GitCloneRequest(BaseModel):
     url: str
     path: Optional[str] = None
     name: Optional[str] = None
+    username: Optional[str] = None
+    token: Optional[str] = None
 
 class TaskKillRequest(BaseModel):
     pid: int
@@ -1313,7 +1316,22 @@ async def git_clone(req: GitCloneRequest):
          raise HTTPException(status_code=400, detail="Destination path exists and is not empty")
 
     try:
-        git.Repo.clone_from(req.url, str(p_obj))
+        # Prepare Environment for SSH (Skip Host Key Checking)
+        env = os.environ.copy()
+        env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no"
+
+        # Prepare URL for HTTPS Auth (if provided)
+        clone_url = req.url
+        if req.username and req.token:
+            # Inject credentials: https://user:token@host/repo.git
+            safe_user = quote_plus(req.username)
+            safe_token = quote_plus(req.token)
+            if clone_url.startswith("https://"):
+                clone_url = clone_url.replace("https://", f"https://{safe_user}:{safe_token}@", 1)
+            elif clone_url.startswith("http://"):
+                clone_url = clone_url.replace("http://", f"http://{safe_user}:{safe_token}@", 1)
+
+        git.Repo.clone_from(clone_url, str(p_obj), env=env)
 
         # Auto-add to known repos
         current = settings_manager.settings.get("git_repos", [])
