@@ -259,8 +259,12 @@ class VLCManager:
             raise Exception("Could not create playlist from path")
 
         # 3. Launch
+        # Check settings for vlc_path override
+        custom_vlc = settings_manager.settings.get("vlc_path")
+        vlc_bin = custom_vlc if custom_vlc and custom_vlc.strip() else "vlc"
+
         cmd = [
-            "vlc",
+            vlc_bin,
             "--extraintf", "rc",
             "--rc-host", f"{self.host}:{self.port}",
             "--fullscreen",
@@ -285,7 +289,10 @@ class VLCManager:
                  self.process = subprocess.Popen(cmd, env=env, preexec_fn=os.setsid)
         except FileNotFoundError:
              # Fallback logic could go here
-             raise Exception("VLC executable not found. Please ensure VLC is installed and in your PATH.")
+             custom_vlc = settings_manager.settings.get("vlc_path")
+             if custom_vlc:
+                 raise Exception(f"VLC executable not found at configured path: {custom_vlc}")
+             raise Exception("VLC executable not found. Please ensure VLC is installed and in your PATH, or configure the path in settings.")
 
     def kill(self):
         # Kill python-tracked process
@@ -450,6 +457,10 @@ class GitRepoRequest(BaseModel):
     message: Optional[str] = None
     branch: Optional[str] = None
     files: Optional[List[str]] = None
+
+class GitCloneRequest(BaseModel):
+    url: str
+    path: str
 
 class TaskKillRequest(BaseModel):
     pid: int
@@ -1134,6 +1145,29 @@ async def remove_git_repo(req: GitRepoRequest):
         settings_manager.settings["git_repos"] = current
         settings_manager.save_settings()
     return {"success": True}
+
+@app.post("/api/git/clone", dependencies=[Depends(verify_token)])
+async def git_clone(req: GitCloneRequest):
+    # Validate destination
+    p_obj = check_path_access(req.path)
+    if not git: raise HTTPException(status_code=501, detail="GitPython not installed")
+
+    if p_obj.exists() and any(p_obj.iterdir()):
+         raise HTTPException(status_code=400, detail="Destination path exists and is not empty")
+
+    try:
+        git.Repo.clone_from(req.url, str(p_obj))
+
+        # Auto-add to known repos
+        current = settings_manager.settings.get("git_repos", [])
+        if str(p_obj) not in current:
+            current.append(str(p_obj))
+            settings_manager.settings["git_repos"] = current
+            settings_manager.save_settings()
+
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/git/status", dependencies=[Depends(verify_token)])
 async def get_git_status(path: str):

@@ -78,6 +78,44 @@ def install_dependencies():
 
 venv_python = sys.executable
 
+def configure_general():
+    print("\n--- General Settings ---")
+
+    # Device Name
+    settings_path = Path("settings.json")
+    data = {"settings": {}, "ui_settings": {}}
+
+    if settings_path.exists():
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+        except: pass
+
+    if "settings" not in data: data["settings"] = {}
+
+    current_name = data["settings"].get("device_name", "")
+    print(f"Current Device Name: {current_name if current_name else '(Not Set)'}")
+
+    new_name = input("Enter Device Name (leave empty to keep/skip): ").strip()
+    if new_name:
+        data["settings"]["device_name"] = new_name
+        print(f"Device Name set to: {new_name}")
+
+    # VLC Path
+    current_vlc = data["settings"].get("vlc_path", "")
+    print(f"\nCurrent VLC Path: {current_vlc if current_vlc else '(Auto/Default)'}")
+    print("Required if VLC is not in your system PATH or you want to use a specific version.")
+
+    new_vlc = input("Enter path to VLC executable (leave empty to keep/skip): ").strip()
+    if new_vlc:
+        data["settings"]["vlc_path"] = new_vlc
+        print(f"VLC Path set to: {new_vlc}")
+
+    with open(settings_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
 def configure_filesystem_mode():
     print("\n--- Filesystem Access Mode ---")
     print("[1] FULL SYSTEM ACCESS (DEFAULT)")
@@ -273,6 +311,7 @@ def main():
 
     configure_port()
     configure_auth()
+    configure_general()
     configure_filesystem_mode()
     # Tailscale skipped for Windows
     configure_service()

@@ -271,6 +271,8 @@
             <button class="tool-btn" onclick="triggerUpload()">Upload</button>
             <button class="tool-btn" onclick="triggerDownload()">Download</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
+            <button class="tool-btn" onclick="togglePinCurrent()">📌 Pin</button>
+            <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="copySelection()">Copy</button>
             <button class="tool-btn" onclick="addToGit()">+ Git</button>
             <button class="tool-btn" onclick="pasteSelection()">Paste</button>
@@ -382,14 +384,36 @@
                 { name: "Root", path: "/" },
                 { name: "Home", path: "/home" }
             ];
+
+            // Load User Favorites
+            let userFavs = [];
+            try {
+                const s = localStorage.getItem('lyrn_favs');
+                if(s) userFavs = JSON.parse(s);
+            } catch(e) {}
+
             const favList = document.getElementById('fav-list');
             favList.innerHTML = '';
+
+            // Render Defaults
             favs.forEach(f => {
                 const el = document.createElement('div');
                 el.className = 'sidebar-item';
                 el.innerHTML = `<span>★</span><span>${f.name}</span>`;
                 el.onclick = () => { navigate(f.path); toggleSidebar(); };
                 favList.appendChild(el);
+            });
+
+            // Render User Favorites
+             userFavs.forEach(f => {
+                 const el = document.createElement('div');
+                 el.className = 'sidebar-item';
+                 el.innerHTML = `<span>📌</span><span>${f.name}</span> <span style="margin-left:auto; opacity:0.5; font-size:10px;" onclick="removeFavorite('${f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', event)">✕</span>`;
+                 el.onclick = (e) => {
+                     if(e.target.innerText === '✕') return;
+                     navigate(f.path); toggleSidebar();
+                 };
+                 favList.appendChild(el);
             });
 
             if(!coreUrl || !authToken) return;
@@ -629,16 +653,16 @@
         function openFile(item) {
             const ext = item.name.split('.').pop().toLowerCase();
             const images = ['png','jpg','jpeg','gif','webp','bmp','svg'];
-            const media = ['mp4','mov','mkv','webm','mp3','wav','ogg'];
+            const media = ['mp4','mov','mkv','webm','mp3','wav','ogg','m4v'];
             const pdf = ['pdf'];
 
             if(images.includes(ext) || media.includes(ext) || pdf.includes(ext)) {
-                 // Use ImageViewer (generic viewer)
+                 // Use MediaViewer (generic viewer)
                  window.parent.postMessage({
                      type: 'OPEN_CHILD_WINDOW',
                      id: 'view_' + Date.now(),
                      title: item.name,
-                     url: `ImageViewer.html?src=${encodeURIComponent(item.path)}`,
+                     url: `MediaViewer.html?src=${encodeURIComponent(item.path)}`,
                      canMinimize: false
                  }, '*');
             } else {
@@ -804,6 +828,41 @@
                 });
                 if(res.ok) { closeModal('modal-shortcut'); alert("Shortcut created!"); } else alert("Error: " + await res.text());
             } catch(e) { alert("Error: " + e.message); }
+        }
+
+        function togglePinCurrent() {
+             const tab = tabs[activeTabIndex];
+             const path = tab.path;
+             const name = path.split(/[/\\]/).pop() || path;
+
+             let userFavs = [];
+             try {
+                const s = localStorage.getItem('lyrn_favs');
+                if(s) userFavs = JSON.parse(s);
+             } catch(e) {}
+
+             // Check if exists
+             if(userFavs.find(f => f.path === path)) {
+                 alert("Already pinned.");
+                 return;
+             }
+
+             userFavs.push({ name: name, path: path });
+             localStorage.setItem('lyrn_favs', JSON.stringify(userFavs));
+             initSidebar();
+        }
+
+        function removeFavorite(path, e) {
+            if(e) e.stopPropagation();
+             let userFavs = [];
+             try {
+                const s = localStorage.getItem('lyrn_favs');
+                if(s) userFavs = JSON.parse(s);
+             } catch(e) {}
+
+             userFavs = userFavs.filter(f => f.path !== path);
+             localStorage.setItem('lyrn_favs', JSON.stringify(userFavs));
+             initSidebar();
         }
 
         // --- Utils ---
