@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RemoDash v1.0</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RemoDash">
+    <title>RemoDash</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -649,7 +652,7 @@
             <span class="system-text" id="sys-battery"></span>
         </div>
         <div class="bar-section">
-            <button class="bar-btn" title="Power" onclick="openPowerModal()">⏻</button>
+            <button class="bar-btn" title="Power" onclick="openPowerModal()" ontouchstart="openPowerModal()">⏻</button>
             <button class="bar-btn" title="Help" onclick="openWelcome()">?</button>
             <button class="bar-btn" title="Reset Dock" onclick="resetDock()">⚓</button>
             <button class="bar-btn" title="Fullscreen" onclick="toggleDashboardFullscreen()">⛶</button>
@@ -860,6 +863,12 @@
             <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
             <button class="btn-full-width" style="margin-bottom:10px;" onclick="openServerConfig()">Edit Server Config</button>
             <button class="btn-full-width" style="margin-bottom:10px;" onclick="openFsSecurity()">Filesystem Security</button>
+
+            <div class="settings-header" style="margin-top:10px;">Device</div>
+            <div class="settings-row">
+                <span>Name</span>
+                <input type="text" id="setting-device-name" placeholder="Server Name" onblur="saveDeviceName(this.value)" style="width:120px; padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px; text-align:right;">
+            </div>
 
             <div class="settings-row" onclick="openThemeSettings()" style="cursor:pointer; background:var(--bg-input); padding:8px; border-radius:6px; margin-top:10px; border:1px solid var(--border-color);">
                 <span>🎨 Theme & Colors</span>
@@ -1891,6 +1900,7 @@
                         localStorage.setItem('lyrn_admin_token', authToken);
                         broadcastToken();
                         hasCheckedAuth = true;
+                        loadGlobalSettings();
                         document.getElementById('auth-overlay').style.display = 'none';
                         return;
                     }
@@ -1906,6 +1916,7 @@
                     authToken = storedToken;
                     broadcastToken();
                     hasCheckedAuth = true;
+                    loadGlobalSettings();
                     return;
                 }
             }
@@ -1953,6 +1964,7 @@
                 document.getElementById('auth-overlay').style.display = 'none';
                 broadcastToken();
                 hasCheckedAuth = true;
+                loadGlobalSettings();
             } else {
                 err.innerText = "Invalid Token. Please check admin_token.txt";
             }
@@ -2223,6 +2235,41 @@
             navigator.serviceWorker.register('/sw.js')
                 .then(reg => console.log('Service Worker Registered', reg))
                 .catch(err => console.log('Service Worker Error', err));
+        }
+
+        async function loadGlobalSettings() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                const settings = data.settings || {};
+
+                if(settings.device_name) {
+                    document.title = settings.device_name + " | RemoDash";
+                    document.getElementById('setting-device-name').value = settings.device_name;
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function saveDeviceName(name) {
+            if(!coreUrl || !authToken) return;
+            // First get current to not overwrite others
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                const settings = data.settings || {};
+
+                if(settings.device_name === name) return;
+
+                settings.device_name = name;
+
+                await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ settings: settings })
+                });
+                document.title = (name ? name + " | " : "") + "RemoDash";
+            } catch(e) { console.error(e); }
         }
 
         // --- Filesystem Security Modal Logic ---

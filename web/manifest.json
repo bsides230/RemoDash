@@ -1,10 +1,10 @@
 {
-  "name": "LYRN Dashboard v5",
-  "short_name": "LYRN",
+  "name": "RemoDash",
+  "short_name": "RemoDash",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050505",
-  "theme_color": "#7c5cff",
+  "theme_color": "#10B981",
   "icons": [
     {
       "src": "favicon.ico",

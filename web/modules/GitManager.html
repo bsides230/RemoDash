@@ -235,7 +235,10 @@
         <div id="sidebar">
             <div class="sidebar-header">
                 <span>Repositories</span>
-                <button class="add-repo-btn" onclick="promptAddRepo()">+</button>
+                <div style="display:flex; gap:5px;">
+                    <button class="add-repo-btn" onclick="showCloneModal()" title="Clone from URL">⬇</button>
+                    <button class="add-repo-btn" onclick="promptAddRepo()" title="Add Local Path">+</button>
+                </div>
             </div>
             <div id="repo-list"></div>
         </div>
@@ -296,6 +299,23 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-clone" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Clone Repository</h3>
+
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Repo URL</label>
+            <input type="text" id="inp-clone-url" placeholder="https://github.com/user/repo.git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
+
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Local Destination Path (Must be empty/new)</label>
+            <input type="text" id="inp-clone-path" placeholder="/path/to/destination" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-clone').style.display='none'">Cancel</button>
+                <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="doClone()">Clone</button>
             </div>
         </div>
     </div>
@@ -569,6 +589,40 @@
             if(path) {
                 await fetchAPI('/api/git/repos', 'POST', { path });
                 loadRepos();
+            }
+        }
+
+        function showCloneModal() {
+            document.getElementById('inp-clone-url').value = '';
+            document.getElementById('inp-clone-path').value = '';
+            document.getElementById('modal-clone').style.display = 'flex';
+        }
+
+        async function doClone() {
+            const url = document.getElementById('inp-clone-url').value.trim();
+            const path = document.getElementById('inp-clone-path').value.trim();
+
+            if(!url || !path) { alert("Please fill both fields."); return; }
+
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "Cloning...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetchAPI('/api/git/clone', 'POST', { url, path });
+                if(res.success) {
+                    alert("Clone Successful!");
+                    document.getElementById('modal-clone').style.display = 'none';
+                    loadRepos();
+                } else {
+                    alert("Clone Failed: " + (res.error || "Unknown error"));
+                }
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
             }
         }
 
