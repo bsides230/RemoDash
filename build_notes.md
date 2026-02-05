@@ -120,3 +120,20 @@
 
 ### Logging
 - **VLC Manager:** Logs VLC launch events and errors to the main system log. Connection errors to the RC interface are handled gracefully and reported to the frontend.
+
+## Updates - Today
+
+### Persistent Terminal
+- **Global Sync:** Terminal sessions are now persistent and synchronized across all connected devices.
+  - Opening a terminal tab on one device automatically opens it on all other connected devices via WebSocket events.
+  - Output is broadcast to all clients in real-time.
+  - History buffer allows new clients to see previous session output upon connection.
+- **Backend:**
+  - Implemented `GlobalTerminalManager` in `server.py` to manage persistent sessions.
+  - Added `WS /api/terminal/events` for real-time session list updates.
+  - Added `GET /api/terminals` and `POST /api/terminals` for session management.
+- **Frontend:**
+  - Updated `Terminal.html` to sync with the server's session list and handle "pop-out" windows correctly without killing the session.
+
+### Utilities
+- **Port Killer:** Added `kill_port.py`, a standalone interactive script to list active ports and terminate processes.
