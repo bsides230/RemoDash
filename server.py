@@ -460,7 +460,8 @@ class GitRepoRequest(BaseModel):
 
 class GitCloneRequest(BaseModel):
     url: str
-    path: str
+    path: Optional[str] = None
+    name: Optional[str] = None
 
 class TaskKillRequest(BaseModel):
     pid: int
@@ -1179,9 +1180,38 @@ async def remove_git_repo(req: GitRepoRequest):
 
 @app.post("/api/git/clone", dependencies=[Depends(verify_token)])
 async def git_clone(req: GitCloneRequest):
-    # Validate destination
-    p_obj = check_path_access(req.path)
     if not git: raise HTTPException(status_code=501, detail="GitPython not installed")
+
+    # Determine Destination
+    mode = settings_manager.settings.get("git_root_mode", "manual")
+    root_path = settings_manager.settings.get("git_root_path", "")
+
+    target_path_str = ""
+
+    if mode == "auto":
+        if not root_path:
+             raise HTTPException(status_code=400, detail="Git Root Path not configured in settings")
+
+        # Determine name
+        name = req.name
+        if not name:
+             # Try to parse from URL
+             try:
+                 name = req.url.split("/")[-1]
+                 if name.endswith(".git"): name = name[:-4]
+             except: pass
+
+        if not name:
+             raise HTTPException(status_code=400, detail="Could not determine repository name")
+
+        target_path_str = str(Path(root_path).expanduser() / name)
+    else:
+        if not req.path:
+             raise HTTPException(status_code=400, detail="Path is required in Manual mode")
+        target_path_str = req.path
+
+    # Validate destination
+    p_obj = check_path_access(target_path_str)
 
     if p_obj.exists() and any(p_obj.iterdir()):
          raise HTTPException(status_code=400, detail="Destination path exists and is not empty")
@@ -1345,12 +1375,31 @@ async def get_sysinfo():
                 continue
     except: pass
 
+    # Android Detection & Paths
+    is_android = "ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", "")
+    standard_paths = []
+
+    # Always include Home
+    home_dir = str(Path.home().resolve())
+
+    if is_android:
+        standard_paths.append({"name": "Home", "path": home_dir})
+        if os.path.exists("/sdcard"):
+            standard_paths.append({"name": "Internal Storage", "path": "/sdcard"})
+
+        # Check for Termux storage links
+        storage_shared = Path.home() / "storage" / "shared"
+        if storage_shared.exists():
+             standard_paths.append({"name": "Shared Storage", "path": str(storage_shared.resolve())})
+
     return {
         "hostname": hostname,
         "ip_address": ip_address,
         "os": f"{platform.system()} {platform.release()}",
         "cpu_model": cpu_model,
-        "partitions": partitions
+        "partitions": partitions,
+        "home_dir": home_dir,
+        "standard_paths": standard_paths
     }
 
 # --- Terminal Logic ---

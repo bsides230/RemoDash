@@ -360,17 +360,51 @@
         let activeTabIndex = -1;
         let sortMode = "name";
         let sortOrder = "asc";
+        let sysInfoCache = null;
 
         document.addEventListener('DOMContentLoaded', () => {
-            initSidebar();
-            const urlParams = new URLSearchParams(window.location.search);
-            const initialPath = urlParams.get('path') || '/';
-            addNewTab(initialPath);
+            init();
         });
+
+        async function init() {
+            if (coreUrl && authToken) {
+                try {
+                    const res = await fetch(`${coreUrl}/api/sysinfo`, { headers: { 'X-Token': authToken } });
+                    sysInfoCache = await res.json();
+                } catch(e) { console.error(e); }
+            }
+
+            initSidebar();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            let initialPath = urlParams.get('path');
+
+            if (!initialPath || initialPath === '/') {
+                // If no path or root (which might be forbidden), try home_dir
+                if (sysInfoCache && sysInfoCache.home_dir) {
+                     // If explicit / was requested but we are on Android (standard_paths exist), prefer home
+                     if (sysInfoCache.standard_paths && sysInfoCache.standard_paths.length > 0) {
+                         initialPath = sysInfoCache.home_dir;
+                     } else if (!initialPath) {
+                         initialPath = sysInfoCache.home_dir;
+                     } else {
+                         initialPath = '/'; // Explicit root on non-android
+                     }
+                } else {
+                    initialPath = initialPath || '/';
+                }
+            }
+
+            addNewTab(initialPath);
+        }
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
-            if (e.data.type === 'TOKEN_UPDATE') { authToken = e.data.token; refreshTab(); initSidebar(); }
+            if (e.data.type === 'TOKEN_UPDATE') {
+                authToken = e.data.token;
+                // Re-init to refresh sysinfo and sidebar
+                init().then(() => refreshTab());
+            }
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
             if (e.data.type === 'COLOR_CHANGE') {
                 document.documentElement.style.setProperty('--brand-purple', e.data.color);
@@ -378,11 +412,18 @@
         });
 
         async function initSidebar() {
+            // Defaults
             const favs = [
                 { name: "My Computer", path: "computer://" },
-                { name: "Root", path: "/" },
-                { name: "Home", path: "/home" }
+                { name: "Root", path: "/" }
             ];
+
+            // Add Home if known
+            if (sysInfoCache && sysInfoCache.home_dir) {
+                favs.push({ name: "Home", path: sysInfoCache.home_dir });
+            } else {
+                favs.push({ name: "Home", path: "/home" });
+            }
 
             // Load User Favorites
             let userFavs = [];
@@ -415,25 +456,35 @@
                  favList.appendChild(el);
             });
 
-            if(!coreUrl || !authToken) return;
-            try {
-                const res = await fetch(`${coreUrl}/api/sysinfo`, { headers: { 'X-Token': authToken } });
-                const data = await res.json();
-                const driveList = document.getElementById('drive-list');
-                driveList.innerHTML = '';
-                if (data.partitions) {
-                    data.partitions.forEach(p => {
-                        const el = document.createElement('div');
-                        el.className = 'sidebar-item';
-                        let icon = '💾';
-                        if (p.opts && p.opts.includes('ro')) icon = '🔒';
-                        el.innerHTML = `<span>${icon}</span><span>${p.mountpoint}</span>`;
-                        el.title = `Device: ${p.device} | Used: ${Math.round(p.percent)}%`;
-                        el.onclick = () => { navigate(p.mountpoint); toggleSidebar(); };
-                        driveList.appendChild(el);
-                    });
-                }
-            } catch(e) { console.error("Sidebar load failed", e); }
+            if(!sysInfoCache) return;
+
+            const driveList = document.getElementById('drive-list');
+            driveList.innerHTML = '';
+
+            // Check for Android Standard Paths first
+            if (sysInfoCache.standard_paths && sysInfoCache.standard_paths.length > 0) {
+                 sysInfoCache.standard_paths.forEach(p => {
+                    const el = document.createElement('div');
+                    el.className = 'sidebar-item';
+                    el.innerHTML = `<span>📱</span><span>${p.name}</span>`;
+                    el.onclick = () => { navigate(p.path); toggleSidebar(); };
+                    driveList.appendChild(el);
+                 });
+            }
+
+            // Then partitions
+            if (sysInfoCache.partitions) {
+                sysInfoCache.partitions.forEach(p => {
+                    const el = document.createElement('div');
+                    el.className = 'sidebar-item';
+                    let icon = '💾';
+                    if (p.opts && p.opts.includes('ro')) icon = '🔒';
+                    el.innerHTML = `<span>${icon}</span><span>${p.mountpoint}</span>`;
+                    el.title = `Device: ${p.device} | Used: ${Math.round(p.percent)}%`;
+                    el.onclick = () => { navigate(p.mountpoint); toggleSidebar(); };
+                    driveList.appendChild(el);
+                });
+            }
         }
 
         function addNewTab(path = "/") {

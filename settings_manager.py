@@ -46,6 +46,16 @@ class SettingsManager:
             print("No settings.json found - First boot detected. Creating default settings.")
             self.first_boot = True
 
+        if self.settings is not None:
+            # Inject defaults if missing
+            if "git_root_mode" not in self.settings:
+                self.settings["git_root_mode"] = "manual"
+            if "git_root_path" not in self.settings:
+                try:
+                    self.settings["git_root_path"] = str(Path.home() / "documents" / "github" / "repos")
+                except:
+                    self.settings["git_root_path"] = ""
+
         if self.first_boot:
             # Create and save a default settings file
             self.settings = self.create_empty_settings_structure()
@@ -53,8 +63,16 @@ class SettingsManager:
 
     def create_empty_settings_structure(self) -> dict:
         """Create empty settings structure for first boot"""
+        default_git = ""
+        try:
+            default_git = str(Path.home() / "documents" / "github" / "repos")
+        except: pass
+
         return {
-            "allowed_origins": []
+            "allowed_origins": [],
+            "git_repos": [],
+            "git_root_mode": "manual",
+            "git_root_path": default_git
         }
 
     def save_settings(self, settings: dict = None):
