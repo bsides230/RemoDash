@@ -88,10 +88,13 @@
 
 ### Backend
 - **Server:**
-  - Added `/api/files/upload` endpoint (POST) supporting `multipart/form-data`.
-  - Added `/api/files/zip` endpoint (POST) for creating temporary zip archives of selected files/folders.
-  - Added `python-multipart` dependency.
-  - Implemented filename sanitization to prevent path traversal attacks during upload.
+  - Added `VLCManager` class to handle VLC process management and communication.
+  - Implemented interaction with VLC's Remote Control (RC) interface via TCP socket (port 4212).
+  - Added endpoints: `/api/vlc/launch`, `/api/vlc/command`, `/api/vlc/status`, `/api/vlc/kill`.
+  - Added automatic `.m3u` playlist generation from folder contents.
+
+### Logging
+- **VLC Manager:** Logs VLC launch events and errors to the main system log. Connection errors to the RC interface are handled gracefully and reported to the frontend.
 
 ## Updates - Today
 
@@ -137,3 +140,11 @@
 
 ### Utilities
 - **Port Killer:** Added `kill_port.py`, a standalone interactive script to list active ports and terminate processes.
+
+## Updates - Today
+
+### Git Manager Improvements
+- **Robust Error Handling:** Fixed "500 Internal Server Error" when clicking on empty, broken, or missing repositories. The UI now gracefully handles these states.
+- **Delete Files:** Added option to delete repository files from disk when removing a repository.
+  - Added "Also delete files from disk" checkbox to the removal confirmation modal in `GitManager.html`.
+  - Updated backend to support file deletion via `shutil.rmtree`.
