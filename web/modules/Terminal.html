@@ -77,7 +77,6 @@
         let activeTabId = null;
         let tabCounter = 0;
         let currentTheme = 'dark';
-        let eventSocket = null;
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
@@ -85,9 +84,6 @@
             }
             if (e.data.type === 'TOKEN_UPDATE') {
                 authToken = e.data.token;
-            }
-            if (e.data.type === 'CHILD_RETURNING') {
-                // No-op for now in persistent mode, or maybe refresh list
             }
             if (e.data.type === 'THEME_CHANGE') {
                 currentTheme = e.data.theme;
@@ -105,37 +101,9 @@
         });
 
         async function init() {
-            // Need a slight delay to ensure authToken might be populated if this is iframe
-            // But usually localStorage is ready.
             if (!coreUrl) return;
-
-            await connectEventStream();
-            await loadExistingSessions();
-        }
-
-        async function loadExistingSessions() {
-            if (!coreUrl || !authToken) return;
-            try {
-                const res = await fetch(coreUrl + '/api/terminals', {
-                    headers: { 'X-Token': authToken }
-                });
-                if (res.ok) {
-                    const sessions = await res.json();
-                    // Sort by creation time?
-                    sessions.sort((a,b) => a.created - b.created);
-
-                    sessions.forEach(s => {
-                        createTabUI(s.id);
-                    });
-
-                    if (sessions.length === 0) {
-                        requestNewSession();
-                    } else {
-                        // Switch to first if none active
-                        if (!activeTabId && tabs.length > 0) switchTab(tabs[0].id);
-                    }
-                }
-            } catch(e) { console.error(e); }
+            // Start with one session
+            requestNewSession();
         }
 
         async function getSessionKey() {
@@ -153,62 +121,24 @@
             return null;
         }
 
-        async function connectEventStream() {
-             if (!coreUrl) return;
-             if (eventSocket) return;
-
-             let wsUrl = coreUrl.replace('http', 'ws');
-             if(wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
-             wsUrl += '/api/terminal/events';
-
-             let key = await getSessionKey();
-             let query = [];
-             if(key) query.push(`key=${encodeURIComponent(key)}`);
-             else if(authToken) query.push(`token=${encodeURIComponent(authToken)}`);
-
-             if(query.length > 0) wsUrl += `?${query.join('&')}`;
-
-             eventSocket = new WebSocket(wsUrl);
-             eventSocket.onmessage = (e) => {
-                 try {
-                     const msg = JSON.parse(e.data);
-                     if (msg.type === 'create') {
-                         createTabUI(msg.data.id);
-                     } else if (msg.type === 'kill') {
-                         removeTabUI(msg.data.id);
-                     } else if (msg.type === 'init') {
-                         // Initial list from socket (optional usage)
-                     }
-                 } catch(err) {}
-             };
-             eventSocket.onclose = () => {
-                 eventSocket = null;
-                 setTimeout(connectEventStream, 3000);
-             };
+        function requestNewSession(cwd=null, command=null) {
+            // Local ID generation
+            const id = 'local_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+            createTabUI(id, cwd, command);
         }
 
-        async function requestNewSession(cwd=null, command=null) {
-            try {
-                await fetch(coreUrl + '/api/terminals', {
-                    method: 'POST',
-                    headers: { 'X-Token': authToken, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cwd: cwd, command: command })
-                });
-            } catch(e) { console.error(e); }
-        }
-
-        function createTabUI(sessionId) {
+        function createTabUI(sessionId, cwd, command) {
             // Check existence
             if (tabs.find(t => t.id === sessionId)) return;
 
-            tabCounter++; // Just for label
+            tabCounter++;
 
             // Create DOM
             const tabEl = document.createElement('div');
             tabEl.className = 'tab';
             tabEl.id = 'tab_' + sessionId;
             tabEl.innerHTML = `
-                <span>Terminal ${sessionId.substr(0,4)}</span>
+                <span>Terminal ${tabCounter}</span>
                 <div class="tab-popout" title="Pop Out" onclick="popOutTab('${sessionId}', event)">⇱</div>
                 <div class="tab-close" onclick="requestCloseTab('${sessionId}', event)">✕</div>
             `;
@@ -246,7 +176,7 @@
             };
             tabs.push(termObj);
 
-            connectTerminal(termObj);
+            connectTerminal(termObj, cwd, command);
 
             // Handle resizing
             new ResizeObserver(() => {
@@ -266,15 +196,18 @@
             if (!activeTabId) switchTab(sessionId);
         }
 
-        async function connectTerminal(termObj) {
+        async function connectTerminal(termObj, cwd, command) {
             let wsUrl = coreUrl.replace('http', 'ws');
             if(wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
-            wsUrl += `/api/terminal/${termObj.id}`; // Connect to specific ID
+            wsUrl += `/api/terminal/${termObj.id}`; // SID for logging/consistency
 
             let key = await getSessionKey();
             let query = [];
             if(key) query.push(`key=${encodeURIComponent(key)}`);
             else if(authToken) query.push(`token=${encodeURIComponent(authToken)}`);
+
+            if(cwd) query.push(`cwd=${encodeURIComponent(cwd)}`);
+            if(command) query.push(`command=${encodeURIComponent(command)}`);
 
             if(query.length > 0) wsUrl += `?${query.join('&')}`;
 
@@ -303,17 +236,13 @@
 
             socket.onclose = (e) => {
                 termObj.connected = false;
-                if (e.code === 4004) {
-                    // Session not found, remove it
-                    removeTabUI(termObj.id);
-                } else {
-                    termObj.term.write("\r\n\x1b[31mDisconnected. Reconnecting...\x1b[0m\r\n");
-                    setTimeout(() => connectTerminal(termObj), 3000);
-                }
+                // If code 4004 (session not found) - irrelevant now as we create on fly
+                // Retry logic
+                termObj.term.write("\r\n\x1b[31mDisconnected.\x1b[0m\r\n");
+                // Don't auto-reconnect for local instances usually, or user can refresh.
             };
 
             socket.onerror = () => {
-                // socket.onclose will handle retry
             };
 
             termObj.term.onData(data => {
@@ -351,15 +280,9 @@
             }
         }
 
-        async function requestCloseTab(tabId, e) {
+        function requestCloseTab(tabId, e) {
             if(e) e.stopPropagation();
-            try {
-                await fetch(coreUrl + `/api/terminals/${tabId}`, {
-                    method: 'DELETE',
-                    headers: { 'X-Token': authToken }
-                });
-            } catch(e) {}
-            // Event stream will trigger removeTabUI
+            removeTabUI(tabId);
         }
 
         function removeTabUI(tabId) {
@@ -367,9 +290,8 @@
             if(idx === -1) return;
 
             const t = tabs[idx];
-            // Prevent reconnection loops
             if(t.socket) {
-                t.socket.onclose = null;
+                t.socket.onclose = null; // Prevent triggers
                 t.socket.close();
             }
             t.term.dispose();
@@ -392,25 +314,16 @@
 
         function popOutTab(tabId, e) {
             if(e) e.stopPropagation();
-            // In persistent mode, we don't need to pass state. Just open window and it connects to same session.
+            // Opens fresh terminal in new window
             window.parent.postMessage({
                 type: 'OPEN_CHILD_WINDOW',
                 parentId: 'mod_terminal',
-                id: 'term_pop_' + tabId, // Use consistent ID?
-                title: 'Terminal ' + tabId.substr(0,4),
-                url: 'Terminal.html?session=' + tabId, // Maybe pass param to auto-focus?
+                id: 'term_pop_' + tabId,
+                title: 'Terminal',
+                url: 'Terminal.html',
                 canMinimize: true
             }, '*');
 
-            // Should we close this tab?
-            // "pop out" usually implies moving it.
-            // If we close it here, we kill the view here.
-            // But session remains alive.
-            // Yes, let's close the UI tab here.
-
-            // Wait, if we close the UI tab here, we are just removing the view. The session is persistent.
-            // But if we use "requestCloseTab", it kills the session!
-            // We must use "removeTabUI" to just close the local view.
             removeTabUI(tabId);
         }
 
