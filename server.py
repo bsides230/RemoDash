@@ -1667,43 +1667,48 @@ class TerminalSession:
             if not shell:
                 shell = os.environ.get("SHELL", "/bin/bash")
 
+            # Prepare Environment
+            env = os.environ.copy()
+            env["TERM"] = "xterm-256color"
+
             print(f"[Terminal] Spawning shell: {shell}")
 
-            try:
-                self.process = subprocess.Popen(
-                    [shell],
-                    preexec_fn=os.setsid,
-                    stdin=slave_fd,
-                    stdout=slave_fd,
-                    stderr=slave_fd,
-                    universal_newlines=False,
-                    cwd=self.cwd
-                )
-            except FileNotFoundError:
-                print(f"[Terminal] Error: Shell '{shell}' not found.")
-                # Fallback attempts
-                fallback = "/bin/sh"
-                # Android/Termux fallback
-                if os.path.exists("/system/bin/sh"):
-                    fallback = "/system/bin/sh"
-                elif os.path.exists("/data/data/com.termux/files/usr/bin/sh"):
-                    fallback = "/data/data/com.termux/files/usr/bin/sh"
+            # Helper to try spawn
+            def try_spawn(cmd_list):
+                try:
+                    return subprocess.Popen(
+                        cmd_list,
+                        preexec_fn=os.setsid,
+                        stdin=slave_fd,
+                        stdout=slave_fd,
+                        stderr=slave_fd,
+                        universal_newlines=False,
+                        cwd=self.cwd,
+                        env=env
+                    )
+                except Exception as e:
+                    print(f"[Terminal] Spawn failed for {cmd_list}: {e}")
+                    return None
 
-                if shell != fallback and os.path.exists(fallback):
-                     print(f"[Terminal] Fallback to {fallback}")
-                     try:
-                        self.process = subprocess.Popen(
-                            [fallback],
-                            preexec_fn=os.setsid,
-                            stdin=slave_fd,
-                            stdout=slave_fd,
-                            stderr=slave_fd,
-                            universal_newlines=False,
-                            cwd=self.cwd
-                        )
-                     except: pass
+            self.process = try_spawn([shell])
+
+            if not self.process:
+                # Fallback attempts
+                fallbacks = ["/bin/sh", "/system/bin/sh", "/data/data/com.termux/files/usr/bin/sh"]
+
+                for fb in fallbacks:
+                     if fb != shell and os.path.exists(fb):
+                          print(f"[Terminal] Fallback to {fb}")
+                          self.process = try_spawn([fb])
+                          if self.process: break
 
             os.close(slave_fd)
+
+            if not self.process:
+                print("[Terminal] Critical: Failed to start any shell.")
+                self.history.append("Error: Failed to start shell process. Please check settings.\r\n")
+                self.close()
+                return
 
         # Start Reader Task
         self.reader_task = asyncio.create_task(self._read_loop())
@@ -1726,6 +1731,12 @@ class TerminalSession:
             except Exception as e:
                 print(f"Terminal Read Error: {e}")
                 break
+
+        # Append exit message
+        if not self.closed:
+             msg = "\r\n\x1b[1;31m[Process terminated]\x1b[0m\r\n"
+             self.history.append(msg)
+             await self._broadcast(msg)
 
         self.close()
 
