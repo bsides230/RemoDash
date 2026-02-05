@@ -457,6 +457,7 @@ class GitRepoRequest(BaseModel):
     message: Optional[str] = None
     branch: Optional[str] = None
     files: Optional[List[str]] = None
+    delete_files: Optional[bool] = False
 
 class GitCloneRequest(BaseModel):
     url: str
@@ -1176,6 +1177,19 @@ async def remove_git_repo(req: GitRepoRequest):
         current.remove(p)
         settings_manager.settings["git_repos"] = current
         settings_manager.save_settings()
+
+    if req.delete_files:
+        try:
+            # Validate safety
+            p_obj = check_path_access(p)
+            if p_obj.exists() and p_obj.is_dir():
+                shutil.rmtree(p_obj)
+        except Exception as e:
+            # If removing from settings succeeded but file delete failed, we still return success
+            # but maybe log it?
+            print(f"Failed to delete repo files: {e}")
+            pass
+
     return {"success": True}
 
 @app.post("/api/git/clone", dependencies=[Depends(verify_token)])
@@ -1236,16 +1250,36 @@ async def get_git_status(path: str):
     if not git:
          raise HTTPException(status_code=501, detail="GitPython not installed")
     try:
-        r = git.Repo(path)
+        try:
+            r = git.Repo(path)
+        except git.exc.InvalidGitRepositoryError:
+            return {"error": "Invalid Git Repository", "branch": "Invalid", "files": [], "history": []}
+        except git.exc.NoSuchPathError:
+            return {"error": "Path not found", "branch": "Missing", "files": [], "history": []}
+
         diffs = []
         # Staged
-        for item in r.index.diff(None):
-             diffs.append({"file": item.a_path, "type": "modified", "staged": False})
-        for item in r.index.diff("HEAD"):
-             diffs.append({"file": item.a_path, "type": "modified", "staged": True})
+        try:
+            for item in r.index.diff(None):
+                diffs.append({"file": item.a_path, "type": "modified", "staged": False})
+        except: pass
+
+        # Diff against HEAD (only if HEAD exists)
+        try:
+            # Check if HEAD is valid
+            _ = r.head.commit
+            for item in r.index.diff("HEAD"):
+                diffs.append({"file": item.a_path, "type": "modified", "staged": True})
+        except ValueError:
+            # Empty repo (no commits)
+            pass
+        except: pass
+
         # Untracked
-        for f in r.untracked_files:
-            diffs.append({"file": f, "type": "untracked", "staged": False})
+        try:
+            for f in r.untracked_files:
+                diffs.append({"file": f, "type": "untracked", "staged": False})
+        except: pass
 
         history = []
         try:
@@ -1258,13 +1292,25 @@ async def get_git_status(path: str):
                 })
         except: pass
 
+        branch_name = "Unknown"
+        try:
+            if r.head.is_detached:
+                branch_name = "Detached"
+            else:
+                branch_name = r.active_branch.name
+        except:
+            # Likely empty repo without branch yet
+            try: branch_name = r.git.branch(show_current=True) or "No Branch"
+            except: branch_name = "No Branch"
+
         return {
-            "branch": r.active_branch.name if not r.head.is_detached else "Detached",
+            "branch": branch_name,
             "files": diffs,
             "history": history
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return structured error instead of 500
+        return {"error": str(e), "branch": "Error", "files": [], "history": []}
 
 @app.post("/api/git/commit", dependencies=[Depends(verify_token)])
 async def git_commit(req: GitRepoRequest):

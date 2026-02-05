@@ -306,6 +306,25 @@
         </div>
     </div>
 
+    <div id="modal-delete" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Remove Repository</h3>
+            <p style="color:var(--text-body); font-size:12px; margin-bottom:15px;">
+                Are you sure you want to remove <strong id="del-repo-name" style="color:var(--text-head)"></strong>?
+            </p>
+
+            <label style="cursor:pointer; display:flex; align-items:center; gap:8px; color:var(--text-body); font-size:12px; margin-bottom:20px; padding:10px; background:rgba(239, 68, 68, 0.1); border-radius:4px; border:1px solid rgba(239, 68, 68, 0.2);">
+                <input type="checkbox" id="chk-delete-files">
+                <span>Also delete files from disk (Cannot be undone)</span>
+            </label>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-delete').style.display='none'">Cancel</button>
+                <button class="tool-btn" style="color:var(--danger); border-color:var(--danger);" onclick="confirmRemoveRepo()">Remove</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-clone" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
         <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
             <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Clone Repository</h3>
@@ -751,13 +770,35 @@
             }
         }
 
-        async function removeRepo() {
-            if(!confirm("Remove this repository from RemoDash? (Files remain on disk)")) return;
-            await fetchAPI('/api/git/repos/remove', 'POST', { path: currentRepoPath });
-            currentRepoPath = null;
-            document.getElementById('repo-interface').style.display = 'none';
-            document.getElementById('empty-state').style.display = 'flex';
-            loadRepos();
+        function removeRepo() {
+            document.getElementById('del-repo-name').innerText = currentRepoPath;
+            document.getElementById('chk-delete-files').checked = false;
+            document.getElementById('modal-delete').style.display = 'flex';
+        }
+
+        async function confirmRemoveRepo() {
+            const delFiles = document.getElementById('chk-delete-files').checked;
+            const btn = event.target;
+            btn.innerText = "Removing...";
+            btn.disabled = true;
+
+            try {
+                await fetchAPI('/api/git/repos/remove', 'POST', {
+                    path: currentRepoPath,
+                    delete_files: delFiles
+                });
+
+                document.getElementById('modal-delete').style.display = 'none';
+                currentRepoPath = null;
+                document.getElementById('repo-interface').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'flex';
+                loadRepos();
+            } catch (e) {
+                alert("Error removing repo: " + e.message);
+            } finally {
+                btn.innerText = "Remove";
+                btn.disabled = false;
+            }
         }
 
         function setupSSH() {
