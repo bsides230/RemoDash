@@ -92,3 +92,12 @@
   - Added `/api/files/zip` endpoint (POST) for creating temporary zip archives of selected files/folders.
   - Added `python-multipart` dependency.
   - Implemented filename sanitization to prevent path traversal attacks during upload.
+
+## Updates - Today
+
+### Offline Support
+- **Package Downloader:** Created `download_offline_packages.py` to facilitate offline installations.
+  - Downloads all dependencies from `requirements.txt` into a local `offline_packages/` directory.
+  - Also fetches essential build tools (`pip`, `setuptools`, `wheel`).
+- **Wizards:** Updated `wizard_linux.py` and `wizard_windows.py` to auto-detect the `offline_packages` folder.
+  - If detected, users are prompted to install dependencies from the local cache instead of PyPI.
