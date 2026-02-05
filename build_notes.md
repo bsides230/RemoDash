@@ -101,3 +101,22 @@
   - Also fetches essential build tools (`pip`, `setuptools`, `wheel`).
 - **Wizards:** Updated `wizard_linux.py` and `wizard_windows.py` to auto-detect the `offline_packages` folder.
   - If detected, users are prompted to install dependencies from the local cache instead of PyPI.
+
+## Updates - Today
+
+### New Modules
+- **VLC Control:** Added a remote control interface for VLC Media Player (`web/modules/VLCControl.html`).
+  - Allows launching VLC on the host machine with a specific folder as a playlist.
+  - Automatically configures VLC for Fullscreen, Random, and Loop playback.
+  - Provides playback controls (Play, Pause, Stop, Next, Prev) and volume control via the web interface.
+  - Displays real-time "Now Playing" status and playback state.
+
+### Backend
+- **Server:**
+  - Added `VLCManager` class to handle VLC process management and communication.
+  - Implemented interaction with VLC's Remote Control (RC) interface via TCP socket (port 4212).
+  - Added endpoints: `/api/vlc/launch`, `/api/vlc/command`, `/api/vlc/status`, `/api/vlc/kill`.
+  - Added automatic `.m3u` playlist generation from folder contents.
+
+### Logging
+- **VLC Manager:** Logs VLC launch events and errors to the main system log. Connection errors to the RC interface are handled gracefully and reported to the frontend.
