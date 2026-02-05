@@ -207,6 +207,160 @@ class Shortcut(BaseModel):
 class ShortcutRunRequest(BaseModel):
     run_mode: Optional[str] = None # Allow override
 
+# --- VLC Manager ---
+class VLCManager:
+    def __init__(self, host="127.0.0.1", port=4212):
+        self.host = host
+        self.port = port
+        self.process = None
+
+    def _send_command(self, cmd: str) -> str:
+        """Connects to VLC RC, sends command, returns response."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(2)
+                s.connect((self.host, self.port))
+
+                # Receive initial welcome banner/prompt if any
+                try:
+                    s.recv(1024)
+                except: pass
+
+                # Send command
+                s.sendall(f"{cmd}\n".encode())
+
+                # Read response
+                # RC interface is tricky, it doesn't always signal end of message well.
+                # We read a bit.
+                data = b""
+                try:
+                    while True:
+                        chunk = s.recv(4096)
+                        if not chunk: break
+                        data += chunk
+                        if len(chunk) < 4096: break
+                except socket.timeout:
+                    pass
+
+                return data.decode(errors="ignore").strip()
+        except ConnectionRefusedError:
+            return "Error: VLC not running or RC interface not active."
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def launch(self, path: str):
+        """Launches VLC with the specified playlist/folder."""
+        # 1. Kill existing if running (simple single-instance management)
+        self.kill()
+
+        # 2. Build Playlist
+        playlist_path = self._create_playlist(path)
+        if not playlist_path:
+            raise Exception("Could not create playlist from path")
+
+        # 3. Launch
+        cmd = [
+            "vlc",
+            "--extraintf", "rc",
+            "--rc-host", f"{self.host}:{self.port}",
+            "--fullscreen",
+            "--loop",   # Repeat All
+            "--random", # Shuffle
+            playlist_path
+        ]
+
+        # Windows specific: vlc might not be in PATH.
+        # Try common paths if simple 'vlc' fails?
+        # For now assume 'vlc' is in PATH as per typical user setup or allow config.
+        # We will try strict 'vlc' first.
+
+        try:
+            if platform.system() == "Windows":
+                 # Detach process
+                 self.process = subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            else:
+                 # Linux: set DISPLAY if needed, though usually inherited
+                 env = os.environ.copy()
+                 if "DISPLAY" not in env: env["DISPLAY"] = ":0"
+                 self.process = subprocess.Popen(cmd, env=env, preexec_fn=os.setsid)
+        except FileNotFoundError:
+             # Fallback logic could go here
+             raise Exception("VLC executable not found. Please ensure VLC is installed and in your PATH.")
+
+    def kill(self):
+        # Kill python-tracked process
+        if self.process:
+            try:
+                self.process.terminate()
+                self.process = None
+            except: pass
+
+        # Force kill by port/name to be sure (in case launched externally or lost track)
+        # This is aggressive but requested: "start the vlc app... make new playlist" implies fresh start.
+        # We can use psutil to find process listening on port 4212?
+        # Or just pkill vlc.
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                if "vlc" in proc.info['name'].lower():
+                    proc.terminate()
+            except: pass
+
+    def _create_playlist(self, folder_path: str) -> Optional[str]:
+        p = Path(folder_path)
+        if not p.exists(): return None
+
+        media_exts = {'.mp4', '.mkv', '.avi', '.mov', '.mp3', '.flac', '.wav', '.webm', '.m4v'}
+        files = []
+
+        if p.is_file():
+            files.append(p)
+        else:
+            for entry in p.iterdir():
+                if entry.is_file() and entry.suffix.lower() in media_exts:
+                    files.append(entry)
+
+        if not files: return None
+
+        # Create temp m3u
+        fd, temp_path = tempfile.mkstemp(suffix=".m3u", prefix="remodash_vlc_")
+        os.close(fd)
+
+        with open(temp_path, "w", encoding="utf-8") as f:
+            f.write("#EXTM3U\n")
+            for item in files:
+                f.write(f"{str(item)}\n")
+
+        return temp_path
+
+    def command(self, action: str):
+        # Map simple actions to RC commands
+        valid = {
+            "play": "play",
+            "pause": "pause",
+            "stop": "stop",
+            "next": "next",
+            "prev": "prev",
+            "vol_up": "volup 2",
+            "vol_down": "voldown 2",
+            "fullscreen": "f"
+        }
+        if action in valid:
+            return self._send_command(valid[action])
+        return "Invalid command"
+
+    def get_status(self):
+        # 'status' returns state (playing/stopped)
+        # 'get_title' returns title
+        state = self._send_command("status")
+        title = self._send_command("get_title")
+
+        # Clean up output
+        # VLC RC often echoes prompt "> "
+        state = state.replace(">", "").strip()
+        title = title.replace(">", "").strip()
+
+        return {"state": state, "title": title}
+
 # --- Shortcuts Manager ---
 class ShortcutsManager:
     def __init__(self, data_file="data/shortcuts.json"):
@@ -273,6 +427,7 @@ class ShortcutsManager:
 logger = DiskJournalLogger()
 settings_manager = SettingsManager()
 shortcuts_manager = ShortcutsManager()
+vlc_manager = VLCManager()
 
 # --- Pydantic Models ---
 class PresetModel(BaseModel):
@@ -301,6 +456,12 @@ class TaskKillRequest(BaseModel):
 
 class CronRequest(BaseModel):
     lines: str
+
+class VLCLaunchRequest(BaseModel):
+    path: str
+
+class VLCCommandRequest(BaseModel):
+    command: str
 
 # --- App Setup ---
 
@@ -662,6 +823,38 @@ async def save_cron(req: CronRequest):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- VLC Endpoints ---
+
+@app.post("/api/vlc/launch", dependencies=[Depends(verify_token)])
+async def vlc_launch(req: VLCLaunchRequest):
+    try:
+        # Validate path access using existing check
+        check_path_access(req.path)
+        vlc_manager.launch(req.path)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vlc/command", dependencies=[Depends(verify_token)])
+async def vlc_command(req: VLCCommandRequest):
+    try:
+        res = vlc_manager.command(req.command)
+        return {"result": res}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/vlc/status", dependencies=[Depends(verify_token)])
+async def vlc_status():
+    try:
+        return vlc_manager.get_status()
+    except Exception as e:
+        return {"state": "error", "title": str(e)}
+
+@app.post("/api/vlc/kill", dependencies=[Depends(verify_token)])
+async def vlc_kill():
+    vlc_manager.kill()
+    return {"success": True}
 
 # --- Shortcuts Endpoints ---
 
