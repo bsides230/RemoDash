@@ -2005,7 +2005,12 @@
                 return;
             }
             try {
-                const res = await fetch(coreUrl + '/health');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const res = await fetch(coreUrl + '/health', { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 const data = await res.json();
 
                 // Server OK
@@ -2173,6 +2178,14 @@
                     iframe.contentWindow.postMessage(payload, '*');
                 }, 500);
                 iframe.contentWindow.postMessage(payload, '*');
+            }
+
+            if (e.data.type === 'GIT_REPOS_UPDATED') {
+                const gitWin = document.getElementById('win_mod_git');
+                if(gitWin) {
+                    const iframe = gitWin.querySelector('iframe');
+                    if(iframe) iframe.contentWindow.postMessage({ type: 'REFRESH_LIST' }, '*');
+                }
             }
         });
 

@@ -218,13 +218,14 @@
             box-shadow: 0 8px 16px rgba(0,0,0,0.5); z-index: 10;
             border: 1px solid var(--border-color); border-radius: 4px;
         }
+        .dropdown-content.show { display: block; } /* Click to show */
         .dropdown-content button {
             color: var(--text-body); padding: 10px 16px;
             text-decoration: none; display: block; width: 100%; text-align: left;
             background: none; border: none; cursor: pointer; font-family: var(--font-mono); font-size: 11px;
         }
         .dropdown-content button:hover { background-color: var(--bg-sec); color: var(--text-head); }
-        .action-dropdown:hover .dropdown-content { display: block; }
+        /* .action-dropdown:hover .dropdown-content { display: block; } REMOVED */
 
     </style>
 </head>
@@ -236,6 +237,7 @@
             <div class="sidebar-header">
                 <span>Repositories</span>
                 <div style="display:flex; gap:5px;">
+                    <button class="add-repo-btn" onclick="loadRepos()" title="Refresh List">↻</button>
                     <button class="add-repo-btn" onclick="showCloneModal()" title="Clone from URL">⬇</button>
                     <button class="add-repo-btn" onclick="promptAddRepo()" title="Add Local Path">+</button>
                 </div>
@@ -263,8 +265,8 @@
                     <button class="tool-btn" onclick="loadRepoDetails()">↻</button>
 
                     <div class="action-dropdown">
-                         <button class="tool-btn">Actions ▼</button>
-                         <div class="dropdown-content">
+                         <button class="tool-btn" id="btn-actions-dropdown" onclick="toggleDropdown(event)">Actions ▼</button>
+                         <div class="dropdown-content" id="dropdown-menu">
                              <button onclick="doPull()">↓ Pull</button>
                              <button onclick="doPush()">↑ Push</button>
                              <div style="height:1px; background:var(--border-color); margin:5px 0"></div>
@@ -339,6 +341,26 @@
             if (e.data.type === 'COLOR_CHANGE') {
                 document.documentElement.style.setProperty('--brand-color', e.data.color);
             }
+            if (e.data.type === 'REFRESH_LIST') {
+                loadRepos();
+            }
+        });
+
+        // Dropdown Logic
+        function toggleDropdown(e) {
+            e.stopPropagation();
+            const el = document.getElementById('dropdown-menu');
+            el.classList.toggle('show');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+             const dropdown = document.getElementById('dropdown-menu');
+             if(dropdown && dropdown.classList.contains('show')) {
+                 if(!e.target.closest('.action-dropdown')) {
+                     dropdown.classList.remove('show');
+                 }
+             }
         });
 
         async function fetchAPI(endpoint, method='GET', body=null) {

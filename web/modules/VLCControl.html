@@ -101,13 +101,30 @@
         .status-playing { color: var(--success-color); }
         .status-stopped { color: var(--text-dim); }
 
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+            z-index: 100; display: none; align-items: center; justify-content: center;
+        }
+        .modal {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            padding: 20px; border-radius: 8px; width: 350px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .modal h3 { margin-top: 0; color: var(--text-head); font-size: 14px; }
+        .modal label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 5px; }
+
     </style>
 </head>
 <body>
 
     <div class="header">
         <h2>VLC Control</h2>
-        <button class="btn danger" onclick="killVLC()" title="Force Kill VLC">☠ Kill VLC</button>
+        <div style="display:flex; gap:10px;">
+            <button class="btn" onclick="openSettings()">⚙ Settings</button>
+            <button class="btn danger" onclick="killVLC()" title="Force Kill VLC">☠ Kill VLC</button>
+        </div>
     </div>
 
     <div class="container">
@@ -151,10 +168,27 @@
 
     </div>
 
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal">
+            <h3>VLC Configuration</h3>
+            <label>Custom VLC Executable Path (Optional)</label>
+            <input type="text" id="inp-vlc-path" class="form-input" placeholder="e.g. C:\Program Files\VideoLAN\VLC\vlc.exe">
+            <div style="font-size:10px; color:var(--text-dim); margin-top:5px;">
+                Leave empty to use system 'vlc' command.
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
+                <button class="btn" onclick="closeSettings()">Cancel</button>
+                <button class="btn primary" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
         let authToken = localStorage.getItem('lyrn_admin_token');
         let pollInterval = null;
+        let currentSettings = {};
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
@@ -167,6 +201,44 @@
             pollStatus();
             pollInterval = setInterval(pollStatus, 2000);
         });
+
+        function openSettings() {
+            document.getElementById('modal-settings').style.display = 'flex';
+            fetchSettings();
+        }
+
+        function closeSettings() {
+            document.getElementById('modal-settings').style.display = 'none';
+        }
+
+        async function fetchSettings() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/config`, { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                currentSettings = data.settings || {};
+                document.getElementById('inp-vlc-path').value = currentSettings.vlc_path || "";
+            } catch(e) { console.error(e); }
+        }
+
+        async function saveSettings() {
+            const vlcPath = document.getElementById('inp-vlc-path').value.trim();
+            currentSettings.vlc_path = vlcPath;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ settings: currentSettings })
+                });
+                if(res.ok) {
+                    alert("Settings saved.");
+                    closeSettings();
+                } else {
+                    alert("Failed to save.");
+                }
+            } catch(e) { alert(e); }
+        }
 
         async function launchVLC() {
             const path = document.getElementById('inp-path').value.trim();
