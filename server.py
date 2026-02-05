@@ -551,6 +551,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[System] Failed to read admin_token.txt: {e}")
 
+    # --- Git Configuration Fix ---
+    # Fix "detected dubious ownership" by trusting all directories
+    if git:
+        try:
+            subprocess.run(["git", "config", "--global", "--replace-all", "safe.directory", "*"], check=False)
+            print("[System] Git safe.directory set to '*'")
+        except Exception as e:
+            print(f"[System] Failed to set git safe.directory: {e}")
+
     await logger.emit("Info", "RemoDash Server started.", "System")
 
     yield
@@ -1447,6 +1456,73 @@ async def git_pull(req: GitRepoRequest):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- SSH Key Management ---
+
+@app.get("/api/git/ssh_key", dependencies=[Depends(verify_token)])
+async def get_ssh_key():
+    """Checks for SSH key and returns public key + fingerprint."""
+    ssh_dir = Path.home() / ".ssh"
+    # Prefer Ed25519, fall back to RSA
+    key_types = ["id_ed25519", "id_rsa"]
+    found_key = None
+
+    for k in key_types:
+        if (ssh_dir / k).exists() and (ssh_dir / f"{k}.pub").exists():
+            found_key = ssh_dir / k
+            break
+
+    if not found_key:
+        return {"exists": False}
+
+    try:
+        pub_path = found_key.with_suffix(".pub")
+        pub_content = pub_path.read_text(encoding="utf-8").strip()
+
+        # Get Fingerprint (Randomart)
+        # ssh-keygen -lv -f /path/to/key
+        proc = subprocess.run(
+            ["ssh-keygen", "-lv", "-f", str(found_key)],
+            capture_output=True, text=True
+        )
+        fingerprint = proc.stdout
+
+        return {
+            "exists": True,
+            "type": found_key.name,
+            "public_key": pub_content,
+            "fingerprint": fingerprint
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read key: {str(e)}")
+
+@app.post("/api/git/ssh_key/generate", dependencies=[Depends(verify_token)])
+async def generate_ssh_key():
+    """Generates a new Ed25519 SSH key pair."""
+    ssh_dir = Path.home() / ".ssh"
+    ssh_dir.mkdir(parents=True, exist_ok=True)
+    key_path = ssh_dir / "id_ed25519"
+
+    if key_path.exists():
+        raise HTTPException(status_code=400, detail="SSH Key already exists")
+
+    try:
+        # Generate Ed25519 key, no passphrase (-N ""), comment "remodash@local"
+        cmd = [
+            "ssh-keygen", "-t", "ed25519",
+            "-C", "remodash@local",
+            "-f", str(key_path),
+            "-N", ""
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+
+        if proc.returncode != 0:
+            raise Exception(proc.stderr)
+
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
 
 @app.get("/api/sysinfo", dependencies=[Depends(verify_token)])
 async def get_sysinfo():
