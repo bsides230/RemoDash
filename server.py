@@ -1803,99 +1803,8 @@ class TerminalSession:
         # Cancel reader?
         # if self.reader_task: self.reader_task.cancel()
 
-class TerminalManager:
-    def __init__(self):
-        self.sessions: Dict[str, TerminalSession] = {}
-        self.event_subscribers: set[WebSocket] = set()
-
-    def create_session(self, cwd=None) -> str:
-        sid = str(uuid.uuid4())
-        session = TerminalSession(sid, cwd)
-        self.sessions[sid] = session
-        asyncio.create_task(self.broadcast_event("create", {"id": sid, "cwd": cwd}))
-        return sid
-
-    def get_session(self, sid: str) -> Optional[TerminalSession]:
-        return self.sessions.get(sid)
-
-    def kill_session(self, sid: str):
-        if sid in self.sessions:
-            s = self.sessions.pop(sid)
-            s.close()
-            asyncio.create_task(self.broadcast_event("kill", {"id": sid}))
-
-    def list_sessions(self):
-        return [{"id": k, "created": v.created_at} for k, v in self.sessions.items()]
-
-    async def broadcast_event(self, event_type: str, data: Any):
-        msg = json.dumps({"type": event_type, "data": data})
-        to_remove = []
-        for ws in self.event_subscribers:
-            try:
-                await ws.send_text(msg)
-            except:
-                to_remove.append(ws)
-        for ws in to_remove:
-            self.event_subscribers.discard(ws)
-
-    async def subscribe_events(self, websocket: WebSocket):
-        await websocket.accept()
-        self.event_subscribers.add(websocket)
-        try:
-            # Send initial list
-            current = self.list_sessions()
-            await websocket.send_text(json.dumps({"type": "init", "data": current}))
-            while True:
-                await websocket.receive_text() # Keep alive / wait for close
-        except:
-            pass
-        finally:
-            self.event_subscribers.discard(websocket)
-
-terminal_manager = TerminalManager()
-
-class CreateTerminalRequest(BaseModel):
-    cwd: Optional[str] = None
-    command: Optional[str] = None # Ignored for now, or could implement "run and hold"
-
-@app.get("/api/terminals", dependencies=[Depends(verify_token)])
-async def list_terminals():
-    return terminal_manager.list_sessions()
-
-@app.post("/api/terminals", dependencies=[Depends(verify_token)])
-async def create_terminal(req: CreateTerminalRequest):
-    sid = terminal_manager.create_session(req.cwd)
-    # If command provided, maybe inject it?
-    if req.command:
-        s = terminal_manager.get_session(sid)
-        if s:
-             await asyncio.sleep(0.1)
-             s.write_input(req.command + "\r\n")
-    return {"id": sid}
-
-@app.delete("/api/terminals/{sid}", dependencies=[Depends(verify_token)])
-async def kill_terminal(sid: str):
-    terminal_manager.kill_session(sid)
-    return {"success": True}
-
-@app.websocket("/api/terminal/events")
-async def terminal_events_ws(websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None):
-    # Verify Auth (Copy-paste verify logic or factor out)
-    if not Path("global_flags/no_auth").exists():
-        if key:
-            expiry = SESSION_KEYS.get(key)
-            if not expiry or time.time() > expiry:
-                 await websocket.close(code=4003)
-                 return
-        else:
-            if not REMODASH_TOKEN or not token or token != REMODASH_TOKEN:
-                await websocket.close(code=4003)
-                return
-
-    await terminal_manager.subscribe_events(websocket)
-
 @app.websocket("/api/terminal/{sid}")
-async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None):
+async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None, cwd: Optional[str] = None, command: Optional[str] = None):
     # Verify Auth
     if not Path("global_flags/no_auth").exists():
         if key:
@@ -1908,16 +1817,19 @@ async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str
                 await websocket.close(code=4003)
                 return
 
-    session = terminal_manager.get_session(sid)
-    if not session:
-        await websocket.close(code=4004, reason="Session not found")
-        return
-
     await websocket.accept()
+
+    # Create Local Session
+    session = TerminalSession(sid, cwd=cwd)
     session.subscribers.add(websocket)
 
+    # Optional Command Injection
+    if command:
+        # We append newline to execute
+        session.write_input(command + "\r\n")
+
     try:
-        # Send history
+        # Send history (captures startup messages/errors)
         for chunk in session.history:
              await websocket.send_text(json.dumps({"type": "output", "data": chunk}))
 
@@ -1934,9 +1846,9 @@ async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        pass
+        print(f"Terminal WS Error: {e}")
     finally:
-        session.subscribers.discard(websocket)
+        session.close()
 
 
 # --- File System Endpoints ---
