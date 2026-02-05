@@ -1,0 +1,11 @@
+fastapi<0.100
+pydantic<2
+uvicorn
+psutil
+aiofiles
+aiohttp
+websockets
+GitPython
+python-crontab
+sse-starlette
+python-multipart
