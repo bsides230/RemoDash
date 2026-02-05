@@ -13,7 +13,7 @@ def print_header(title):
 def install_system_dependencies():
     print("--- Termux System Dependencies ---")
     print("Checking for required system packages...")
-    packages = ["build-essential", "clang", "python", "libffi-dev", "openssl-dev", "git", "binutils", "rust"]
+    packages = ["build-essential", "clang", "python", "libffi", "openssl", "git", "binutils", "rust"]
 
     cmd = ["pkg", "install", "-y"] + packages
 
@@ -22,7 +22,11 @@ def install_system_dependencies():
         subprocess.check_call(cmd)
         print("System dependencies installed.")
     except subprocess.CalledProcessError:
-        print("Error installing system dependencies. Ensure you have internet access and try running 'pkg update' first.")
+        print("Error installing system dependencies.")
+        print("Suggestions:")
+        print("1. Ensure you have internet access.")
+        print("2. Run 'pkg update' to refresh package lists.")
+        print("3. If you see mirror errors, run 'termux-change-repo' to select a working mirror.")
         return False
     except FileNotFoundError:
         print("Error: 'pkg' command not found. Are you running this in Termux?")
