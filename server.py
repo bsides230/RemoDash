@@ -1,6 +1,11 @@
 import os
 import sys
-import psutil
+try:
+    import psutil
+except ImportError:
+    print("[System] Warning: psutil not found. Using mock implementation.")
+    psutil = None
+
 import asyncio
 import json
 import datetime
@@ -42,6 +47,57 @@ try:
     from crontab import CronTab
 except ImportError:
     CronTab = None
+
+# --- Psutil Mock for Android/No-Dep environments ---
+if psutil is None:
+    class MockPsutil:
+        class VirtualMemory:
+            percent = 0
+            used = 0
+            total = 0
+        class DiskUsage:
+            percent = 0
+            used = 0
+            total = 0
+        class Battery:
+            percent = 0
+            power_plugged = False
+            secsleft = 0
+        class CpuFreq:
+            current = 0
+            max = 0
+        class Process:
+            def __init__(self, pid): pass
+            def terminate(self): pass
+
+        NoSuchProcess = Exception
+        AccessDenied = Exception
+
+        @staticmethod
+        def cpu_percent(interval=None): return 0
+        @staticmethod
+        def virtual_memory(): return MockPsutil.VirtualMemory()
+        @staticmethod
+        def disk_usage(path): return MockPsutil.DiskUsage()
+        @staticmethod
+        def disk_partitions(): return []
+        @staticmethod
+        def cpu_count(logical=True): return 1
+        @staticmethod
+        def cpu_freq(): return MockPsutil.CpuFreq()
+        @staticmethod
+        def sensors_battery(): return None
+        @staticmethod
+        def net_io_counters():
+            class NetIO:
+                def _asdict(self): return {}
+            return NetIO()
+        @staticmethod
+        def process_iter(attrs=None): return []
+        @staticmethod
+        def Process(pid): return MockPsutil.Process(pid)
+
+    psutil = MockPsutil()
 
 # Platform-specific imports for Terminal
 if platform.system() != "Windows":
@@ -306,11 +362,14 @@ class VLCManager:
         # This is aggressive but requested: "start the vlc app... make new playlist" implies fresh start.
         # We can use psutil to find process listening on port 4212?
         # Or just pkill vlc.
-        for proc in psutil.process_iter(['pid', 'name']):
-            try:
-                if "vlc" in proc.info['name'].lower():
-                    proc.terminate()
-            except: pass
+        try:
+            for proc in psutil.process_iter(['pid', 'name']):
+                try:
+                    if proc.info and proc.info['name'] and "vlc" in proc.info['name'].lower():
+                        proc.terminate()
+                except: pass
+        except Exception:
+            pass
 
     def _create_playlist(self, folder_path: str) -> Optional[str]:
         p = Path(folder_path)
@@ -605,6 +664,9 @@ async def health_check():
     try:
         for part in psutil.disk_partitions():
             try:
+                # Skip inaccessible partitions
+                if "cdrom" in part.opts or part.fstype == "":
+                    continue
                 usage = psutil.disk_usage(part.mountpoint)
                 partitions_info.append({
                     "device": part.device,
@@ -683,7 +745,10 @@ async def health_check():
     net_io = {}
     try:
         if psutil:
-            net_io = psutil.net_io_counters()._asdict()
+            # Check if implemented
+            try:
+                net_io = psutil.net_io_counters()._asdict()
+            except AttributeError: pass
     except (PermissionError, Exception):
         pass
 
@@ -818,9 +883,17 @@ async def shutdown_system():
 async def get_tasks():
     processes = []
     try:
-        for proc in psutil.process_iter(['pid', 'name', 'username', 'cpu_percent', 'memory_percent', 'status']):
+        # 'username' often causes PermissionError on Android
+        attrs = ['pid', 'name', 'cpu_percent', 'memory_percent', 'status']
+        if not ("ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", "")):
+             attrs.append('username')
+
+        for proc in psutil.process_iter(attrs):
             try:
-                processes.append(proc.info)
+                p_info = proc.info
+                # Polyfill username if missing
+                if 'username' not in p_info: p_info['username'] = "?"
+                processes.append(p_info)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
     except Exception: pass
@@ -840,7 +913,7 @@ async def kill_task(req: TaskKillRequest):
 async def get_network_stats():
     try:
         return psutil.net_io_counters()._asdict()
-    except (PermissionError, Exception):
+    except (PermissionError, Exception, AttributeError):
         return {}
 
 # --- Cron Manager Endpoints ---
@@ -1361,6 +1434,9 @@ async def get_sysinfo():
     try:
         for part in psutil.disk_partitions():
             try:
+                # Skip inaccessible/dummy partitions
+                if "cdrom" in part.opts or part.fstype == "":
+                    continue
                 usage = psutil.disk_usage(part.mountpoint)
                 partitions.append({
                     "device": part.device,
@@ -1940,9 +2016,20 @@ async def get_config():
     """Gets the full system configuration."""
     if not settings_manager.settings:
         settings_manager.load_or_detect_first_boot()
+
+    # Read Port
+    port = 8000
+    if os.path.exists("port.txt"):
+        try:
+            with open("port.txt", "r") as f:
+                val = f.read().strip()
+                if val.isdigit(): port = int(val)
+        except: pass
+
     return {
         "settings": settings_manager.settings,
-        "ui_settings": settings_manager.ui_settings
+        "ui_settings": settings_manager.ui_settings,
+        "port": port
     }
 
 @app.post("/api/config", dependencies=[Depends(verify_token)])
@@ -1952,6 +2039,13 @@ async def save_config(data: Dict[str, Any]):
         settings_manager.settings = data["settings"]
     if "ui_settings" in data:
         settings_manager.ui_settings = data["ui_settings"]
+
+    if "port" in data:
+        try:
+            with open("port.txt", "w") as f:
+                f.write(str(data["port"]))
+        except Exception as e:
+            print(f"Failed to save port: {e}")
 
     settings_manager.save_settings()
     return {"success": True, "message": "Settings saved."}
