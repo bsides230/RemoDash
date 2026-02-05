@@ -56,9 +56,64 @@ class SettingsManager:
                 except:
                     self.settings["git_root_path"] = ""
 
+            self.detect_shell()
+
         if self.first_boot:
             # Create and save a default settings file
             self.settings = self.create_empty_settings_structure()
+            self.save_settings()
+
+    def detect_shell(self):
+        """Detects a valid shell executable and updates settings."""
+        # Check if existing setting is valid
+        current = self.settings.get("terminal_shell")
+        if current:
+            # Check if it exists (using shutil.which to verify executable status effectively or os.access)
+            # If it's just a command name like "bash", shutil.which handles it.
+            # If it's a path, shutil.which checks it too.
+            if shutil.which(current) or (os.path.exists(current) and os.access(current, os.X_OK)):
+                return
+
+        # Search for a valid shell
+        candidates = []
+
+        # 1. Environment Variable
+        env_shell = os.environ.get("SHELL")
+        if env_shell: candidates.append(env_shell)
+
+        # 2. Common Termux Paths
+        candidates.extend([
+            "/data/data/com.termux/files/usr/bin/bash",
+            "/data/data/com.termux/files/usr/bin/zsh",
+            "/data/data/com.termux/files/usr/bin/sh"
+        ])
+
+        # 3. Standard Linux Paths
+        candidates.extend([
+            "/bin/bash",
+            "/usr/bin/bash",
+            "/bin/sh",
+            "/usr/bin/sh",
+            "/system/bin/sh" # Android system shell
+        ])
+
+        found_shell = None
+        for path in candidates:
+            if path and os.path.exists(path) and os.access(path, os.X_OK):
+                found_shell = path
+                break
+
+        # 4. Fallback to shutil.which
+        if not found_shell:
+            for name in ["bash", "zsh", "sh"]:
+                path = shutil.which(name)
+                if path:
+                    found_shell = path
+                    break
+
+        if found_shell:
+            print(f"[System] Auto-detected terminal shell: {found_shell}")
+            self.settings["terminal_shell"] = found_shell
             self.save_settings()
 
     def create_empty_settings_structure(self) -> dict:

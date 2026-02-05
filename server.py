@@ -1567,17 +1567,48 @@ class TerminalSession:
         else:
             # Linux PTY
             self.master_fd, slave_fd = pty.openpty()
-            shell = os.environ.get("SHELL", "/bin/bash")
 
-            self.process = subprocess.Popen(
-                [shell],
-                preexec_fn=os.setsid,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                universal_newlines=False,
-                cwd=self.cwd
-            )
+            # Use configured shell from settings, or fallback to env/default
+            shell = settings_manager.settings.get("terminal_shell")
+            if not shell:
+                shell = os.environ.get("SHELL", "/bin/bash")
+
+            print(f"[Terminal] Spawning shell: {shell}")
+
+            try:
+                self.process = subprocess.Popen(
+                    [shell],
+                    preexec_fn=os.setsid,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    universal_newlines=False,
+                    cwd=self.cwd
+                )
+            except FileNotFoundError:
+                print(f"[Terminal] Error: Shell '{shell}' not found.")
+                # Fallback attempts
+                fallback = "/bin/sh"
+                # Android/Termux fallback
+                if os.path.exists("/system/bin/sh"):
+                    fallback = "/system/bin/sh"
+                elif os.path.exists("/data/data/com.termux/files/usr/bin/sh"):
+                    fallback = "/data/data/com.termux/files/usr/bin/sh"
+
+                if shell != fallback and os.path.exists(fallback):
+                     print(f"[Terminal] Fallback to {fallback}")
+                     try:
+                        self.process = subprocess.Popen(
+                            [fallback],
+                            preexec_fn=os.setsid,
+                            stdin=slave_fd,
+                            stdout=slave_fd,
+                            stderr=slave_fd,
+                            universal_newlines=False,
+                            cwd=self.cwd
+                        )
+                     except: pass
+
             os.close(slave_fd)
 
         # Start Reader Task
