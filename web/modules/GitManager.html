@@ -332,6 +332,18 @@
             <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Repo URL</label>
             <input type="text" id="inp-clone-url" placeholder="https://github.com/user/repo.git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
 
+            <!-- Optional Auth -->
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:1">
+                    <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Username (Optional)</label>
+                    <input type="text" id="inp-clone-user" placeholder="git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                </div>
+                <div style="flex:1">
+                    <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Token/Password (Optional)</label>
+                    <input type="password" id="inp-clone-token" placeholder="ghp_..." style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                </div>
+            </div>
+
             <label id="lbl-clone-dest" style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Local Destination Path (Must be empty/new)</label>
             <input type="text" id="inp-clone-path" placeholder="/path/to/destination" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
             <div id="clone-hint" style="font-size:10px; color:var(--text-dim); margin-top:-10px; margin-bottom:15px; display:none;">Will be cloned to: <span id="clone-root-preview"></span></div>
@@ -746,6 +758,8 @@
             const hint = document.getElementById('clone-hint');
 
             document.getElementById('inp-clone-url').value = '';
+            document.getElementById('inp-clone-user').value = '';
+            document.getElementById('inp-clone-token').value = '';
             inp.value = '';
 
             if (mode === 'auto') {
@@ -765,6 +779,8 @@
         async function doClone() {
             const url = document.getElementById('inp-clone-url').value.trim();
             const val = document.getElementById('inp-clone-path').value.trim(); // Name or Path depending on mode
+            const user = document.getElementById('inp-clone-user').value.trim();
+            const token = document.getElementById('inp-clone-token').value.trim();
             const mode = currentSettings.git_root_mode || 'manual';
 
             if(!url) { alert("URL is required."); return; }
@@ -776,6 +792,11 @@
             btn.disabled = true;
 
             const payload = { url };
+            if (user && token) {
+                payload.username = user;
+                payload.token = token;
+            }
+
             if (mode === 'auto') payload.name = val; // can be empty
             else payload.path = val;
 
