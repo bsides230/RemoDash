@@ -237,6 +237,7 @@
             <div class="sidebar-header">
                 <span>Repositories</span>
                 <div style="display:flex; gap:5px;">
+                    <button class="add-repo-btn" onclick="showSettings()" title="Settings">⚙</button>
                     <button class="add-repo-btn" onclick="loadRepos()" title="Refresh List">↻</button>
                     <button class="add-repo-btn" onclick="showCloneModal()" title="Clone from URL">⬇</button>
                     <button class="add-repo-btn" onclick="promptAddRepo()" title="Add Local Path">+</button>
@@ -312,12 +313,39 @@
             <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Repo URL</label>
             <input type="text" id="inp-clone-url" placeholder="https://github.com/user/repo.git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
 
-            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Local Destination Path (Must be empty/new)</label>
+            <label id="lbl-clone-dest" style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Local Destination Path (Must be empty/new)</label>
             <input type="text" id="inp-clone-path" placeholder="/path/to/destination" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
+            <div id="clone-hint" style="font-size:10px; color:var(--text-dim); margin-top:-10px; margin-bottom:15px; display:none;">Will be cloned to: <span id="clone-root-preview"></span></div>
 
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button class="tool-btn" onclick="document.getElementById('modal-clone').style.display='none'">Cancel</button>
                 <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="doClone()">Clone</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Git Settings</h3>
+
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Clone Mode</label>
+            <div style="margin:5px 0 15px 0; display:flex; gap:10px; color:var(--text-body);">
+                <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                    <input type="radio" name="git_mode" value="auto" onchange="toggleSettingsUI()"> Auto (Central Folder)
+                </label>
+                <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                    <input type="radio" name="git_mode" value="manual" onchange="toggleSettingsUI()"> Manual (Ask Path)
+                </label>
+            </div>
+
+            <div id="setting-root-path-group">
+                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Root Git Folder</label>
+                <input type="text" id="inp-setting-root" placeholder="~/documents/github/repos" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 5px 0; font-family:var(--font-mono); outline:none;">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-settings').style.display='none'">Cancel</button>
+                <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="saveSettings()">Save</button>
             </div>
         </div>
     </div>
@@ -330,12 +358,13 @@
 
         // State tracking
         let currentFiles = []; // { file: str, type: str, staged: bool }
+        let currentSettings = { git_root_mode: 'manual', git_root_path: '' };
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
             if (e.data.type === 'TOKEN_UPDATE') {
                 authToken = e.data.token;
-                if(coreUrl && authToken) loadRepos();
+                if(coreUrl && authToken) { loadRepos(); loadSettings(); }
             }
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
             if (e.data.type === 'COLOR_CHANGE') {
@@ -614,25 +643,99 @@
             }
         }
 
+        // --- Settings ---
+        async function loadSettings() {
+            if(!authToken) return;
+            try {
+                const res = await fetchAPI('/api/config');
+                if(res && res.settings) {
+                    currentSettings = res.settings;
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function showSettings() {
+            // Populate
+            const mode = currentSettings.git_root_mode || 'manual';
+            document.querySelector(`input[name="git_mode"][value="${mode}"]`).checked = true;
+            document.getElementById('inp-setting-root').value = currentSettings.git_root_path || '';
+            toggleSettingsUI();
+            document.getElementById('modal-settings').style.display = 'flex';
+        }
+
+        function toggleSettingsUI() {
+            const mode = document.querySelector('input[name="git_mode"]:checked').value;
+            const grp = document.getElementById('setting-root-path-group');
+            grp.style.display = (mode === 'auto') ? 'block' : 'none';
+        }
+
+        async function saveSettings() {
+            const mode = document.querySelector('input[name="git_mode"]:checked').value;
+            const root = document.getElementById('inp-setting-root').value.trim();
+
+            const payload = {
+                settings: {
+                    ...currentSettings,
+                    git_root_mode: mode,
+                    git_root_path: root
+                }
+            };
+
+            const res = await fetchAPI('/api/config', 'POST', payload);
+            if(res && res.success) {
+                alert("Settings Saved");
+                document.getElementById('modal-settings').style.display = 'none';
+                loadSettings();
+            } else {
+                alert("Error saving settings");
+            }
+        }
+
+        // --- Clone ---
+
         function showCloneModal() {
+            // Check mode
+            const mode = currentSettings.git_root_mode || 'manual';
+            const lbl = document.getElementById('lbl-clone-dest');
+            const inp = document.getElementById('inp-clone-path');
+            const hint = document.getElementById('clone-hint');
+
             document.getElementById('inp-clone-url').value = '';
-            document.getElementById('inp-clone-path').value = '';
+            inp.value = '';
+
+            if (mode === 'auto') {
+                lbl.innerText = "Repository Name (Optional - Auto from URL)";
+                inp.placeholder = "my-repo";
+                hint.style.display = 'block';
+                document.getElementById('clone-root-preview').innerText = currentSettings.git_root_path + "/<name>";
+            } else {
+                lbl.innerText = "Local Destination Path (Must be empty/new)";
+                inp.placeholder = "/path/to/destination";
+                hint.style.display = 'none';
+            }
+
             document.getElementById('modal-clone').style.display = 'flex';
         }
 
         async function doClone() {
             const url = document.getElementById('inp-clone-url').value.trim();
-            const path = document.getElementById('inp-clone-path').value.trim();
+            const val = document.getElementById('inp-clone-path').value.trim(); // Name or Path depending on mode
+            const mode = currentSettings.git_root_mode || 'manual';
 
-            if(!url || !path) { alert("Please fill both fields."); return; }
+            if(!url) { alert("URL is required."); return; }
+            if(mode === 'manual' && !val) { alert("Path is required."); return; }
 
             const btn = event.target;
             const oldText = btn.innerText;
             btn.innerText = "Cloning...";
             btn.disabled = true;
 
+            const payload = { url };
+            if (mode === 'auto') payload.name = val; // can be empty
+            else payload.path = val;
+
             try {
-                const res = await fetchAPI('/api/git/clone', 'POST', { url, path });
+                const res = await fetchAPI('/api/git/clone', 'POST', payload);
                 if(res.success) {
                     alert("Clone Successful!");
                     document.getElementById('modal-clone').style.display = 'none';
@@ -687,6 +790,7 @@
         // Init
         if(coreUrl && authToken) {
             loadRepos();
+            loadSettings();
         }
     </script>
 </body>
