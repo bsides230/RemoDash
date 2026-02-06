@@ -1,0 +1,15 @@
+{
+  "settings": {
+    "git_root_mode": "auto",
+    "git_root_path": "test_env/repos",
+    "git_repos": [
+      "/app/test_env/repos/test-repo"
+    ],
+    "terminal_shell": "/bin/bash"
+  },
+  "ui_settings": {
+    "font_size": 12,
+    "window_size": "1400x900",
+    "confirmation_preferences": {}
+  }
+}

@@ -1,0 +1,2627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RemoDash">
+    <title>RemoDash</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json" />
+
+    <style>
+        /* =========================================
+           1. CORE VARIABLES & THEME
+           ========================================= */
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --brand-color: #10B981; /* Default Emerald */
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
+            --brand-color-glow: rgba(16, 185, 129, 0.4);
+            --brand-bg-gradient: rgba(16, 185, 129, 0.15); /* Stronger background */
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --border-color: #333333; /* Slightly lighter default */
+
+            --dock-bg: rgba(20, 20, 20, 0.6);
+            --dock-border: rgba(255, 255, 255, 0.1);
+            --dock-blur: 20px;
+
+            --font-size-base: 12px;
+
+            --bg-input: #050505;
+            --error-color: #ff4444;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            /* --brand-color override moved to JS for consistency or kept dynamic */
+            --brand-color-dim: rgba(0,0,0, 0.05);
+            --brand-color-glow: rgba(0,0,0, 0.1);
+            --brand-bg-gradient: rgba(0,0,0, 0.05);
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --dock-bg: rgba(255, 255, 255, 0.6);
+            --dock-border: rgba(0, 0, 0, 0.1);
+            --bg-input: #ffffff;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; padding: 0; width: 100vw;
+            min-height: 100vh; overflow: hidden;
+            background-color: var(--bg-core);
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--text-body);
+            transition: background-color 0.5s ease;
+            background-image:
+                repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(125, 125, 125, 0.03) 10px, rgba(125, 125, 125, 0.03) 11px),
+                radial-gradient(circle at 50% 0%, var(--brand-bg-gradient) 0%, transparent 70%); /* Bigger/Brighter */
+            background-size: auto, 100% 100%;
+            background-attachment: fixed;
+            font-size: var(--font-size-base);
+        }
+
+        body.no-select * {
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+
+        /* =========================================
+           TOP SYSTEM BAR
+           ========================================= */
+        #top-system-bar {
+            position: fixed; top: 0; left: 0; right: 0;
+            height: 32px;
+            background: rgba(10, 10, 10, 0.6);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10000;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 15px;
+            user-select: none;
+        }
+
+        .bar-section { display: flex; align-items: center; gap: 15px; }
+        .system-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; color: var(--text-head);
+            letter-spacing: 0.05em; cursor: help;
+        }
+        #sys-cpu { color: var(--brand-color); }
+        .bar-btn {
+            background: transparent; border: none; color: var(--text-dim);
+            cursor: pointer; font-family: 'JetBrains Mono'; font-size: 14px;
+            padding: 4px; display: flex; align-items: center; justify-content: center;
+            transition: color 0.2s;
+        }
+        .bar-btn:hover { color: var(--text-head); }
+        .bar-btn.close-iframe-btn { color: #ff4444; margin-left: 10px; }
+        #btn-close-iframe { display: none; }
+
+        /* STATUS LIGHT */
+        .status-light {
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #ff4444; /* Default Red */
+            margin-right: 12px;
+            box-shadow: 0 0 5px rgba(255, 68, 68, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+        .status-light.green { background-color: #00cc66; box-shadow: 0 0 8px rgba(0, 204, 102, 0.6); }
+        .status-light.yellow { background-color: #ffbb33; box-shadow: 0 0 8px rgba(255, 187, 51, 0.6); }
+        .status-light.blue { background-color: var(--brand-color); box-shadow: 0 0 10px var(--brand-color); }
+        .status-light.orange { background-color: #ff8800; box-shadow: 0 0 8px #ff8800; }
+
+        .status-light.pulse { animation: lightPulse 1.5s infinite ease-in-out; }
+        @keyframes lightPulse { 0% { opacity: 1; transform:scale(1); } 50% { opacity: 0.6; transform:scale(0.9); } 100% { opacity: 1; transform:scale(1); } }
+
+        .status-light:hover { transform: scale(1.2); }
+
+        /* =========================================
+           WINDOW SYSTEM
+           ========================================= */
+        #desktop-area { position: absolute; top: 32px; left: 0; right: 0; bottom: 0; z-index: 1; pointer-events: none; }
+
+        .lyrn-window {
+            pointer-events: auto;
+            position: absolute; background: var(--bg-panel); border: 1px solid var(--border-color);
+            display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            border-radius: 8px; width: 800px; height: 600px;
+            min-width: 300px; min-height: 200px;
+            transition: box-shadow 0.2s, opacity 0.2s, transform 0.2s;
+            opacity: 0; transform: scale(0.95);
+            animation: openWin 0.2s forwards ease-out;
+            overflow: hidden; /* Fix iframe corner bleeding */
+        }
+        @keyframes openWin { to { opacity: 1; transform: scale(1); } }
+
+        .lyrn-window.active { border-color: var(--brand-color); box-shadow: 0 25px 70px rgba(0,0,0,0.7), 0 0 15px var(--brand-color-dim); }
+        .lyrn-window.always-on-top { z-index: 9999 !important; border: 1px solid var(--brand-color); box-shadow: 0 0 0 1px var(--brand-color); }
+        .lyrn-window.maximized {
+            transition: width 0.2s, height 0.2s, left 0.2s, top 0.2s;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+        }
+
+        .window-header {
+            height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center; padding: 0 8px 0 12px;
+            cursor: grab; user-select: none; flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        /* Themeable header via JS injection */
+        .window-header.themed {
+            background: var(--brand-color-dim);
+            border-bottom: 1px solid var(--brand-color);
+        }
+
+        .window-header:active { cursor: grabbing; }
+        .window-title { font-family: 'JetBrains Mono', monospace; font-size: calc(var(--font-size-base) - 1px); text-transform: uppercase; color: var(--text-dim); }
+        .window-header.themed .window-title { color: var(--text-head); }
+
+        .win-controls { display: flex; align-items: center; gap: 6px; }
+        .win-btn {
+            background: transparent; border: none; color: var(--text-dim);
+            width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: var(--font-size-base);
+            transition: all 0.2s;
+        }
+        .win-btn:hover { background: var(--brand-color-dim); color: var(--text-head); }
+        .window-header.themed .win-btn:hover { background: var(--bg-panel); color: var(--brand-color); }
+
+        .win-btn.pinned {
+            background: var(--brand-color-dim);
+            color: var(--brand-color);
+            /* Visual indication of "pinned" state */
+            box-shadow: inset 0 0 0 1px var(--brand-color);
+        }
+
+        .window-content { flex: 1; position: relative; background: var(--bg-core); overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: none; }
+        .iframe-shield { position: absolute; top:0; left:0; width:100%; height:100%; z-index:10; display:none; }
+        .lyrn-window.is-dragging .iframe-shield, .lyrn-window.is-resizing .iframe-shield { display: block; }
+
+        .resize-handle {
+            position: absolute; bottom: 0; right: 0; width: 25px; height: 25px;
+            z-index: 20; opacity: 0; cursor: nwse-resize;
+            transition: opacity 0.2s;
+        }
+        .resize-handle::after {
+            content:''; position: absolute; bottom: 4px; right: 4px;
+            width: 8px; height: 8px; border-right: 2px solid var(--brand-color); border-bottom: 2px solid var(--brand-color);
+            border-radius: 0 0 2px 0;
+        }
+        .lyrn-window:hover .resize-handle { opacity: 1; }
+
+        /* New Mobile Resize Handle */
+        .mobile-resize-handle {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 24px;
+            z-index: 20; display: none; align-items: center; justify-content: center;
+            cursor: ns-resize; padding-top: 4px;
+        }
+        .mobile-resize-handle::after {
+            content: ''; width: 40px; height: 4px; background: var(--border-color); border-radius: 2px;
+            transition: background 0.2s;
+        }
+        .mobile-resize-handle:active::after { background: var(--brand-color); }
+
+        /* =========================================
+           FLOATING DOCK (WEBSITE STYLE)
+           ========================================= */
+
+        /* The main container - Acts as the Anchor */
+        #floating-dock {
+            position: fixed;
+            /* Default position (will be overridden by JS) */
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end; /* Align to bottom so handle stays put */
+
+            background: transparent; /* Main container is transparent */
+            border: none;
+            box-shadow: none;
+            z-index: 20000;
+
+            /* Allow buttons to pop UP outside the container */
+            overflow: visible;
+            width: 50px;
+            height: 30px; /* Base height matches handle height */
+
+            /* Disable Selection on Dock */
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+
+            /* Transition for snapping */
+            transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        #floating-dock.is-dragging {
+            transition: none !important;
+            cursor: grabbing;
+        }
+
+        /* The content area - Absolute positioned ABOVE the handle */
+        #dock-content {
+            position: absolute;
+            bottom: 100%; /* Push upwards above handle */
+            left: 0;
+            width: 100%;
+
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 8px;
+            padding-bottom: 12px; /* Visual gap above handle */
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin-bottom: 5px;
+
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transform-origin: bottom center;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy pop */
+            pointer-events: auto;
+        }
+
+        /* Collapsed State */
+        #floating-dock.dock-collapsed #dock-content {
+            opacity: 0;
+            transform: translateY(10px) scale(0.8);
+            pointer-events: none;
+        }
+
+        /* Buttons styling */
+        .dock-btn {
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 6px !important;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            padding: 0 !important;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .dock-btn:hover {
+            background: var(--brand-color-dim);
+            color: var(--brand-color);
+            border-color: var(--brand-color);
+        }
+
+        /* The Handle Container */
+        #dock-handle {
+            width: 50px; /* Matches container width */
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 15px; /* Pill shape */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: background 0.2s, transform 0.2s;
+            flex-shrink: 0;
+        }
+
+        #dock-handle:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        /* The Glowing LED Bar */
+        .handle-bar {
+            width: 20px;
+            height: 4px;
+            background-color: #ffffff; /* Hot center */
+            border-radius: 2px;
+            opacity: 1;
+            /* Purple LED Glow Effect */
+            box-shadow: 0 0 6px var(--brand-color), 0 0 12px var(--brand-color);
+            transition: all 0.3s;
+        }
+
+        #floating-dock:hover .handle-bar {
+            background-color: #fff;
+            box-shadow: 0 0 8px var(--brand-color), 0 0 16px var(--brand-color), 0 0 24px var(--brand-color);
+        }
+
+        /* WIGGLE ANIMATION (Edit Mode) */
+        @keyframes wiggle {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            50% { transform: rotate(0deg); }
+            75% { transform: rotate(3deg); }
+            100% { transform: rotate(0deg); }
+        }
+        .dock-btn.wiggle {
+            animation: wiggle 0.3s ease-in-out infinite;
+            background: rgba(255,50,50,0.15);
+            border: 1px solid rgba(255,50,50,0.5);
+            color: #ffcccc;
+            transition: none;
+        }
+        .dock-btn.wiggle:hover { transform: scale(1.05); }
+
+        .active-dot {
+            position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+            width: 3px; height: 3px; border-radius: 50%;
+            background-color: var(--brand-color);
+            box-shadow: 0 0 6px var(--brand-color); display: none;
+        }
+        .dock-btn.is-running .active-dot { display: block; }
+        .active-dot.minimized-dot { background-color: #ff8800; box-shadow: 0 0 6px #ff8800; }
+
+        /* =========================================
+           POPUPS & SETTINGS
+           ========================================= */
+        #settings-popup {
+            position: fixed;
+            width: 260px; background: var(--bg-panel);
+            border: 1px solid var(--dock-border); border-radius: 12px;
+            padding: 15px; color: var(--text-body);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            display: none; flex-direction: column; gap: 12px;
+            z-index: 20001;
+            max-height: 80vh; overflow-y: auto;
+        }
+        #settings-popup.show { display: flex; animation: fadeUp 0.2s; }
+        @keyframes fadeUp { from{opacity:0; transform:scale(0.95);} to{opacity:1; transform:scale(1);} }
+
+        .settings-header {
+            font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim);
+            text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;
+        }
+        .settings-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+
+        .btn-full-width {
+            width: 100%; background: var(--bg-core); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 8px; border-radius: 6px; cursor: pointer;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+        .btn-full-width:hover { background: var(--brand-color); border-color: var(--brand-color); }
+
+        /* Settings Page Structure */
+        .settings-page { display: flex; flex-direction: column; gap: 12px; height: 100%; width: 100%; }
+        .settings-page.hidden { display: none; }
+
+        .settings-nav-header {
+            display: flex; align-items: center; gap: 10px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px; font-family: 'JetBrains Mono'; font-size: 12px; text-transform: uppercase; color: var(--text-head);
+        }
+        .settings-back-btn {
+            background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0;
+        }
+        .settings-back-btn:hover { color: var(--brand-color); }
+
+        .custom-color-row { display: flex; gap: 8px; align-items: center; margin-top: 5px; }
+        .custom-slot {
+            width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border-color);
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .custom-slot:hover { transform: scale(1.1); border-color: var(--text-head); }
+
+        /* SLIDER STYLES */
+        input[type="range"] {
+            -webkit-appearance: none; width: 100px; height: 4px; background: var(--border-color);
+            border-radius: 2px; outline: none; opacity: 0.7; transition: opacity .2s;
+        }
+        input[type="range"]:hover { opacity: 1; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%;
+            background: var(--brand-color); cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px; height: 12px; border-radius: 50%; background: var(--brand-color); cursor: pointer;
+        }
+
+        /* WELCOME POPUP & CONNECTION POPUP & SERVER CONFIG */
+        #welcome-popup, #connection-popup, #server-config-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 320px; background: var(--bg-panel);
+            border: 1px solid var(--brand-color);
+            box-shadow: 0 0 30px rgba(124, 92, 255, 0.2);
+            border-radius: 12px; z-index: 22000;
+            display: none; flex-direction: column;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from { opacity: 0; transform: translate(-50%, -45%) scale(0.95); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+
+        .welcome-content { padding: 20px; color: var(--text-body); font-size: 13px; line-height: 1.5; }
+        .welcome-footer { padding: 10px 20px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-dim); }
+        .welcome-title { font-family: 'JetBrains Mono'; color: var(--text-head); font-size: 14px; margin-bottom: 10px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+
+        .cta-btn {
+            background: var(--brand-color); color: #fff; border: none;
+            padding: 6px 12px; border-radius: 4px;
+            font-family: 'JetBrains Mono'; font-size: 11px;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+        .cta-btn:hover { background: #fff; color: var(--brand-color); box-shadow: 0 0 10px var(--brand-color-glow); }
+
+
+        /* EDIT POPUP */
+        .edit-popup {
+            position: fixed;
+            background: #000; border: 1px solid #333; border-radius: 50px;
+            padding: 8px; display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9); z-index: 20002;
+            animation: fadeUp 0.15s ease-out;
+            pointer-events: auto;
+        }
+        .edit-popup-btn {
+            background: #1a1a1a; border: none; color: #fff;
+            width: 36px; height: 36px; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 16px; transition: background 0.2s;
+        }
+        .edit-popup-btn:hover { background: #333; }
+        .edit-popup-btn.danger { color: #ff5555; }
+        .edit-popup-btn.danger:hover { background: #500; color: #fff; }
+        .edit-popup-sep { width: 1px; height: 20px; background: #333; }
+
+        /* EDIT MODE BANNER */
+        #edit-mode-banner {
+            position: fixed; top: 40px; left: 50%; transform: translateX(-50%);
+            background: var(--brand-color); color: #fff;
+            padding: 8px 16px; border-radius: 30px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            display: none; align-items: center; gap: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5); z-index: 21000;
+        }
+        #edit-mode-banner button {
+            background: rgba(0,0,0,0.2); border: none; color: white;
+            padding: 4px 8px; border-radius: 4px; cursor: pointer;
+            font-family: inherit; font-size: 10px; text-transform: uppercase;
+        }
+        #edit-mode-banner button:hover { background: rgba(0,0,0,0.4); }
+
+        /* Toggle Switch */
+        .toggle-switch { position: relative; width: 32px; height: 18px; display: inline-block; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 18px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: var(--text-dim); transition: .4s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: var(--brand-color); }
+        input:checked + .toggle-slider:before { transform: translateX(14px); background-color: white; }
+
+        /* FS Security Modal */
+        #fs-security-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 450px; background: var(--bg-panel);
+            border: 1px solid var(--brand-color);
+            box-shadow: 0 0 50px rgba(0,0,0,0.7);
+            border-radius: 12px; z-index: 22000;
+            display: none; flex-direction: column;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .fs-section {
+            margin-bottom: 15px; border: 1px solid var(--border-color);
+            padding: 10px; border-radius: 6px; background: var(--bg-input);
+        }
+        .fs-label {
+            font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 5px; text-transform: uppercase;
+        }
+        .fs-input {
+            width: 100%; padding: 8px; background: var(--bg-core); border: 1px solid var(--border-color);
+            color: var(--text-head); font-family: 'JetBrains Mono'; font-size: 12px; border-radius: 4px;
+        }
+        .fs-list {
+            display: flex; flex-direction: column; gap: 5px; max-height: 100px; overflow-y: auto;
+        }
+        .fs-list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-core); padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-color);
+            font-size: 11px; font-family: 'JetBrains Mono';
+        }
+        .fs-warning {
+            color: #ffaa00; font-size: 11px; margin-top: 5px; line-height: 1.4;
+            background: rgba(255, 170, 0, 0.1); padding: 8px; border-radius: 4px; border: 1px solid rgba(255, 170, 0, 0.3);
+        }
+        .mode-select-btn {
+            flex: 1; padding: 10px; border: 1px solid var(--border-color); background: var(--bg-core);
+            color: var(--text-dim); cursor: pointer; border-radius: 4px; font-family: 'JetBrains Mono';
+            transition: all 0.2s;
+        }
+        .mode-select-btn.active {
+            border-color: var(--brand-color); color: var(--text-head); background: var(--brand-color-dim);
+        }
+
+        /* =========================================
+           MEDIA QUERIES
+           ========================================= */
+        @media (max-width: 600px) {
+            /* STACKED CARD LAYOUT FOR MOBILE */
+            #desktop-area {
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                padding: 15px;
+                padding-top: 10px;
+                padding-bottom: 120px; /* Clearance for floating dock */
+                gap: 20px;
+                overflow-y: auto;
+                pointer-events: auto; /* Enable scroll interaction */
+                background: rgba(0,0,0,0.2);
+            }
+
+            .lyrn-window {
+                /* Force Relative Stack Behavior */
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+
+                /* Card Dimensions */
+                width: 100% !important;
+                height: 65vh; /* Open height - Removed !important for resizing */
+                min-height: 200px;
+
+                /* Visual Style */
+                margin: 0 !important;
+                border-radius: 16px !important;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+
+                /* Disable Desktop Animations/Logic */
+                transform: none !important;
+                opacity: 1 !important;
+                flex-shrink: 0;
+
+                /* Smooth entry */
+                animation: slideUp 0.3s ease-out forwards !important;
+            }
+
+            @keyframes slideUp {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            /* Hide Resize/Drag UI */
+            .resize-handle { display: none !important; }
+            .mobile-resize-handle { display: flex; } /* Show mobile handle */
+
+            .window-header { cursor: default !important; }
+            .win-controls .win-btn:first-child { display: none; } /* Hide Maximize */
+        }
+
+        /* COLOR PICKER */
+        .color-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 5px;
+        }
+        .color-opt {
+            width: 100%; height: 40px; border-radius: 4px; cursor: pointer;
+            border: 2px solid transparent; transition: all 0.2s;
+        }
+        .color-opt:hover { transform: scale(1.1); }
+        .color-opt.active { border-color: var(--text-head); box-shadow: 0 0 5px var(--text-head); }
+
+        /* POWER MODAL */
+        #power-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            z-index: 25000; display: none; align-items: center; justify-content: center;
+        }
+        .power-box {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            padding: 20px; border-radius: 12px; width: 300px;
+            display: flex; flex-direction: column; gap: 10px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+        .power-btn {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 12px; border-radius: 6px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-family: 'JetBrains Mono'; transition: all 0.2s;
+        }
+        .power-btn:hover { background: var(--brand-color); color: #fff; border-color: var(--brand-color); }
+        .power-btn.danger { color: #ff5555; border-color: rgba(255,85,85,0.3); }
+        .power-btn.danger:hover { background: #ff5555; color: #fff; }
+
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div id="top-system-bar">
+        <div class="bar-section">
+            <div id="sys-status-server" class="status-light" title="Server Status: Disconnected" onclick="openConnectionPopup()"></div>
+            <span class="system-text" id="sys-cpu"></span>
+            <span class="system-text" id="sys-date">...</span>
+            <span class="system-text" id="sys-clock">...</span>
+            <span class="system-text" id="sys-battery"></span>
+        </div>
+        <div class="bar-section">
+            <button class="bar-btn" title="Power" onclick="openPowerModal()" ontouchstart="openPowerModal()">⏻</button>
+            <button class="bar-btn" title="Help" onclick="openWelcome()">?</button>
+            <button class="bar-btn" title="Reset Dock" onclick="resetDock()">⚓</button>
+            <button class="bar-btn" title="Reset Windows" onclick="resetWindowPositions()">✥</button>
+            <button class="bar-btn" title="Fullscreen" onclick="toggleDashboardFullscreen()">⛶</button>
+            <button class="bar-btn close-iframe-btn" id="btn-close-iframe" onclick="closeDashboard()">✕</button>
+        </div>
+    </div>
+
+    <div id="power-modal">
+        <div class="power-box">
+            <div class="window-header">
+                <span class="window-title">Power Options</span>
+                <button class="win-btn" onclick="closePowerModal()">✕</button>
+            </div>
+            <button class="power-btn" onclick="confirmPower('restart')">↺ Restart Server</button>
+            <button class="power-btn" onclick="confirmPower('reboot')">⟲ Reboot System</button>
+            <button class="power-btn danger" onclick="confirmPower('shutdown')">⏻ Shutdown System</button>
+        </div>
+    </div>
+
+    <div id="auth-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); backdrop-filter:blur(15px); z-index:30000; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="background:var(--bg-panel); border:1px solid var(--brand-color); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
+            <h2 style="margin:0 0 20px 0; color:var(--text-head); font-family:'JetBrains Mono'; text-transform:uppercase; font-size:16px;">Authentication Required</h2>
+            <p style="font-size:12px; color:var(--text-body); margin-bottom:20px; line-height:1.4;">Please enter your Admin Token to access the system.</p>
+            <div style="margin-bottom: 15px; text-align: center;">
+                 <input type="file" id="inp-token-file" accept=".txt" style="display:none" onchange="handleTokenFile(this)">
+                 <button class="cta-btn" onclick="document.getElementById('inp-token-file').click()" style="width:100%; padding:10px; background:transparent; border:1px solid var(--brand-color);">
+                    📂 Upload Token File
+                 </button>
+                 <p style="font-size:10px; color:var(--text-dim); margin-top:5px; margin-bottom:0;">Select admin_token.txt</p>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                <div style="flex:1; height:1px; background:var(--border-color);"></div>
+                <span style="font-size:10px; color:var(--text-dim);">OR</span>
+                <div style="flex:1; height:1px; background:var(--border-color);"></div>
+            </div>
+
+            <input type="password" id="inp-auth-token" placeholder="Paste Token String Here..." style="width:100%; padding:10px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; margin-bottom:15px; border-radius:4px;">
+
+            <label style="display:flex; align-items:start; gap:10px; font-size:11px; color:var(--text-dim); text-align:left; margin-bottom:20px; cursor:pointer;">
+                <input type="checkbox" id="chk-save-token">
+                <span>Save token to this device?<br><span style="color:#ffaa00;">Warning: Only do this on private devices.</span></span>
+            </label>
+
+            <button class="cta-btn" style="width:100%; padding:10px;" onclick="submitAuthToken()">AUTHENTICATE</button>
+            <div id="auth-error" style="color:var(--error-color); font-size:11px; margin-top:10px; min-height:15px;"></div>
+        </div>
+    </div>
+
+    <div id="edit-mode-banner">
+        <span>EDIT MODE ACTIVE</span>
+        <button onclick="disableEditMode()">DONE</button>
+    </div>
+
+    <div id="desktop-area"></div>
+
+    <div id="welcome-popup">
+        <div class="window-header">
+            <span class="window-title">System Welcome</span>
+            <button class="win-btn" onclick="closeWelcome()">✕</button>
+        </div>
+
+        <!-- STEP 1: WELCOME -->
+        <div class="welcome-step" id="w-step-1">
+            <div class="welcome-content">
+                <span class="welcome-title">Welcome to RemoDash</span>
+                <p>RemoDash turns this machine into a visual server you can control from any browser.</p>
+                <p>This quick tour will guide you through the basics of the interface.</p>
+            </div>
+            <div class="welcome-footer">
+                <div style="flex:1"></div>
+                <button class="cta-btn" onclick="setWelcomeStep(2)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- STEP 2: DOCK -->
+        <div class="welcome-step" id="w-step-2" style="display:none">
+            <div class="welcome-content">
+                <span class="welcome-title">The Floating Dock</span>
+                <p>The floating dock is your main navigation tool.</p>
+                <ul style="padding-left:20px; margin:10px 0;">
+                    <li><strong>Drag</strong> the glowing handle to move it.</li>
+                    <li><strong>Click</strong> the handle to minimize/expand it.</li>
+                    <li><strong>Reset Dock</strong> using the ⚓ anchor in the top bar.</li>
+                    <li><strong>Reset Windows</strong> using the ✥ button to center all apps.</li>
+                </ul>
+            </div>
+            <div class="welcome-footer">
+                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="setWelcomeStep(1)">Back</button>
+                <button class="cta-btn" onclick="setWelcomeStep(3)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: MODULES -->
+        <div class="welcome-step" id="w-step-3" style="display:none">
+            <div class="welcome-content">
+                <span class="welcome-title">Modules</span>
+                <p>Everything runs in "Modules" (Apps).</p>
+                <p><strong>Terminal:</strong> A full system shell.</p>
+                <p><strong>Files:</strong> Manage and edit files.</p>
+                <p><strong>Shortcuts:</strong> Create one-click scripts.</p>
+                <p>Modules are persistent tabs. You can pop them out into separate windows if needed.</p>
+            </div>
+            <div class="welcome-footer">
+                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="setWelcomeStep(2)">Back</button>
+                <button class="cta-btn" onclick="setWelcomeStep(4)">Next ➔</button>
+            </div>
+        </div>
+
+        <!-- STEP 4: FINISH -->
+        <div class="welcome-step" id="w-step-4" style="display:none">
+             <div class="welcome-content">
+                <span class="welcome-title">You are Ready</span>
+                <p>Explore the settings (⚙️) in the dock to customize your theme, font size, and layout.</p>
+                <p>Enjoy your control plane.</p>
+            </div>
+            <div class="welcome-footer">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="checkbox" id="chk-hide-welcome" onchange="toggleHideWelcome(this.checked)">
+                    Don't show on startup
+                </label>
+                <div style="display:flex; gap:10px;">
+                    <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="setWelcomeStep(3)">Back</button>
+                    <button class="cta-btn" onclick="closeWelcome()">Get Started</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="connection-popup">
+        <div class="window-header">
+            <span class="window-title">Core Connection</span>
+            <button class="win-btn" onclick="skipConnection()">✕</button>
+        </div>
+        <div class="welcome-content">
+            <span class="welcome-title">Backend Configuration</span>
+            <p>Please enter the URL of the Python Core backend.</p>
+            <input type="text" id="inp-core-url" placeholder="http://localhost:8000" style="width:100%; padding:8px; margin-top:10px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); font-family:'JetBrains Mono';">
+            <div id="conn-status" style="margin-top:10px; font-size:11px; color:var(--text-dim);"></div>
+        </div>
+        <div class="welcome-footer">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="chk-no-startup-conn" onchange="toggleStartupConn(this.checked)">
+                Don't show on startup
+            </label>
+            <div style="display:flex; gap:10px;">
+                <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="skipConnection()">SKIP</button>
+                <button class="cta-btn" onclick="testAndSaveConnection()">CONNECT</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="server-config-popup" style="width:500px; display:none;">
+        <div class="window-header">
+            <span class="window-title">Server Configuration</span>
+            <button class="win-btn" onclick="closeServerConfig()">✕</button>
+        </div>
+        <div class="welcome-content" style="max-height:70vh; overflow-y:auto;">
+             <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+                 <button class="cta-btn" id="btn-cfg-wizard" onclick="setCfgMode('wizard')">Wizard</button>
+                 <button class="cta-btn" id="btn-cfg-raw" style="background:transparent; border:1px solid var(--border-color);" onclick="setCfgMode('raw')">Raw JSON</button>
+             </div>
+
+             <div id="cfg-view-wizard">
+                 <div class="fs-section">
+                     <span class="fs-label">Device Name</span>
+                     <input type="text" id="cfg-dev-name" class="fs-input" placeholder="My Server">
+                 </div>
+                 <div class="fs-section">
+                     <span class="fs-label">Server Port</span>
+                     <input type="number" id="cfg-port" class="fs-input" placeholder="8000">
+                     <div class="fs-warning" style="margin-top:5px; font-size:10px; background:none; border:none; padding:0; color:#ffaa00;">* Requires Restart</div>
+                 </div>
+                 <div class="fs-section">
+                     <span class="fs-label">VLC Path (Optional)</span>
+                     <input type="text" id="cfg-vlc-path" class="fs-input" placeholder="/usr/bin/vlc">
+                 </div>
+             </div>
+
+             <div id="cfg-view-raw" style="display:none;">
+                 <p>Edit <code>settings.json</code> directly. Use caution.</p>
+                 <textarea id="sys-config-editor" style="width:100%; height:300px; font-family:'JetBrains Mono'; font-size:12px; background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; padding:10px; resize:vertical;"></textarea>
+             </div>
+        </div>
+        <div class="welcome-footer">
+             <button class="cta-btn" onclick="saveServerConfig()">Save & Apply</button>
+        </div>
+    </div>
+
+    <!-- New Modal -->
+    <div id="fs-security-modal">
+        <div class="window-header">
+            <span class="window-title">Filesystem Security</span>
+            <button class="win-btn" onclick="closeFsSecurity()">✕</button>
+        </div>
+        <div class="welcome-content" style="max-height: 70vh; overflow-y: auto;">
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="btn-mode-open" class="mode-select-btn" onclick="setFsModeUI('open')">OPEN (Full)</button>
+                <button id="btn-mode-jailed" class="mode-select-btn" onclick="setFsModeUI('jailed')">JAILED (Restricted)</button>
+            </div>
+
+            <div id="fs-open-warning" class="fs-warning" style="display:none; margin-bottom:15px;">
+                <strong>WARNING: FULL SYSTEM ACCESS</strong><br>
+                RemoDash will have read/write/delete access to the entire filesystem of the host machine.
+            </div>
+
+            <div id="fs-jailed-config" style="display:none;">
+                <div class="fs-section">
+                    <span class="fs-label">Jail Root Directory (Required)</span>
+                    <input type="text" id="inp-fs-root" class="fs-input" placeholder="/path/to/jail">
+                </div>
+
+                <div class="fs-section">
+                    <span class="fs-label">Extra Allowed Roots (Optional)</span>
+                    <div class="fs-list" id="fs-extra-roots-list"></div>
+                    <div style="display: flex; gap: 5px; margin-top: 8px;">
+                        <input type="text" id="inp-fs-extra" class="fs-input" placeholder="e.g. D:\ or /mnt/data">
+                        <button class="cta-btn" onclick="addExtraRoot()">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="welcome-footer">
+            <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="closeFsSecurity()">Cancel</button>
+            <button class="cta-btn" onclick="saveFsSecurity()">Save Changes</button>
+        </div>
+    </div>
+
+    <div id="settings-popup">
+        <div id="page-main" class="settings-page">
+            <div class="settings-header">General</div>
+            <button class="btn-full-width" style="margin-bottom:10px;" onclick="openConnectionPopup()">Configure Connection</button>
+            <button class="btn-full-width" style="margin-bottom:10px;" onclick="openServerConfig()">Edit Server Config</button>
+            <button class="btn-full-width" style="margin-bottom:10px;" onclick="openFsSecurity()">Filesystem Security</button>
+
+            <div class="settings-header" style="margin-top:10px;">Device</div>
+            <div class="settings-row">
+                <span>Name</span>
+                <input type="text" id="setting-device-name" placeholder="Server Name" onblur="saveDeviceName(this.value)" style="width:120px; padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px; text-align:right;">
+            </div>
+
+            <div class="settings-row" onclick="openThemeSettings()" style="cursor:pointer; background:var(--bg-input); padding:8px; border-radius:6px; margin-top:10px; border:1px solid var(--border-color);">
+                <span>🎨 Theme & Colors</span>
+                <span>➔</span>
+            </div>
+
+            <div class="settings-row" style="margin-top:10px;">
+                <span>Pin Open</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="settings-row">
+                <span>Font Size: <b id="font-size-display">12</b>px</span>
+                <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
+            </div>
+
+            <div class="settings-header" style="margin-top:5px;">Layout</div>
+            <button class="btn-full-width" onclick="enableEditMode()">Edit Dock Order</button>
+
+            <div class="settings-header" style="margin-top:5px;">Modules</div>
+            <div id="module-list-container"></div>
+        </div>
+
+        <div id="page-theme" class="settings-page hidden">
+            <div class="settings-nav-header">
+                <button class="settings-back-btn" onclick="showSettingsPage('main')">⬅</button>
+                <span>Theme Settings</span>
+            </div>
+
+            <div class="settings-row">
+                <span>Dark Mode</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <span>Theme Windows</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-theme-windows" onchange="toggleWindowTheming(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="settings-header" style="margin-top:10px;">Theme Presets</div>
+            <div id="theme-presets-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;"></div>
+
+            <div class="settings-header" style="margin-top:10px;">Accent Color</div>
+            <div class="color-grid" id="color-picker-grid"></div>
+
+            <div class="settings-header" style="margin-top:10px;">Custom Color</div>
+            <div style="display:flex; gap:5px; align-items:center;">
+                <input type="color" id="inp-color-picker" style="width:40px; height:32px; border:none; background:none; cursor:pointer; padding:0;" onchange="updateBrandColor(this.value)">
+                <input type="text" id="inp-hex-color" placeholder="#RRGGBB" style="flex:1; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px;">
+                <button class="cta-btn" onclick="applyCustomHex()">Apply</button>
+            </div>
+
+            <div class="settings-header" style="margin-top:10px;">Saved Colors (Right-click to Save)</div>
+            <div class="custom-color-row" id="custom-slots-container">
+                 <!-- Generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <div id="floating-dock">
+        <div id="dock-content"></div>
+
+        <div id="dock-handle" title="Drag to Move | Click to Toggle">
+            <div class="handle-bar"></div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           CONFIG & STATE
+           ========================================================================= */
+        const MODULE_REGISTRY = [
+            { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
+            { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "🚀" },
+            { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "📁" },
+            { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "💻" },
+            { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "📝" },
+            { id: "mod_tasks", file: "TaskManager.html", name: "Task Manager", icon: "⚡" },
+            { id: "mod_git", file: "GitManager.html", name: "Git Manager", icon: "🐙" },
+            { id: "mod_net", file: "NetworkMonitor.html", name: "Network", icon: "📡" },
+            { id: "mod_logs", file: "LogViewer.html", name: "Logs", icon: "📜" },
+            { id: "mod_cron", file: "CronManager.html", name: "Cron Jobs", icon: "⏰" },
+            { id: "mod_vlc", file: "VLCControl.html", name: "VLC Player", icon: "📺" },
+        ];
+
+        let appSettings = {
+            activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
+            dockPinned: true,
+            dockPos: null,
+            theme: 'dark', // 'light' or 'dark' (base mode)
+            activeThemePreset: 'default', // ID of active preset
+            fontSize: 12,
+            brandColor: '#10B981',
+            themeWindows: false,
+            customColors: ['#333333', '#333333', '#333333', '#333333']
+        };
+
+        const THEME_PRESETS = {
+            'default': {
+                name: 'Default',
+                colors: {
+                    '--bg-core': '#050505',
+                    '--bg-panel': '#0a0a0a',
+                    '--border-color': '#333333',
+                    '--text-body': '#b0b0b0'
+                }
+            },
+            'cyberpunk': {
+                name: 'Cyberpunk',
+                colors: {
+                    '--bg-core': '#000b1e',
+                    '--bg-panel': '#02122b',
+                    '--border-color': '#00f0ff',
+                    '--text-body': '#a0c0ff'
+                },
+                brand: '#fce300'
+            },
+            'ocean': {
+                name: 'Ocean Deep',
+                colors: {
+                    '--bg-core': '#001e26',
+                    '--bg-panel': '#002b36',
+                    '--border-color': '#073642',
+                    '--text-body': '#839496'
+                },
+                brand: '#2aa198'
+            },
+            'midnight': {
+                name: 'Midnight',
+                colors: {
+                    '--bg-core': '#000000',
+                    '--bg-panel': '#050505',
+                    '--border-color': '#222222',
+                    '--text-body': '#888888'
+                },
+                brand: '#7c5cff'
+            },
+            'forest': {
+                name: 'Forest',
+                colors: {
+                    '--bg-core': '#051005',
+                    '--bg-panel': '#0a1a0a',
+                    '--border-color': '#1a331a',
+                    '--text-body': '#a0b0a0'
+                },
+                brand: '#4caf50'
+            }
+        };
+
+        let zIndexCounter = 100;
+        // Map: modId -> Array of { id: windowId, title: string }
+        let runningInstances = {};
+        let isEditMode = false;
+
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+        let coreUrl = "http://localhost:8000";
+        if(window.location.protocol.startsWith('http')) {
+             coreUrl = window.location.origin;
+        }
+        let authToken = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            renderDock();
+            initDockDrag();
+            startClock();
+            initSystemMonitor();
+            checkIfIframe();
+            checkWelcome();
+            checkConnection();
+            initThemePresets();
+            initColorPicker();
+            initCustomSlots();
+
+            document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
+            document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
+            document.getElementById('setting-theme-windows').checked = appSettings.themeWindows || false;
+
+            // Initialize Font Size Slider
+            document.getElementById('setting-font-size').value = appSettings.fontSize;
+            updateFontSize(appSettings.fontSize, false);
+
+            // Apply Theme & Brand Color
+            if(appSettings.activeThemePreset) applyThemePreset(appSettings.activeThemePreset, false);
+            if(appSettings.brandColor) updateBrandColor(appSettings.brandColor);
+            toggleWindowTheming(appSettings.themeWindows || false, false);
+
+            // Handle clicking outside
+            document.addEventListener('click', (e) => {
+                // Settings Popup
+                const setPop = document.getElementById('settings-popup');
+                if(setPop.classList.contains('show') && !e.target.closest('#settings-popup') && !e.target.closest('#btn_settings')) {
+                    setPop.classList.remove('show');
+                }
+
+                // Edit Mode - Exit if clicking outside dock/popups
+                if(isEditMode && !e.target.closest('#floating-dock') && !e.target.closest('.edit-popup') && !e.target.closest('#edit-mode-banner') && !e.target.closest('#settings-popup')) {
+                    disableEditMode();
+                }
+            });
+        });
+
+        /* =========================================
+           SETTINGS PAGE LOGIC
+           ========================================= */
+        function showSettingsPage(pageId) {
+            document.querySelectorAll('.settings-page').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + pageId).classList.remove('hidden');
+        }
+
+        function openThemeSettings() { showSettingsPage('theme'); }
+
+        function initThemePresets() {
+            const container = document.getElementById('theme-presets-container');
+            if(!container) return;
+            container.innerHTML = '';
+            for(const [id, preset] of Object.entries(THEME_PRESETS)) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-full-width';
+                btn.style.textAlign = 'center';
+                btn.style.border = (appSettings.activeThemePreset === id) ? '1px solid var(--brand-color)' : '1px solid var(--border-color)';
+                btn.innerText = preset.name;
+                btn.onclick = () => applyThemePreset(id);
+                container.appendChild(btn);
+            }
+        }
+
+        function applyThemePreset(id, save = true) {
+            const preset = THEME_PRESETS[id];
+            if(!preset) return;
+
+            appSettings.activeThemePreset = id;
+
+            // Apply CSS variables
+            for(const [key, val] of Object.entries(preset.colors)) {
+                document.documentElement.style.setProperty(key, val);
+            }
+
+            // Apply Brand if included
+            if(preset.brand) {
+                updateBrandColor(preset.brand);
+            }
+
+            // Update UI
+            initThemePresets();
+
+            if(save) saveSettings();
+        }
+
+        function initCustomSlots() {
+             const container = document.getElementById('custom-slots-container');
+             container.innerHTML = '';
+             (appSettings.customColors || []).forEach((c, i) => {
+                 const div = document.createElement('div');
+                 div.className = 'custom-slot';
+                 div.style.backgroundColor = c;
+                 div.title = "Click to apply, Right-click to save current";
+                 div.onclick = () => updateBrandColor(c);
+                 div.oncontextmenu = (e) => {
+                     e.preventDefault();
+                     appSettings.customColors[i] = appSettings.brandColor;
+                     saveSettings();
+                     initCustomSlots();
+                 };
+                 container.appendChild(div);
+             });
+        }
+
+        function applyCustomHex() {
+            const val = document.getElementById('inp-hex-color').value.trim();
+            if(/^#[0-9A-F]{6}$/i.test(val)) {
+                updateBrandColor(val);
+            } else {
+                alert("Invalid Hex Code (Format: #RRGGBB)");
+            }
+        }
+
+        /* =========================================
+           DOCK LOGIC
+           ========================================= */
+        function renderDock() {
+            const container = document.getElementById('dock-content');
+            const modContainer = document.getElementById('module-list-container');
+            container.innerHTML = '';
+            modContainer.innerHTML = '';
+
+            // 1. Module List (Settings) - Render from Registry (Fixed Order)
+            MODULE_REGISTRY.forEach(mod => {
+                const isActive = appSettings.activeModules.includes(mod.id);
+                const row = document.createElement('div');
+                row.className = 'settings-row';
+                row.innerHTML = `<span>${mod.name}</span><label class="toggle-switch"><input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleModuleActive('${mod.id}', this.checked)"><span class="toggle-slider"></span></label>`;
+                modContainer.appendChild(row);
+            });
+
+            // 2. Dock Icons - Render from ActiveModules (Dynamic Order)
+            appSettings.activeModules.forEach(modId => {
+                const mod = MODULE_REGISTRY.find(m => m.id === modId);
+                if (!mod) return; // Skip if ID invalid
+
+                const btn = document.createElement('button');
+                btn.className = 'dock-btn';
+                if(isEditMode) btn.classList.add('wiggle');
+
+                btn.id = 'btn_' + mod.id;
+                btn.innerHTML = `${mod.icon}<div class="active-dot"></div>`;
+
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if(isEditMode) {
+                        openEditPopup(e, mod);
+                    } else {
+                        handleDockClick(mod, btn);
+                    }
+                };
+                container.appendChild(btn);
+            });
+
+            // 3. Settings Button
+            const settingsBtn = document.createElement('button');
+            settingsBtn.className = 'dock-btn';
+            settingsBtn.innerHTML = '⚙️';
+            settingsBtn.id = 'btn_settings';
+
+            if(isEditMode) {
+                 settingsBtn.style.opacity = '0.3';
+                 settingsBtn.style.pointerEvents = 'none';
+            }
+
+            settingsBtn.onclick = (e) => {
+                e.stopPropagation();
+                if(isEditMode) return;
+                const popup = document.getElementById('settings-popup');
+                if(popup.classList.contains('show')) {
+                    popup.classList.remove('show');
+                    return;
+                }
+
+                showSettingsPage('main'); // Reset to main
+
+                const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
+                // Estimate height or use fixed
+                const pHeight = 450;
+                const pWidth = 260;
+
+                let leftPos = dockRect.left - pWidth - 15;
+                if(leftPos < 10) leftPos = dockRect.right + 15;
+
+                // Vertical positioning smarts
+                let topPos = dockRect.bottom - pHeight;
+                // If near top, align top
+                if (dockRect.top < pHeight) topPos = dockRect.top;
+
+                // Clamp
+                if (topPos + pHeight > window.innerHeight) topPos = window.innerHeight - pHeight - 20;
+                if (topPos < 10) topPos = 10;
+
+                popup.style.top = topPos + 'px';
+                popup.style.left = leftPos + 'px';
+
+                popup.classList.add('show');
+            };
+            container.appendChild(settingsBtn);
+
+            updateDockIndicators();
+        }
+
+        /* =========================================
+           WEBSITE STYLE DRAG (GRID SNAP)
+           ========================================= */
+        function initDockDrag() {
+            const dock = document.getElementById('floating-dock');
+            const handle = document.getElementById('dock-handle');
+
+            // Apply saved position OR CENTER DEFAULT
+            if (appSettings.dockPos) {
+                 dock.style.bottom = 'auto';
+                 dock.style.right = 'auto';
+                 dock.style.left = appSettings.dockPos.left + 'px';
+                 dock.style.top = appSettings.dockPos.top + 'px';
+            } else {
+                 // Calculate Center
+                 const startLeft = (window.innerWidth / 2) - 25; // 50px width / 2
+                 const startTop = (window.innerHeight / 2) - 15; // 30px height / 2
+
+                 dock.style.bottom = 'auto';
+                 dock.style.right = 'auto';
+                 dock.style.left = startLeft + 'px';
+                 dock.style.top = startTop + 'px';
+            }
+
+            if(!appSettings.dockPinned) {
+                dock.classList.add('dock-collapsed');
+            }
+
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+            let hasMoved = false;
+
+            // 1. Drag Functionality
+            handle.addEventListener('mousedown', startDrag);
+            handle.addEventListener('touchstart', startDrag, {passive: false});
+
+            function startDrag(e) {
+                if(e.type === 'touchstart') e.preventDefault();
+
+                isDragging = true;
+                hasMoved = false;
+                dock.classList.add('is-dragging');
+
+                const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+                startX = clientX;
+                startY = clientY;
+
+                const rect = dock.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+
+                // Ensure absolute positioning
+                dock.style.bottom = 'auto';
+                dock.style.right = 'auto';
+                dock.style.left = `${initialLeft}px`;
+                dock.style.top = `${initialTop}px`;
+
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', stopDrag);
+                document.addEventListener('touchmove', onDrag, {passive: false});
+                document.addEventListener('touchend', stopDrag);
+            }
+
+            function onDrag(e) {
+                if (!isDragging) return;
+                if(e.cancelable) e.preventDefault();
+
+                const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+                const dx = clientX - startX;
+                const dy = clientY - startY;
+
+                if (Math.abs(dx) + Math.abs(dy) > 5) hasMoved = true;
+
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+
+                const maxLeft = window.innerWidth - dock.offsetWidth;
+                const maxTop = window.innerHeight - dock.offsetHeight;
+
+                if (newLeft < 0) newLeft = 0;
+                if (newLeft > maxLeft) newLeft = maxLeft;
+                if (newTop < 32) newTop = 32; // Respect top bar
+                if (newTop > maxTop) newTop = maxTop;
+
+                dock.style.left = `${newLeft}px`;
+                dock.style.top = `${newTop}px`;
+            }
+
+            function stopDrag() {
+                isDragging = false;
+                dock.classList.remove('is-dragging');
+
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchmove', onDrag);
+                document.removeEventListener('touchend', stopDrag);
+
+                if (hasMoved) {
+                    // Snap to Grid
+                    const rect = dock.getBoundingClientRect();
+                    const gridSize = 40;
+                    const safeMargin = 20;
+
+                    let currentLeft = rect.left;
+                    let currentTop = rect.top;
+
+                    let finalLeft = Math.round(currentLeft / gridSize) * gridSize;
+                    let finalTop = Math.round(currentTop / gridSize) * gridSize;
+
+                    const maxLeft = window.innerWidth - rect.width - safeMargin;
+                    const maxTop = window.innerHeight - rect.height - safeMargin;
+
+                    if (finalLeft < safeMargin) finalLeft = safeMargin;
+                    if (finalLeft > maxLeft) finalLeft = maxLeft;
+                    if (finalTop < 32 + safeMargin) finalTop = 32 + safeMargin;
+                    if (finalTop > maxTop) finalTop = maxTop;
+
+                    dock.style.left = `${finalLeft}px`;
+                    dock.style.top = `${finalTop}px`;
+
+                    appSettings.dockPos = { left: finalLeft, top: finalTop };
+                    saveSettings();
+                } else {
+                    // It was a click, not a drag
+                    dock.classList.toggle('dock-collapsed');
+                }
+            }
+        }
+
+        /* =========================================
+           EDIT MODE
+           ========================================= */
+        function enableEditMode() {
+            isEditMode = true;
+            document.getElementById('settings-popup').classList.remove('show');
+            document.getElementById('edit-mode-banner').style.display = 'flex';
+            document.getElementById('floating-dock').classList.remove('dock-collapsed');
+            renderDock();
+        }
+
+        function disableEditMode() {
+            isEditMode = false;
+            document.getElementById('edit-mode-banner').style.display = 'none';
+            document.querySelectorAll('.edit-popup').forEach(p => p.remove());
+
+            if(!appSettings.dockPinned) {
+                document.getElementById('floating-dock').classList.add('dock-collapsed');
+            }
+            renderDock();
+        }
+
+        function openEditPopup(e, mod) {
+            document.querySelectorAll('.edit-popup').forEach(p => p.remove());
+            const popup = document.createElement('div');
+            popup.className = 'edit-popup';
+
+            // Vertical Stack logic
+            const prev = '↑';
+            const next = '↓';
+
+            popup.innerHTML = `
+                <button class="edit-popup-btn" onclick="moveApp('${mod.id}', -1)">${prev}</button>
+                <button class="edit-popup-btn" onclick="moveApp('${mod.id}', 1)">${next}</button>
+                <div class="edit-popup-sep"></div>
+                <button class="edit-popup-btn danger" onclick="confirmRemoveApp('${mod.id}')">🗑</button>
+            `;
+
+            document.body.appendChild(popup);
+
+            const btnRect = e.currentTarget.getBoundingClientRect();
+            let top = btnRect.top;
+            let left = btnRect.left - 160;
+
+            if (left < 10) left = btnRect.right + 10;
+
+            popup.style.top = top + 'px';
+            popup.style.left = left + 'px';
+
+            e.stopPropagation();
+        }
+
+        function moveApp(modId, dir) {
+            const idx = appSettings.activeModules.indexOf(modId);
+            if (idx === -1) return;
+
+            const newIdx = idx + dir;
+            if (newIdx >= 0 && newIdx < appSettings.activeModules.length) {
+                const temp = appSettings.activeModules[idx];
+                appSettings.activeModules[idx] = appSettings.activeModules[newIdx];
+                appSettings.activeModules[newIdx] = temp;
+                saveSettings(); renderDock();
+                document.querySelectorAll('.edit-popup').forEach(p => p.remove());
+            }
+        }
+
+        function confirmRemoveApp(modId) {
+            if(confirm('Are you sure you want to remove this app from the dock?')) {
+                toggleModuleActive(modId, false);
+                document.querySelectorAll('.edit-popup').forEach(p => p.remove());
+            }
+        }
+
+        /* =========================================
+           HELPERS
+           ========================================= */
+
+        function handleDockClick(mod, btn) {
+            const instanceId = 'win_' + mod.id;
+            const el = document.getElementById(instanceId);
+
+            if (el) {
+                // Toggle logic
+                if (el.style.display === 'none') {
+                    // Show
+                    el.style.display = 'flex';
+                    el.style.zIndex = ++zIndexCounter;
+                    el.classList.remove('minimized');
+                } else {
+                    // It's visible, but is it on top?
+                    const topZ = zIndexCounter;
+                    if (parseInt(el.style.zIndex) === topZ) {
+                        // It is on top, so minimize it
+                        el.style.display = 'none';
+                    } else {
+                        // Bring to front
+                        el.style.zIndex = ++zIndexCounter;
+                    }
+                }
+            } else {
+                // Create
+                createWindow(mod);
+            }
+            updateDockIndicators();
+        }
+
+        // Parent tracking for child windows
+        let childParentMap = {};
+
+        function createWindow(mod, instanceId, isChild = false, parentId = null, options = {}) {
+            if(!instanceId) instanceId = 'win_' + mod.id;
+
+            const area = document.getElementById('desktop-area');
+            const win = document.createElement('div');
+            win.className = 'lyrn-window active';
+            win.id = instanceId;
+            win.style.zIndex = ++zIndexCounter;
+
+            if (isChild && parentId) {
+                childParentMap[instanceId] = parentId;
+            }
+
+            const isMobileWidth = window.innerWidth <= 600;
+            const startW = isMobileWidth ? '100%' : (isTouch ? '90%' : '800px');
+            const startH = isMobileWidth ? '65vh' : (isTouch ? '80%' : '600px');
+
+            win.style.width = startW;
+            win.style.height = startH;
+
+            // Offset based on total windows
+            const totalWins = document.querySelectorAll('.lyrn-window').length;
+            const offset = (totalWins * 30) + 50;
+            if(!isMobileWidth && !options.center) {
+                 win.style.left = isTouch ? '5%' : offset + 'px';
+                 win.style.top = isTouch ? '10%' : offset + 'px';
+            } else if (options.center) {
+                // Logic to center already handled by caller or default CSS (needs absolute positioning though)
+                win.style.left = (window.innerWidth / 2 - 400) + 'px'; // Approx
+                win.style.top = (window.innerHeight / 2 - 300) + 'px';
+            }
+
+            // Controls
+            let controlsHtml = `
+                 <button class="win-btn pin-btn" title="Pin Always on Top" onclick="togglePin('${instanceId}', this)">📌</button>
+            `;
+
+            // Minimize Button: Main apps minimize to dock (Hide). Child apps minimize to parent (Return).
+            // Image Viewer (type 'widget') has no minimize.
+            if (options.canMinimize !== false) {
+                 const minAction = isChild ? `returnChildToParent('${instanceId}')` : `minimizeWindow('${instanceId}')`;
+                 controlsHtml += `<button class="win-btn" onclick="${minAction}">_</button>`;
+            }
+
+            controlsHtml += `
+                 <button class="win-btn" onclick="toggleMaximize(this)">☐</button>
+                 <button class="win-btn close-btn" onclick="closeWindow('${instanceId}')">✕</button>
+            `;
+
+            let src = mod.file;
+            if (options.url) src = options.url; // Override for specific URLs (child windows)
+            // Ensure path
+            if(!src.includes('/') && !src.startsWith('http')) src = 'modules/' + src;
+
+            win.innerHTML = `
+                <div class="window-header ${appSettings.themeWindows ? 'themed' : ''}">
+                    <span class="window-title">${mod.name}</span>
+                    <div class="win-controls">
+                         ${controlsHtml}
+                    </div>
+                </div>
+                <div class="window-content">
+                    <div class="iframe-shield"></div>
+                    <iframe src="${src}"></iframe>
+                </div>
+                <div class="resize-handle"></div>
+                <div class="mobile-resize-handle"></div>
+            `;
+
+            const iframe = win.querySelector('iframe');
+            // Inject Font Size on Load
+            iframe.onload = () => {
+                iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
+                iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
+                iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
+                if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
+
+                // Pass extra context if needed
+                if(options.payload) {
+                    iframe.contentWindow.postMessage(options.payload, '*');
+                }
+            };
+
+            setupWindowDrag(win);
+            setupWindowResize(win);
+            setupMobileResize(win);
+            win.onmousedown = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
+            win.ontouchstart = () => { win.style.zIndex = ++zIndexCounter; updateDockIndicators(); };
+            area.appendChild(win);
+
+            // Register Instance
+            if(!runningInstances[mod.id]) runningInstances[mod.id] = [];
+            runningInstances[mod.id].push({ id: instanceId, title: mod.name });
+
+            updateDockIndicators();
+        }
+
+        function closeWindow(instanceId) {
+            const win = document.getElementById(instanceId);
+            if(win) win.remove();
+
+            // Remove from registry
+            for (const modId in runningInstances) {
+                runningInstances[modId] = runningInstances[modId].filter(inst => inst.id !== instanceId);
+                if(runningInstances[modId].length === 0) delete runningInstances[modId];
+            }
+
+            // Clean up child map
+            if (childParentMap[instanceId]) delete childParentMap[instanceId];
+
+            updateDockIndicators();
+        }
+
+        function minimizeWindow(instanceId) {
+            const win = document.getElementById(instanceId);
+            if(win) win.style.display = 'none';
+            updateDockIndicators();
+        }
+
+        function returnChildToParent(childId) {
+            const parentId = childParentMap[childId];
+            if (parentId) {
+                // Try both direct ID and 'win_' prefix
+                let parentWin = document.getElementById(parentId);
+                if (!parentWin && !parentId.startsWith('win_')) {
+                    parentWin = document.getElementById('win_' + parentId);
+                }
+
+                if (parentWin) {
+                     const iframe = parentWin.querySelector('iframe');
+                     if (iframe) {
+                         iframe.contentWindow.postMessage({ type: 'CHILD_RETURNING', childId: childId }, '*');
+                     }
+                }
+            }
+            closeWindow(childId);
+        }
+
+        function setupWindowResize(win) {
+            const handle = win.querySelector('.resize-handle');
+            const startResize = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                const startX = e.touches ? e.touches[0].clientX : e.clientX;
+                const startY = e.touches ? e.touches[0].clientY : e.clientY;
+                const startW = win.offsetWidth; const startH = win.offsetHeight;
+                win.classList.add('is-resizing');
+                const doResize = (ev) => {
+                    const curX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+                    const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                    const newW = startW + (curX - startX); const newH = startH + (curY - startY);
+                    if(newW > 250) win.style.width = newW + 'px';
+                    if(newH > 150) win.style.height = newH + 'px';
+                };
+                const stopResize = () => {
+                    win.classList.remove('is-resizing');
+                    window.removeEventListener('mousemove', doResize); window.removeEventListener('mouseup', stopResize);
+                    window.removeEventListener('touchmove', doResize); window.removeEventListener('touchend', stopResize);
+                };
+                window.addEventListener('mousemove', doResize); window.addEventListener('mouseup', stopResize);
+                window.addEventListener('touchmove', doResize, {passive:false}); window.addEventListener('touchend', stopResize);
+            };
+            handle.addEventListener('mousedown', startResize); handle.addEventListener('touchstart', startResize, {passive:false});
+        }
+
+        function setupMobileResize(win) {
+            const handle = win.querySelector('.mobile-resize-handle');
+            if(!handle) return;
+
+            const startResize = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                // For mobile touches use first touch, fallback to mouse for testing
+                const startY = e.touches ? e.touches[0].clientY : e.clientY;
+                const startH = win.offsetHeight;
+
+                win.classList.add('is-resizing');
+
+                const doResize = (ev) => {
+                    // Prevent page scroll
+                    if(ev.cancelable) ev.preventDefault();
+                    const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                    const newH = startH + (curY - startY);
+
+                    if(newH > 150) win.style.height = newH + 'px';
+                };
+
+                const stopResize = () => {
+                    win.classList.remove('is-resizing');
+                    window.removeEventListener('touchmove', doResize); window.removeEventListener('touchend', stopResize);
+                    window.removeEventListener('mousemove', doResize); window.removeEventListener('mouseup', stopResize);
+                };
+
+                window.addEventListener('touchmove', doResize, {passive: false}); window.addEventListener('touchend', stopResize);
+                window.addEventListener('mousemove', doResize); window.addEventListener('mouseup', stopResize);
+            };
+
+            handle.addEventListener('touchstart', startResize, {passive: false});
+            handle.addEventListener('mousedown', startResize);
+        }
+
+        function setupWindowDrag(win) {
+            const header = win.querySelector('.window-header');
+            const startDrag = (e) => {
+                if(e.target.closest('button')) return;
+                if(win.classList.contains('maximized')) return;
+                const startX = e.touches ? e.touches[0].clientX : e.clientX;
+                const startY = e.touches ? e.touches[0].clientY : e.clientY;
+                const startLeft = win.offsetLeft; const startTop = win.offsetTop;
+                win.classList.add('is-dragging');
+                const doDrag = (ev) => {
+                    ev.preventDefault();
+                    const curX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+                    const curY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                    win.style.left = (startLeft + (curX - startX)) + 'px';
+                    win.style.top = (startTop + (curY - startY)) + 'px';
+                };
+                const stopDrag = () => {
+                    win.classList.remove('is-dragging');
+                    window.removeEventListener('mousemove', doDrag); window.removeEventListener('touchmove', doDrag);
+                };
+                window.addEventListener('mousemove', doDrag); window.addEventListener('mouseup', stopDrag);
+                window.addEventListener('touchmove', doDrag, {passive:false}); window.addEventListener('touchend', stopDrag);
+            };
+            header.addEventListener('mousedown', startDrag); header.addEventListener('touchstart', startDrag, {passive:false});
+        }
+
+        function updateDockIndicators() {
+            document.querySelectorAll('.dock-btn').forEach(btn => {
+                btn.classList.remove('is-running');
+                const dot = btn.querySelector('.active-dot');
+                if(dot) dot.classList.remove('minimized-dot');
+
+                // Check running
+                const modId = btn.id.replace('btn_', '');
+                if (runningInstances[modId] && runningInstances[modId].length > 0) {
+                     btn.classList.add('is-running');
+                     // If all minimized, show minimized dot
+                     const allMin = runningInstances[modId].every(inst => {
+                         const el = document.getElementById(inst.id);
+                         return el && el.style.display === 'none';
+                     });
+                     if(allMin && dot) dot.classList.add('minimized-dot');
+                }
+            });
+        }
+
+        function resetDock() {
+            // Recalculate center
+            const startLeft = (window.innerWidth / 2) - 25;
+            const startTop = (window.innerHeight / 2) - 15;
+
+            appSettings.dockPos = { left: startLeft, top: startTop };
+            appSettings.dockPinned = true;
+            document.getElementById('setting-dock-pin').checked = true;
+
+            const dock = document.getElementById('floating-dock');
+            dock.style.bottom = 'auto';
+            dock.style.right = 'auto';
+            dock.style.left = startLeft + 'px';
+            dock.style.top = startTop + 'px';
+            dock.classList.remove('dock-collapsed');
+            saveSettings();
+        }
+
+        function resetWindowPositions() {
+            const wins = document.querySelectorAll('.lyrn-window');
+            if (wins.length === 0) return;
+
+            const area = document.getElementById('desktop-area');
+            const centerX = area.offsetWidth / 2;
+            const centerY = area.offsetHeight / 2;
+
+            let count = 0;
+            wins.forEach(win => {
+                // Un-maximize if needed
+                if (win.classList.contains('maximized')) {
+                    win.classList.remove('maximized');
+                    // Restore potential cache if it exists, or just let the reset overwrite it
+                    if (win.dataset.cache) {
+                        win.style.cssText = win.dataset.cache;
+                    }
+                }
+
+                // Show if hidden (minimized)
+                if(win.style.display === 'none') {
+                    win.style.display = 'flex';
+                }
+
+                // Bring to front logic (optional, but good for visibility)
+                win.style.zIndex = ++zIndexCounter;
+
+                // Center with slight cascade
+                const w = win.offsetWidth || 800;
+                const h = win.offsetHeight || 600;
+
+                const left = Math.max(0, centerX - (w / 2) + (count * 20));
+                const top = Math.max(0, centerY - (h / 2) + (count * 20));
+
+                win.style.left = left + 'px';
+                win.style.top = top + 'px';
+
+                count++;
+            });
+            updateDockIndicators();
+        }
+
+        function toggleTheme(isDark) {
+            const theme = isDark ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', theme);
+            appSettings.theme = theme;
+            saveSettings();
+
+            // Broadcast
+            document.querySelectorAll('iframe').forEach(f => {
+                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
+            });
+        }
+
+        function updateFontSize(size, save = true) {
+            document.documentElement.style.setProperty('--font-size-base', size + 'px');
+            document.getElementById('font-size-display').innerText = size;
+
+            appSettings.fontSize = parseInt(size);
+            if(save) saveSettings();
+
+            // Broadcast to all active windows
+            document.querySelectorAll('iframe').forEach(f => {
+                f.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: size }, '*');
+            });
+        }
+
+        function toggleDockPin(pinned) {
+            appSettings.dockPinned = pinned;
+            const dock = document.getElementById('floating-dock');
+            pinned ? dock.classList.remove('dock-collapsed') : dock.classList.add('dock-collapsed');
+            saveSettings();
+        }
+
+        function togglePin(instanceId, btn) {
+            const win = document.getElementById(instanceId);
+            if(win) {
+                win.classList.toggle('always-on-top');
+                if(win.classList.contains('always-on-top')) {
+                    btn.classList.add('pinned');
+                    btn.innerHTML = '📍';
+                } else {
+                    btn.classList.remove('pinned');
+                    btn.innerHTML = '📌';
+                }
+            }
+        }
+
+        function toggleWindowTheming(checked, save = true) {
+            appSettings.themeWindows = checked;
+            const headers = document.querySelectorAll('.window-header');
+            headers.forEach(h => {
+                if(checked) h.classList.add('themed');
+                else h.classList.remove('themed');
+            });
+            if(save) saveSettings();
+        }
+
+        function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
+        function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
+        function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
+        function loadSettings() {
+            const s = localStorage.getItem('lyrn-settings');
+            if(s) appSettings = { ...appSettings, ...JSON.parse(s) };
+            if(!appSettings.customColors) appSettings.customColors = ['#333333', '#333333', '#333333', '#333333'];
+            if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme);
+        }
+
+        /* POWER */
+        function openPowerModal() { document.getElementById('power-modal').style.display = 'flex'; }
+        function closePowerModal() { document.getElementById('power-modal').style.display = 'none'; }
+        async function confirmPower(action) {
+            if(confirm("Are you sure you want to " + action + "?")) {
+                try {
+                    const res = await fetch(coreUrl + '/api/power/' + action, {
+                        method: 'POST',
+                        headers: { 'X-Token': authToken }
+                    });
+                    if(res.ok) {
+                        alert("Command sent: " + action);
+                        closePowerModal();
+                    } else {
+                        alert("Failed: " + await res.text());
+                    }
+                } catch(e) { alert("Error: " + e.message); }
+            }
+        }
+
+        /* COLOR PICKER */
+        const BRAND_COLORS = [
+            '#10B981', // Emerald
+            '#7c5cff', // Purple
+            '#3B82F6', // Blue
+            '#F59E0B', // Orange
+            '#EF4444', // Red
+            '#EC4899', // Pink
+            '#14B8A6', // Teal
+            '#6366F1', // Indigo
+            '#000000', // Black
+            '#ffffff'  // White
+        ];
+
+        function initColorPicker() {
+            const grid = document.getElementById('color-picker-grid');
+            if(!grid) return;
+            grid.innerHTML = '';
+            BRAND_COLORS.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'color-opt';
+                div.style.backgroundColor = c;
+                div.onclick = () => updateBrandColor(c);
+                if(c.toUpperCase() === (appSettings.brandColor || '').toUpperCase()) div.classList.add('active');
+                grid.appendChild(div);
+            });
+        }
+
+        function updateBrandColor(color) {
+            appSettings.brandColor = color;
+            document.documentElement.style.setProperty('--brand-color', color);
+
+            // Re-calc dims
+            let hex = color.replace('#','');
+            if(hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+            const r = parseInt(hex.substring(0,2), 16);
+            const g = parseInt(hex.substring(2,4), 16);
+            const b = parseInt(hex.substring(4,6), 16);
+
+            document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+            document.documentElement.style.setProperty('--brand-color-glow', `rgba(${r},${g},${b}, 0.4)`);
+            document.documentElement.style.setProperty('--brand-bg-gradient', `rgba(${r},${g},${b}, 0.3)`); // Brighter
+
+            // Update inputs
+            const hexInp = document.getElementById('inp-hex-color');
+            const colInp = document.getElementById('inp-color-picker');
+            if(hexInp && document.activeElement !== hexInp) hexInp.value = color;
+            if(colInp) colInp.value = color;
+
+            saveSettings();
+            initColorPicker(); // Update active state
+            initCustomSlots(); // Update border colors potentially?
+
+            // Broadcast
+            document.querySelectorAll('iframe').forEach(f => {
+                f.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: color }, '*');
+            });
+        }
+
+        function startClock() {
+            const timeEl = document.getElementById('sys-clock');
+            const dateEl = document.getElementById('sys-date');
+
+            // Update immediately
+            updateTime();
+            setInterval(updateTime, 1000);
+
+            function updateTime() {
+                const n = new Date();
+                if(timeEl) timeEl.innerText = n.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                if(dateEl) dateEl.innerText = n.toLocaleDateString([], {month: 'short', day: 'numeric'});
+            }
+        }
+
+        function checkConnection() {
+            // Restore checkbox state
+            const hidden = localStorage.getItem('lyrn-conn-hidden');
+            document.getElementById('chk-no-startup-conn').checked = (hidden === 'true');
+
+            const stored = localStorage.getItem('lyrn_core_url');
+
+            // If we have a stored URL, try to use it regardless
+            if (stored) {
+                coreUrl = stored;
+                document.getElementById('inp-core-url').value = stored;
+            } else if (window.location.protocol.startsWith('http')) {
+                 document.getElementById('inp-core-url').value = window.location.origin;
+            }
+
+            // Always start monitoring (it handles failures gracefully)
+            initBackendMonitor();
+
+            // Only show popup if NO URL stored AND user hasn't hidden it
+            if (!stored && hidden !== 'true') {
+                document.getElementById('connection-popup').style.display = 'flex';
+            }
+        }
+
+        function openConnectionPopup() {
+            const stored = localStorage.getItem('lyrn_core_url');
+            if(stored) document.getElementById('inp-core-url').value = stored;
+            document.getElementById('connection-popup').style.display = 'flex';
+            document.getElementById('settings-popup').classList.remove('show');
+        }
+
+        function skipConnection() {
+            document.getElementById('connection-popup').style.display = 'none';
+        }
+
+        function toggleStartupConn(isChecked) {
+            localStorage.setItem('lyrn-conn-hidden', isChecked);
+        }
+
+        async function testAndSaveConnection() {
+            const inp = document.getElementById('inp-core-url');
+            let url = inp.value.replace(/\/$/, "");
+            if(!url) url = "http://localhost:8000";
+
+            const statusEl = document.getElementById('conn-status');
+            statusEl.innerText = "Testing...";
+            statusEl.style.color = "var(--text-dim)";
+
+            setLight('sys-status-server', 'yellow', 'Testing Connection...');
+
+            try {
+                const res = await fetch(url + '/health');
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    localStorage.setItem('lyrn_core_url', url);
+                    coreUrl = url;
+                    document.getElementById('connection-popup').style.display = 'none';
+
+                    // Connected successfully, now check Auth
+                    initBackendMonitor();
+                    checkAuth();
+
+                    // Broadcast to modules
+                    document.querySelectorAll('iframe').forEach(f => {
+                        f.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: url }, '*');
+                    });
+
+                    setLight('sys-status-server', 'green', 'Connected to Core');
+                } else {
+                    throw new Error("Invalid response");
+                }
+            } catch (e) {
+                statusEl.innerText = "Connection Failed: " + e.message;
+                statusEl.style.color = "var(--error-color)";
+                setLight('sys-status-server', 'red', 'Connection Failed');
+            }
+        }
+
+        let hasCheckedAuth = false;
+        async function checkAuth() {
+            if(hasCheckedAuth) return;
+
+            // 1. Check Global Auth Status (Bypass if disabled)
+            try {
+                const res = await fetch(coreUrl + '/api/auth/status');
+                if(res.ok) {
+                    const status = await res.json();
+                    if(status.required === false) {
+                        authToken = "NO_AUTH";
+                        localStorage.setItem('lyrn_admin_token', authToken);
+                        broadcastToken();
+                        hasCheckedAuth = true;
+                        loadGlobalSettings();
+                        document.getElementById('auth-overlay').style.display = 'none';
+                        return;
+                    }
+                }
+            } catch(e) { console.error("Failed to check auth status", e); }
+
+            // 2. Check LocalStorage
+            const storedToken = localStorage.getItem('lyrn_admin_token');
+            if(storedToken) {
+                // Verify it
+                const valid = await verifyToken(storedToken);
+                if(valid) {
+                    authToken = storedToken;
+                    broadcastToken();
+                    hasCheckedAuth = true;
+                    loadGlobalSettings();
+                    return;
+                }
+            }
+
+            // 3. Show Overlay
+            document.getElementById('auth-overlay').style.display = 'flex';
+        }
+
+        function handleTokenFile(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const text = e.target.result.trim();
+                    if(text) {
+                        document.getElementById('inp-auth-token').value = text;
+                        submitAuthToken();
+                    }
+                };
+                reader.readAsText(input.files[0]);
+            }
+        }
+
+        async function submitAuthToken() {
+            const inp = document.getElementById('inp-auth-token');
+            const err = document.getElementById('auth-error');
+            const save = document.getElementById('chk-save-token');
+            const token = inp.value.trim();
+
+            if(!token) {
+                err.innerText = "Token cannot be empty.";
+                return;
+            }
+
+            err.innerText = "Verifying...";
+
+            const valid = await verifyToken(token);
+            if(valid) {
+                authToken = token;
+                if(save.checked) {
+                    if(confirm("Are you sure you want to save this token? Only do this on a trusted device.")) {
+                        localStorage.setItem('lyrn_admin_token', token);
+                    }
+                }
+
+                document.getElementById('auth-overlay').style.display = 'none';
+                broadcastToken();
+                hasCheckedAuth = true;
+                loadGlobalSettings();
+            } else {
+                err.innerText = "Invalid Token. Please check admin_token.txt";
+            }
+        }
+
+        async function verifyToken(token) {
+            try {
+                const res = await fetch(coreUrl + '/api/verify_token', {
+                    method: 'POST',
+                    headers: { 'X-Token': token }
+                });
+                if(res.ok) return true;
+                return false;
+            } catch(e) {
+                console.error("Auth check failed", e);
+                return false;
+            }
+        }
+
+        function broadcastToken() {
+            document.querySelectorAll('iframe').forEach(f => {
+                f.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
+            });
+        }
+
+        let monitorInterval = null;
+        function initBackendMonitor() {
+            if(monitorInterval) clearInterval(monitorInterval);
+            fetchStats();
+            monitorInterval = setInterval(fetchStats, 2000);
+        }
+
+        async function fetchStats() {
+            const srvLight = 'sys-status-server';
+
+            if(!coreUrl) {
+                setLight(srvLight, 'red', 'No Connection Configured');
+                return;
+            }
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const res = await fetch(coreUrl + '/health', { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                const data = await res.json();
+
+                // Server OK
+                setLight(srvLight, 'green', 'Connected to Backend');
+
+                // Hide connection popup if visible
+                document.getElementById('connection-popup').style.display = 'none';
+
+                // Trigger Auth Check if connected and not done yet
+                if(!hasCheckedAuth) checkAuth();
+
+                const cpuText = `CPU: ${data.cpu.percent}%`;
+                const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
+                document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
+
+            } catch (e) {
+                document.getElementById('sys-cpu').innerText = "";
+                setLight(srvLight, 'red', 'Disconnected / Offline');
+            }
+        }
+
+        function setLight(id, status, title) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.className = 'status-light ' + status;
+                el.title = title || status;
+            }
+        }
+
+        function initSystemMonitor() {
+            if('getBattery' in navigator) {
+                navigator.getBattery().then(b => {
+                    const update = () => {
+                        const icon = b.charging ? '⚡' : '';
+                        document.getElementById('sys-battery').innerText = icon + Math.round(b.level*100) + '%';
+                    };
+                    update();
+                    b.addEventListener('levelchange', update);
+                    b.addEventListener('chargingchange', update);
+                });
+            }
+        }
+        function toggleDashboardFullscreen() { !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen(); }
+        function checkIfIframe() { if(window.self !== window.top) document.getElementById('btn-close-iframe').style.display = 'flex'; }
+        function closeDashboard() { window.parent.postMessage({ type: 'CLOSE_DASHBOARD' }, '*'); }
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'OPEN_CHILD_WINDOW') {
+                // Logic for pop-outs (Terminal, etc)
+                const { parentId, id, title, url, canMinimize } = e.data;
+
+                const existing = document.getElementById(id);
+                if(existing) {
+                    existing.style.display = 'flex';
+                    existing.style.zIndex = ++zIndexCounter;
+                    return;
+                }
+
+                const mod = { id: id, name: title, file: url };
+                // We treat the child ID as a distinct module ID for registry purposes, or better yet, just use a generic 'child' type
+                // But createWindow expects a mod object.
+
+                createWindow(mod, id, true, parentId, {
+                    canMinimize: canMinimize,
+                    url: url,
+                    center: true
+                });
+            }
+
+            if (e.data.type === 'OPEN_FILE') {
+                // Opening a file in the File Editor
+                const editorMod = MODULE_REGISTRY.find(m => m.id === 'mod_file_editor');
+                if(!editorMod) return;
+
+                const instanceId = 'win_' + editorMod.id;
+                let win = document.getElementById(instanceId);
+
+                if (!win) {
+                    createWindow(editorMod, instanceId);
+                    win = document.getElementById(instanceId); // grab ref
+                } else {
+                    if (win.style.display === 'none') {
+                        win.style.display = 'flex';
+                        win.style.zIndex = ++zIndexCounter;
+                        win.classList.remove('minimized');
+                    } else {
+                        win.style.zIndex = ++zIndexCounter;
+                    }
+                }
+                updateDockIndicators();
+
+                // Send payload
+                const iframe = win.querySelector('iframe');
+                // If it was just created, we need to wait for load.
+                // We already handle this in onload with options.payload, but here we might be reusing existing.
+                // It's safe to send immediately if it's already loaded, or queue it.
+                // But simpler: just send it. If iframe is loading, it won't receive it yet.
+                // Retrying slightly is safer.
+                setTimeout(() => {
+                    iframe.contentWindow.postMessage({ type: 'OPEN_FILE', path: e.data.path, name: e.data.name }, '*');
+                }, 500);
+                // Also send immediately in case it's already hot
+                iframe.contentWindow.postMessage({ type: 'OPEN_FILE', path: e.data.path, name: e.data.name }, '*');
+            }
+
+            if(e.data.type === 'OPEN_WIDGET') {
+                 // Legacy Widget Support (Image Viewer uses this or OPEN_CHILD_WINDOW?
+                 // Let's migrate Image Viewer to use OPEN_CHILD_WINDOW for consistency, or keep this.)
+                 // The prompt said "popup widget".
+
+                // Check if widget already exists
+                const existing = document.getElementById('win_' + e.data.id);
+                if(existing) {
+                    existing.style.display = 'flex';
+                    existing.style.zIndex = ++zIndexCounter;
+                    return;
+                }
+
+                const mod = {
+                    id: e.data.id,
+                    name: e.data.name,
+                    file: e.data.file
+                };
+                // Treat widgets as Child Windows with no parent return logic (or just close)
+                createWindow(mod, 'win_' + mod.id, false, null, { canMinimize: false, center: true });
+
+                const win = document.getElementById('win_' + mod.id);
+                if(win) {
+                    win.style.width = '500px';
+                    win.style.height = '400px';
+                }
+            }
+
+            if (e.data.type === 'OPEN_TERMINAL_TAB') {
+                const termMod = MODULE_REGISTRY.find(m => m.id === 'mod_terminal');
+                if(!termMod) return;
+
+                const instanceId = 'win_' + termMod.id;
+                let win = document.getElementById(instanceId);
+
+                if (!win) {
+                    createWindow(termMod, instanceId);
+                    win = document.getElementById(instanceId);
+                } else {
+                    if (win.style.display === 'none') {
+                        win.style.display = 'flex';
+                        win.style.zIndex = ++zIndexCounter;
+                        win.classList.remove('minimized');
+                    } else {
+                        win.style.zIndex = ++zIndexCounter;
+                    }
+                }
+                updateDockIndicators();
+
+                const iframe = win.querySelector('iframe');
+                // Pass command data
+                const payload = {
+                    type: 'ADD_TAB',
+                    cwd: e.data.cwd,
+                    command: e.data.command
+                };
+
+                // If iframe is loading, wait a bit (handled by onload in createWindow too, but here we might be live)
+                setTimeout(() => {
+                    iframe.contentWindow.postMessage(payload, '*');
+                }, 500);
+                iframe.contentWindow.postMessage(payload, '*');
+            }
+
+            if (e.data.type === 'GIT_REPOS_UPDATED') {
+                const gitWin = document.getElementById('win_mod_git');
+                if(gitWin) {
+                    const iframe = gitWin.querySelector('iframe');
+                    if(iframe) iframe.contentWindow.postMessage({ type: 'REFRESH_LIST' }, '*');
+                }
+            }
+        });
+
+        /* Welcome Popup Logic */
+        function checkWelcome() {
+            const hidden = localStorage.getItem('lyrn-welcome-hidden');
+            document.getElementById('chk-hide-welcome').checked = (hidden === 'true');
+            if(hidden !== 'true') openWelcome();
+        }
+        function openWelcome() {
+            setWelcomeStep(1);
+            document.getElementById('welcome-popup').style.display = 'flex';
+        }
+        function setWelcomeStep(step) {
+            document.querySelectorAll('.welcome-step').forEach(el => el.style.display = 'none');
+            document.getElementById('w-step-' + step).style.display = 'block';
+        }
+        function closeWelcome() {
+            document.getElementById('welcome-popup').style.display = 'none';
+        }
+        function toggleHideWelcome(isChecked) {
+            localStorage.setItem('lyrn-welcome-hidden', isChecked);
+        }
+
+        // Server Config Logic
+        let currentFullConfig = {};
+
+        function openServerConfig() {
+            document.getElementById('server-config-popup').style.display = 'flex';
+            document.getElementById('settings-popup').classList.remove('show');
+            setCfgMode('wizard');
+            fetchServerConfig();
+        }
+        function closeServerConfig() {
+             document.getElementById('server-config-popup').style.display = 'none';
+        }
+
+        function setCfgMode(mode) {
+            document.getElementById('cfg-view-wizard').style.display = (mode === 'wizard') ? 'block' : 'none';
+            document.getElementById('cfg-view-raw').style.display = (mode === 'raw') ? 'block' : 'none';
+
+            const btnWiz = document.getElementById('btn-cfg-wizard');
+            const btnRaw = document.getElementById('btn-cfg-raw');
+
+            if(mode === 'wizard') {
+                btnWiz.style.background = 'var(--brand-color)';
+                btnWiz.style.border = 'none';
+                btnRaw.style.background = 'transparent';
+                btnRaw.style.border = '1px solid var(--border-color)';
+            } else {
+                btnRaw.style.background = 'var(--brand-color)';
+                btnRaw.style.border = 'none';
+                btnWiz.style.background = 'transparent';
+                btnWiz.style.border = '1px solid var(--border-color)';
+            }
+        }
+
+        async function fetchServerConfig() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const json = await res.json();
+                currentFullConfig = json;
+
+                // Populate Raw
+                document.getElementById('sys-config-editor').value = JSON.stringify(json, null, 2);
+
+                // Populate Wizard
+                const s = json.settings || {};
+                document.getElementById('cfg-dev-name').value = s.device_name || '';
+                document.getElementById('cfg-vlc-path').value = s.vlc_path || '';
+                document.getElementById('cfg-port').value = json.port || 8000;
+
+            } catch(e) { console.error(e); }
+        }
+
+        async function saveServerConfig() {
+            try {
+                let payload = {};
+                if (document.getElementById('cfg-view-raw').style.display !== 'none') {
+                    // Raw Mode
+                    const text = document.getElementById('sys-config-editor').value;
+                    payload = JSON.parse(text);
+                } else {
+                    // Wizard Mode
+                    // Update currentFullConfig with form values
+                    if(!currentFullConfig.settings) currentFullConfig.settings = {};
+                    currentFullConfig.settings.device_name = document.getElementById('cfg-dev-name').value.trim();
+                    currentFullConfig.settings.vlc_path = document.getElementById('cfg-vlc-path').value.trim();
+                    currentFullConfig.port = parseInt(document.getElementById('cfg-port').value);
+                    payload = currentFullConfig;
+                }
+
+                await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify(payload)
+                });
+                alert("Saved. Restart server to apply port changes.");
+                closeServerConfig();
+
+                // Update local device name if changed
+                if(payload.settings && payload.settings.device_name) {
+                    document.title = payload.settings.device_name + " | RemoDash";
+                    document.getElementById('setting-device-name').value = payload.settings.device_name;
+                }
+
+            } catch(e) { alert("Error: " + e.message); }
+        }
+
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('Service Worker Registered', reg))
+                .catch(err => console.log('Service Worker Error', err));
+        }
+
+        async function loadGlobalSettings() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                const settings = data.settings || {};
+
+                if(settings.device_name) {
+                    document.title = settings.device_name + " | RemoDash";
+                    document.getElementById('setting-device-name').value = settings.device_name;
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function saveDeviceName(name) {
+            if(!coreUrl || !authToken) return;
+            // First get current to not overwrite others
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                const settings = data.settings || {};
+
+                if(settings.device_name === name) return;
+
+                settings.device_name = name;
+
+                await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ settings: settings })
+                });
+                document.title = (name ? name + " | " : "") + "RemoDash";
+            } catch(e) { console.error(e); }
+        }
+
+        // --- Filesystem Security Modal Logic ---
+        let currentFsConfig = {};
+        let tempExtraRoots = [];
+
+        async function openFsSecurity() {
+            document.getElementById('settings-popup').classList.remove('show');
+            document.getElementById('fs-security-modal').style.display = 'flex';
+
+            // Fetch config
+            try {
+                const res = await fetch(coreUrl + '/api/config', { headers: { 'X-Token': authToken } });
+                const data = await res.json();
+                currentFsConfig = data.settings || {};
+
+                // Defaults
+                const mode = currentFsConfig.filesystem_mode || 'open';
+                const root = currentFsConfig.filesystem_root || '';
+                tempExtraRoots = [...(currentFsConfig.filesystem_extra_roots || [])];
+
+                document.getElementById('inp-fs-root').value = root;
+                setFsModeUI(mode);
+                renderExtraRoots();
+
+            } catch(e) {
+                alert("Failed to load config: " + e.message);
+                closeFsSecurity();
+            }
+        }
+
+        function closeFsSecurity() {
+            document.getElementById('fs-security-modal').style.display = 'none';
+        }
+
+        function setFsModeUI(mode) {
+            document.getElementById('btn-mode-open').classList.toggle('active', mode === 'open');
+            document.getElementById('btn-mode-jailed').classList.toggle('active', mode === 'jailed');
+
+            document.getElementById('fs-open-warning').style.display = (mode === 'open') ? 'block' : 'none';
+            document.getElementById('fs-jailed-config').style.display = (mode === 'jailed') ? 'block' : 'none';
+        }
+
+        function renderExtraRoots() {
+            const list = document.getElementById('fs-extra-roots-list');
+            list.innerHTML = '';
+            tempExtraRoots.forEach((path, idx) => {
+                const div = document.createElement('div');
+                div.className = 'fs-list-item';
+                div.innerHTML = `<span>${path}</span><button class="win-btn" style="width:16px;height:16px;font-size:10px;color:#ff5555;" onclick="removeExtraRoot(${idx})">✕</button>`;
+                list.appendChild(div);
+            });
+        }
+
+        function addExtraRoot() {
+            const inp = document.getElementById('inp-fs-extra');
+            const val = inp.value.trim();
+            if(val && !tempExtraRoots.includes(val)) {
+                tempExtraRoots.push(val);
+                inp.value = '';
+                renderExtraRoots();
+            }
+        }
+
+        function removeExtraRoot(idx) {
+            tempExtraRoots.splice(idx, 1);
+            renderExtraRoots();
+        }
+
+        async function saveFsSecurity() {
+            const isOpen = document.getElementById('btn-mode-open').classList.contains('active');
+            const mode = isOpen ? 'open' : 'jailed';
+
+            if (mode === 'open') {
+                 const confirmMsg = "I UNDERSTAND THIS GIVES FULL SYSTEM ACCESS";
+                 const input = prompt("WARNING: FULL SYSTEM ACCESS\n\nThis allows RemoDash to modify any file on this system.\n\nType EXACTLY:\n" + confirmMsg);
+                 if (input !== confirmMsg) {
+                     alert("Confirmation failed. Mode not changed.");
+                     return;
+                 }
+            }
+
+            const root = document.getElementById('inp-fs-root').value.trim();
+
+            if (mode === 'jailed' && !root) {
+                alert("Jail Root Directory is required for Jailed mode.");
+                return;
+            }
+
+            // Prepare Data
+            const newSettings = {
+                ...currentFsConfig,
+                filesystem_mode: mode,
+                filesystem_root: root,
+                filesystem_extra_roots: tempExtraRoots
+            };
+
+            try {
+                await fetch(coreUrl + '/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ settings: newSettings })
+                });
+                alert("Security settings saved.");
+                closeFsSecurity();
+            } catch(e) {
+                alert("Error saving settings: " + e.message);
+            }
+        }
+    </script>
+</body>
+</html>

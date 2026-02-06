@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Network Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-purple: #7c5cff;
+            --border-color: #222222;
+            --color-up: #7c5cff;
+            --color-down: #10B981;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+            --brand-purple: #6a4ce0;
+        }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 20px;
+            height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        #stats-row {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: rgba(128,128,128,0.05); padding: 15px; border-radius: 8px;
+            border: 1px solid var(--border-color); text-align: center;
+        }
+
+        .label { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--text-dim); margin-bottom: 5px; }
+        .value { font-family: 'JetBrains Mono'; font-size: 16px; color: var(--text-head); font-weight: bold; }
+
+        #graph-container {
+            flex: 1; position: relative; border: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .legend {
+            position: absolute; top: 10px; right: 10px;
+            display: flex; gap: 15px; font-size: 10px; font-family: 'JetBrains Mono';
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    </style>
+</head>
+<body>
+    <div id="stats-row">
+        <div class="stat-box">
+             <div class="label">UPLOAD SPEED</div>
+             <div class="value" id="val-up" style="color:var(--color-up)">0 KB/s</div>
+        </div>
+        <div class="stat-box">
+             <div class="label">DOWNLOAD SPEED</div>
+             <div class="value" id="val-down" style="color:var(--color-down)">0 KB/s</div>
+        </div>
+         <div class="stat-box">
+             <div class="label">TOTAL SENT</div>
+             <div class="value" id="val-sent">0 GB</div>
+        </div>
+        <div class="stat-box">
+             <div class="label">TOTAL RECV</div>
+             <div class="value" id="val-recv">0 GB</div>
+        </div>
+    </div>
+
+    <div id="graph-container">
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:var(--color-up)"></div> Upload</div>
+            <div class="legend-item"><div class="dot" style="background:var(--color-down)"></div> Download</div>
+        </div>
+        <canvas id="net-chart"></canvas>
+    </div>
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+
+        // Data History
+        const maxPoints = 60;
+        let historyUp = new Array(maxPoints).fill(0);
+        let historyDown = new Array(maxPoints).fill(0);
+
+        let lastBytesSent = 0;
+        let lastBytesRecv = 0;
+        let lastTime = Date.now();
+        let isFirst = true;
+
+        const canvas = document.getElementById('net-chart');
+        const ctx = canvas.getContext('2d');
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
+            if (e.data.type === 'TOKEN_UPDATE') authToken = e.data.token;
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+        });
+
+        // Resize Canvas
+        function resize() {
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = canvas.parentElement.offsetHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        async function updateStats() {
+            if(!coreUrl || !authToken) return;
+
+            try {
+                const res = await fetch(coreUrl + '/api/network', {
+                    headers: { 'X-Token': authToken }
+                });
+                if(!res.ok) return;
+                const data = await res.json();
+
+                const now = Date.now();
+                const deltaS = (now - lastTime) / 1000;
+
+                if (isFirst) {
+                    lastBytesSent = data.bytes_sent;
+                    lastBytesRecv = data.bytes_recv;
+                    lastTime = now;
+                    isFirst = false;
+                    return;
+                }
+
+                if (deltaS > 0) {
+                    const upSpeed = (data.bytes_sent - lastBytesSent) / deltaS; // Bytes/s
+                    const downSpeed = (data.bytes_recv - lastBytesRecv) / deltaS;
+
+                    historyUp.push(upSpeed);
+                    historyUp.shift();
+
+                    historyDown.push(downSpeed);
+                    historyDown.shift();
+
+                    document.getElementById('val-up').innerText = formatSpeed(upSpeed);
+                    document.getElementById('val-down').innerText = formatSpeed(downSpeed);
+                    document.getElementById('val-sent').innerText = formatBytes(data.bytes_sent);
+                    document.getElementById('val-recv').innerText = formatBytes(data.bytes_recv);
+
+                    lastBytesSent = data.bytes_sent;
+                    lastBytesRecv = data.bytes_recv;
+                    lastTime = now;
+
+                    drawGraph();
+                }
+
+            } catch(e) { console.error(e); }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatSpeed(bps) {
+            return formatBytes(bps) + '/s';
+        }
+
+        function drawGraph() {
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            // Find max value for scaling
+            let maxVal = Math.max(...historyUp, ...historyDown);
+            if (maxVal < 1024) maxVal = 1024; // Min scale 1KB/s
+
+            // Draw Grid (optional)
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border-color').trim();
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
+            ctx.stroke();
+
+            // Helper to map Value to Y
+            const getY = (val) => h - ((val / maxVal) * (h * 0.9)); // 90% height usage
+
+            // Draw Up (Purple)
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-up').trim();
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            historyUp.forEach((val, i) => {
+                const x = (i / (maxPoints - 1)) * w;
+                const y = getY(val);
+                if (i===0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+
+            // Draw Down (Green)
+            ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-down').trim();
+            ctx.beginPath();
+            historyDown.forEach((val, i) => {
+                const x = (i / (maxPoints - 1)) * w;
+                const y = getY(val);
+                if (i===0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
+
+        if(coreUrl && authToken) {
+            setInterval(updateStats, 1000);
+        }
+    </script>
+</body>
+</html>
