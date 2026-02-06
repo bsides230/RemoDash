@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RemoDash">
@@ -148,7 +148,14 @@
 
         .lyrn-window.active { border-color: var(--brand-color); box-shadow: 0 25px 70px rgba(0,0,0,0.7), 0 0 15px var(--brand-color-dim); }
         .lyrn-window.always-on-top { z-index: 9999 !important; border: 1px solid var(--brand-color); box-shadow: 0 0 0 1px var(--brand-color); }
-        .lyrn-window.maximized { transition: width 0.2s, height 0.2s, left 0.2s, top 0.2s; }
+        .lyrn-window.maximized {
+            transition: width 0.2s, height 0.2s, left 0.2s, top 0.2s;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+        }
 
         .window-header {
             height: 36px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
@@ -655,6 +662,7 @@
             <button class="bar-btn" title="Power" onclick="openPowerModal()" ontouchstart="openPowerModal()">⏻</button>
             <button class="bar-btn" title="Help" onclick="openWelcome()">?</button>
             <button class="bar-btn" title="Reset Dock" onclick="resetDock()">⚓</button>
+            <button class="bar-btn" title="Reset Windows" onclick="resetWindowPositions()">✥</button>
             <button class="bar-btn" title="Fullscreen" onclick="toggleDashboardFullscreen()">⛶</button>
             <button class="bar-btn close-iframe-btn" id="btn-close-iframe" onclick="closeDashboard()">✕</button>
         </div>
@@ -736,7 +744,8 @@
                 <ul style="padding-left:20px; margin:10px 0;">
                     <li><strong>Drag</strong> the glowing handle to move it.</li>
                     <li><strong>Click</strong> the handle to minimize/expand it.</li>
-                    <li><strong>Reset</strong> it using the ⚓ anchor in the top bar if you lose it.</li>
+                    <li><strong>Reset Dock</strong> using the ⚓ anchor in the top bar.</li>
+                    <li><strong>Reset Windows</strong> using the ✥ button to center all apps.</li>
                 </ul>
             </div>
             <div class="welcome-footer">
@@ -1773,6 +1782,49 @@
             dock.classList.remove('dock-collapsed');
             saveSettings();
         }
+
+        function resetWindowPositions() {
+            const wins = document.querySelectorAll('.lyrn-window');
+            if (wins.length === 0) return;
+
+            const area = document.getElementById('desktop-area');
+            const centerX = area.offsetWidth / 2;
+            const centerY = area.offsetHeight / 2;
+
+            let count = 0;
+            wins.forEach(win => {
+                // Un-maximize if needed
+                if (win.classList.contains('maximized')) {
+                    win.classList.remove('maximized');
+                    // Restore potential cache if it exists, or just let the reset overwrite it
+                    if (win.dataset.cache) {
+                        win.style.cssText = win.dataset.cache;
+                    }
+                }
+
+                // Show if hidden (minimized)
+                if(win.style.display === 'none') {
+                    win.style.display = 'flex';
+                }
+
+                // Bring to front logic (optional, but good for visibility)
+                win.style.zIndex = ++zIndexCounter;
+
+                // Center with slight cascade
+                const w = win.offsetWidth || 800;
+                const h = win.offsetHeight || 600;
+
+                const left = Math.max(0, centerX - (w / 2) + (count * 20));
+                const top = Math.max(0, centerY - (h / 2) + (count * 20));
+
+                win.style.left = left + 'px';
+                win.style.top = top + 'px';
+
+                count++;
+            });
+            updateDockIndicators();
+        }
+
         function toggleTheme(isDark) {
             const theme = isDark ? 'dark' : 'light';
             document.body.setAttribute('data-theme', theme);
