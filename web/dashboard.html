@@ -9,7 +9,8 @@
     <title>RemoDash</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" /> -->
+    <link rel="stylesheet" href="assets/style.css">
     <link rel="manifest" href="manifest.json" />
 
     <style>
@@ -17,6 +18,7 @@
            1. CORE VARIABLES & THEME
            ========================================= */
         :root {
+            --font-family-base: 'Inter', system-ui, sans-serif;
             --bg-core: #050505;
             --bg-panel: #0a0a0a;
             --brand-color: #10B981; /* Default Emerald */
@@ -60,7 +62,7 @@
             margin: 0; padding: 0; width: 100vw;
             min-height: 100vh; overflow: hidden;
             background-color: var(--bg-core);
-            font-family: 'Inter', system-ui, sans-serif;
+            font-family: var(--font-family-base);
             color: var(--text-body);
             transition: background-color 0.5s ease;
             background-image:
@@ -920,6 +922,13 @@
                 <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
             </div>
 
+            <div class="settings-row">
+                <span>Font Family</span>
+                <select id="setting-font-family" onchange="updateFontFamily(this.value)" style="background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; font-family:var(--font-family-base); max-width: 120px;">
+                    <option value="'Inter', system-ui, sans-serif">Inter (Default)</option>
+                </select>
+            </div>
+
             <div class="settings-header" style="margin-top:5px;">Layout</div>
             <button class="btn-full-width" onclick="enableEditMode()">Edit Dock Order</button>
 
@@ -981,17 +990,18 @@
            CONFIG & STATE
            ========================================================================= */
         const MODULE_REGISTRY = [
-            { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "📊" },
-            { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "🚀" },
-            { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "📁" },
-            { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "💻" },
-            { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "📝" },
-            { id: "mod_tasks", file: "TaskManager.html", name: "Task Manager", icon: "⚡" },
-            { id: "mod_git", file: "GitManager.html", name: "Git Manager", icon: "🐙" },
-            { id: "mod_net", file: "NetworkMonitor.html", name: "Network", icon: "📡" },
-            { id: "mod_logs", file: "LogViewer.html", name: "Logs", icon: "📜" },
-            { id: "mod_cron", file: "CronManager.html", name: "Cron Jobs", icon: "⏰" },
-            { id: "mod_vlc", file: "VLCControl.html", name: "VLC Player", icon: "📺" },
+            { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "analytics" },
+            { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "rocket_launch" },
+            { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "folder" },
+            { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "terminal" },
+            { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "edit_document" },
+            { id: "mod_tasks", file: "TaskManager.html", name: "Task Manager", icon: "bolt" },
+            { id: "mod_git", file: "GitManager.html", name: "Git Manager", icon: "deployed_code" },
+            { id: "mod_net", file: "NetworkMonitor.html", name: "Network", icon: "wifi" },
+            { id: "mod_logs", file: "LogViewer.html", name: "Logs", icon: "article" },
+            { id: "mod_cron", file: "CronManager.html", name: "Cron Jobs", icon: "schedule" },
+            { id: "mod_vlc", file: "VLCControl.html", name: "VLC Player", icon: "play_circle" },
+            { id: "mod_hw_report", file: "HardwareReport.html", name: "Hardware Report", icon: "hardware" },
         ];
 
         let appSettings = {
@@ -1083,6 +1093,7 @@
             initThemePresets();
             initColorPicker();
             initCustomSlots();
+            initFonts();
 
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
@@ -1091,6 +1102,8 @@
             // Initialize Font Size Slider
             document.getElementById('setting-font-size').value = appSettings.fontSize;
             updateFontSize(appSettings.fontSize, false);
+
+            if(appSettings.fontFamily) updateFontFamily(appSettings.fontFamily, false);
 
             // Apply Theme & Brand Color
             if(appSettings.activeThemePreset) applyThemePreset(appSettings.activeThemePreset, false);
@@ -1215,7 +1228,7 @@
                 if(isEditMode) btn.classList.add('wiggle');
 
                 btn.id = 'btn_' + mod.id;
-                btn.innerHTML = `${mod.icon}<div class="active-dot"></div>`;
+                btn.innerHTML = `<span class="material-symbols-outlined">${mod.icon}</span><div class="active-dot"></div>`;
 
                 btn.onclick = (e) => {
                     e.stopPropagation();
@@ -1232,7 +1245,7 @@
             // 3. Settings Button
             const settingsBtn = document.createElement('button');
             settingsBtn.className = 'dock-btn';
-            settingsBtn.innerHTML = '⚙️';
+            settingsBtn.innerHTML = '<span class="material-symbols-outlined">settings</span>';
             settingsBtn.id = 'btn_settings';
 
             if(isEditMode) {
@@ -2580,6 +2593,47 @@
         function removeExtraRoot(idx) {
             tempExtraRoots.splice(idx, 1);
             renderExtraRoots();
+        }
+
+        // Font Management
+        async function initFonts() {
+            if(!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(coreUrl + '/api/fonts', { headers: { 'X-Token': authToken } });
+                const fonts = await res.json();
+
+                const select = document.getElementById('setting-font-family');
+                // Keep default
+                select.innerHTML = `<option value="'Inter', system-ui, sans-serif">Inter (Default)</option>`;
+
+                fonts.forEach(filename => {
+                    // Deduce name: MyFont-Regular.ttf -> MyFont-Regular
+                    const name = filename.split('.').slice(0, -1).join('.');
+                    // Create @font-face style
+                    const style = document.createElement('style');
+                    style.innerHTML = `
+                        @font-face {
+                            font-family: '${name}';
+                            src: url('assets/fonts/${filename}');
+                        }
+                    `;
+                    document.head.appendChild(style);
+
+                    const opt = document.createElement('option');
+                    opt.value = `'${name}', sans-serif`;
+                    opt.innerText = name;
+                    select.appendChild(opt);
+                });
+
+                if(appSettings.fontFamily) select.value = appSettings.fontFamily;
+
+            } catch(e) { console.error("Failed to list fonts", e); }
+        }
+
+        function updateFontFamily(family, save = true) {
+            document.documentElement.style.setProperty('--font-family-base', family);
+            appSettings.fontFamily = family;
+            if(save) saveSettings();
         }
 
         async function saveFsSecurity() {

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hardware Report</title>
+    <link rel="stylesheet" href="../assets/style.css">
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
+            --border-color: #333333;
+            --font-family-base: 'Inter', sans-serif;
+            --font-family-mono: 'JetBrains Mono', monospace;
+            --font-size-base: 12px;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+        }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: var(--font-family-base);
+            font-size: var(--font-size-base);
+            margin: 0; padding: 20px;
+            overflow-y: auto;
+        }
+
+        h2 {
+            font-family: var(--font-family-mono);
+            color: var(--text-head);
+            font-size: 16px;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .section {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-head);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font-family-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            border-color: var(--brand-color);
+            color: var(--brand-color);
+            background: var(--brand-color-dim);
+        }
+        .btn.primary {
+            background: var(--brand-color);
+            color: #fff;
+            border-color: var(--brand-color);
+        }
+        .btn.primary:hover {
+            opacity: 0.9;
+            color: #fff;
+        }
+
+        .warning-box {
+            background: rgba(255, 170, 0, 0.1);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+            color: #ffaa00;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-bottom: 10px;
+            font-family: var(--font-family-mono);
+        }
+
+        #report-output {
+            width: 100%;
+            height: 400px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            font-family: var(--font-family-mono);
+            font-size: 11px;
+            padding: 10px;
+            resize: vertical;
+            white-space: pre;
+            overflow: auto;
+        }
+
+        .loading {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="section" id="sec-deps">
+        <h2>System Dependencies</h2>
+        <div id="deps-status">Checking...</div>
+    </div>
+
+    <div class="section" id="sec-generate" style="display:none;">
+        <h2>Hardware Report</h2>
+        <p>Click below to generate a comprehensive hardware report. This may take up to 60 seconds.</p>
+        <button class="btn primary" onclick="generateReport()">Generate Report</button>
+    </div>
+
+    <div class="section" id="sec-result" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h2>Report Output</h2>
+            <div style="display:flex; gap:10px;">
+                <button class="btn" onclick="downloadReport()">Download (Client)</button>
+                <button class="btn" onclick="saveToHost()">Save to Host (~/Documents)</button>
+            </div>
+        </div>
+        <textarea id="report-output" readonly></textarea>
+    </div>
+
+    <script>
+        let coreUrl = '';
+        let authToken = '';
+
+        window.addEventListener('message', (e) => {
+            const data = e.data;
+            if (data.type === 'CORE_URL_CHANGE') {
+                coreUrl = data.url;
+                checkDeps();
+            }
+            if (data.type === 'TOKEN_UPDATE') {
+                authToken = data.token;
+                checkDeps();
+            }
+            if (data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', data.theme);
+            if (data.type === 'COLOR_CHANGE') document.documentElement.style.setProperty('--brand-color', data.color);
+            if (data.type === 'FONT_CHANGE') document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
+        });
+
+        async function checkDeps() {
+            if (!coreUrl || !authToken) return;
+            try {
+                const res = await fetch(`${coreUrl}/api/hw_report/check_deps`, {
+                    headers: { 'X-Token': authToken }
+                });
+                const data = await res.json();
+
+                const container = document.getElementById('deps-status');
+                if (data.missing.length > 0) {
+                    let html = `<div class="warning-box">Missing Tools: ${data.missing.join(', ')}</div>`;
+                    html += `<p>These tools are required to generate a full report.</p>`;
+                    html += `<button class="btn" onclick="installDeps('${data.install_cmd}')">Install via Terminal</button>`;
+                    container.innerHTML = html;
+                    document.getElementById('sec-generate').style.display = 'none';
+                } else {
+                    container.innerHTML = `<span style="color:var(--brand-color)">All dependencies are installed.</span>`;
+                    document.getElementById('sec-generate').style.display = 'block';
+                }
+            } catch (e) {
+                document.getElementById('deps-status').innerText = "Error checking dependencies: " + e.message;
+            }
+        }
+
+        function installDeps(cmd) {
+            window.parent.postMessage({
+                type: 'OPEN_TERMINAL_TAB',
+                command: cmd
+            }, '*');
+        }
+
+        async function generateReport() {
+            const out = document.getElementById('report-output');
+            const sec = document.getElementById('sec-result');
+
+            sec.style.display = 'block';
+            out.value = "Generating report... please wait...";
+
+            try {
+                const res = await fetch(`${coreUrl}/api/hw_report/generate`, {
+                    method: 'POST',
+                    headers: { 'X-Token': authToken }
+                });
+                const data = await res.json();
+                out.value = data.content;
+            } catch (e) {
+                out.value = "Error: " + e.message;
+            }
+        }
+
+        function downloadReport() {
+            const content = document.getElementById('report-output').value;
+            if (!content) return;
+
+            const blob = new Blob([content], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Hardware_Report_${new Date().toISOString().slice(0,10)}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        async function saveToHost() {
+            const content = document.getElementById('report-output').value;
+            if (!content) return;
+
+            if(!confirm("Save report to server's ~/Documents folder?")) return;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/hw_report/save`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': authToken
+                    },
+                    body: JSON.stringify({ report_content: content })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("Report saved to: " + data.path);
+                } else {
+                    alert("Failed to save report.");
+                }
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
