@@ -490,11 +490,116 @@ class ShortcutsManager:
         self.shortcuts = [s for s in self.shortcuts if s.id != sid]
         self._save()
 
+# --- Hardware Report Manager ---
+class HardwareReportManager:
+    def __init__(self):
+        # Tools to check
+        self.required_checks = [
+            ("lshw", "lshw"),
+            ("lspci", "pciutils"),
+            ("lsusb", "usbutils"),
+            ("dmidecode", "dmidecode"),
+            ("lsblk", "util-linux"),
+            ("ip", "net-tools"),
+            ("upower", "upower"),
+            ("sensors", "lm-sensors")
+        ]
+
+    def check_dependencies(self):
+        missing = []
+        for bin_name, pkg_name in self.required_checks:
+            if not shutil.which(bin_name):
+                # ip might be /usr/sbin/ip or /sbin/ip
+                if bin_name == "ip":
+                     if not (shutil.which("ip") or shutil.which("/sbin/ip") or shutil.which("/usr/sbin/ip")):
+                          missing.append(pkg_name)
+                else:
+                    missing.append(pkg_name)
+        return list(set(missing)) # Dedupe
+
+    def get_install_command(self):
+        return "sudo apt update && sudo apt install -y lshw pciutils usbutils dmidecode util-linux upower net-tools wireless-tools rfkill lm-sensors"
+
+    def run_command(self, cmd, timeout=30):
+        try:
+            # shell=False is safer, but user script used shell=True sometimes via bash -lc
+            # The user script constructed commands like ["bash", "-lc", "cat ..."]
+            p = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout,
+                check=False
+            )
+            return p.returncode, p.stdout.strip(), p.stderr.strip()
+        except Exception as e:
+            return 127, "", str(e)
+
+    def generate(self):
+        # Adapted from user script
+        commands = [
+            ("uname", ["uname", "-a"]),
+            ("os_release", ["bash", "-lc", "cat /etc/os-release 2>/dev/null || true"]),
+            ("cpuinfo", ["bash", "-lc", "lscpu 2>/dev/null || cat /proc/cpuinfo | head -200"]),
+            ("meminfo", ["bash", "-lc", "free -h 2>/dev/null || cat /proc/meminfo | head -80"]),
+            ("disks_lsblk", ["lsblk", "-a", "-o", "NAME,SIZE,TYPE,FSTYPE,FSVER,MOUNTPOINTS,MODEL,SERIAL,TRAN"]),
+            ("disks_blkid", ["bash", "-lc", "blkid 2>/dev/null || true"]),
+            ("pci", ["bash", "-lc", "lspci -nnk 2>/dev/null || true"]),
+            ("usb", ["bash", "-lc", "lsusb 2>/dev/null || true"]),
+            ("usb_verbose", ["bash", "-lc", "lsusb -v 2>/dev/null | head -400 || true"]),
+            ("lshw_short", ["bash", "-lc", "lshw -short 2>/dev/null || true"]),
+            ("lshw_json", ["bash", "-lc", "lshw -json 2>/dev/null || true"]),
+            ("dmidecode", ["bash", "-lc", "dmidecode 2>/dev/null || true"]),
+            ("dmesg_warn_err", ["bash", "-lc", "dmesg -T 2>/dev/null | egrep -i 'error|warn|fail' | tail -200 || true"]),
+            ("ip_addr", ["bash", "-lc", "ip a 2>/dev/null || ifconfig -a 2>/dev/null || true"]),
+            ("wifi", ["bash", "-lc", "iw dev 2>/dev/null || true"]),
+            ("rfkill", ["bash", "-lc", "rfkill list 2>/dev/null || true"]),
+            ("bluetooth", ["bash", "-lc", "bluetoothctl show 2>/dev/null || true"]),
+            ("power_supply", ["bash", "-lc", "ls -1 /sys/class/power_supply 2>/dev/null || true"]),
+            ("upower_list", ["bash", "-lc", "upower -e 2>/dev/null || true"]),
+            ("upower_battery", ["bash", "-lc", "upower -i $(upower -e 2>/dev/null | grep -i battery | head -1) 2>/dev/null || true"]),
+            ("sensors", ["bash", "-lc", "sensors 2>/dev/null || true"]),
+        ]
+
+        timestamp = datetime.datetime.now().isoformat()
+        md = f"# Hardware Report\n\nGenerated: {timestamp}\n\n"
+
+        for key, cmd in commands:
+            rc, out, err = self.run_command(cmd, timeout=60 if key in ("lshw_json", "dmidecode") else 30)
+
+            # Format
+            preview = out
+            if key in ("lshw_json", "usb_verbose"):
+                if len(preview) > 6000:
+                    preview = preview[:6000] + "\n... (truncated)"
+
+            body = preview if preview else (f"(no output) rc={rc}\n{err}" if err else f"(no output) rc={rc}")
+            md += f"\n## {key}\n\n```\n{body}\n```\n"
+
+        return md
+
+    def save_to_docs(self, content, filename=None):
+        if not filename:
+            filename = f"hw_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+
+        # Determine Documents path
+        docs_dir = Path.home() / "Documents"
+        if not docs_dir.exists():
+            docs_dir.mkdir(parents=True, exist_ok=True)
+
+        path = docs_dir / filename
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        return str(path)
+
 # Global Logger
 logger = DiskJournalLogger()
 settings_manager = SettingsManager()
 shortcuts_manager = ShortcutsManager()
 vlc_manager = VLCManager()
+hw_report_manager = HardwareReportManager()
 
 # --- Pydantic Models ---
 class PresetModel(BaseModel):
@@ -537,6 +642,10 @@ class VLCLaunchRequest(BaseModel):
 
 class VLCCommandRequest(BaseModel):
     command: str
+
+class HardwareReportSaveRequest(BaseModel):
+    report_content: str
+    filename: Optional[str] = None
 
 # --- App Setup ---
 
@@ -2145,6 +2254,41 @@ async def save_config(data: Dict[str, Any]):
     return {"success": True, "message": "Settings saved."}
 
 # Serve dashboard at root
+# --- Hardware Report Endpoints ---
+@app.get("/api/hw_report/check_deps", dependencies=[Depends(verify_token)])
+async def hw_report_check_deps():
+    missing = hw_report_manager.check_dependencies()
+    return {"missing": missing, "install_cmd": hw_report_manager.get_install_command()}
+
+@app.post("/api/hw_report/generate", dependencies=[Depends(verify_token)])
+async def hw_report_generate():
+    try:
+        content = await asyncio.to_thread(hw_report_manager.generate)
+        return {"content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/hw_report/save", dependencies=[Depends(verify_token)])
+async def hw_report_save(req: HardwareReportSaveRequest):
+    try:
+        path = await asyncio.to_thread(hw_report_manager.save_to_docs, req.report_content, req.filename)
+        return {"success": True, "path": path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/fonts", dependencies=[Depends(verify_token)])
+async def list_fonts():
+    fonts_dir = Path("web/assets/fonts")
+    if not fonts_dir.exists():
+        return []
+
+    fonts = []
+    # extensions: .ttf, .otf, .woff, .woff2
+    for ext in ["*.ttf", "*.otf", "*.woff", "*.woff2"]:
+        for f in fonts_dir.glob(ext):
+            fonts.append(f.name)
+    return sorted(fonts)
+
 @app.get("/")
 async def read_root():
     return FileResponse('web/dashboard.html')
