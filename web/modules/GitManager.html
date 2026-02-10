@@ -276,8 +276,6 @@
                              <div style="height:1px; background:var(--border-color); margin:5px 0"></div>
                              <button onclick="doDiscard()" style="color:var(--danger)">✕ Discard Changes</button>
                              <button onclick="removeRepo()" style="color:var(--danger)">🗑 Remove from List</button>
-                             <div style="height:1px; background:var(--border-color); margin:5px 0"></div>
-                             <button onclick="setupSSH()">🔑 Setup SSH</button>
                          </div>
                     </div>
                 </div>
@@ -330,18 +328,10 @@
             <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Clone Repository</h3>
 
             <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Repo URL</label>
-            <input type="text" id="inp-clone-url" placeholder="https://github.com/user/repo.git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
+            <input type="text" id="inp-clone-url" placeholder="https://github.com/user/repo.git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 5px 0; font-family:var(--font-mono); outline:none;">
 
-            <!-- Optional Auth -->
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <div style="flex:1">
-                    <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Username (Optional)</label>
-                    <input type="text" id="inp-clone-user" placeholder="git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
-                </div>
-                <div style="flex:1">
-                    <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Token/Password (Optional)</label>
-                    <input type="password" id="inp-clone-token" placeholder="ghp_..." style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
-                </div>
+            <div style="font-size:10px; color:var(--text-dim); margin-bottom:15px;">
+                Authentication will use <a href="#" onclick="document.getElementById('modal-clone').style.display='none';showSettings();" style="color:var(--brand-color); text-decoration:none;">Global Credentials</a> if configured.
             </div>
 
             <label id="lbl-clone-dest" style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Local Destination Path (Must be empty/new)</label>
@@ -356,56 +346,92 @@
     </div>
 
     <div id="modal-settings" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
-        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Git Settings</h3>
-
-            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Clone Mode</label>
-            <div style="margin:5px 0 15px 0; display:flex; gap:10px; color:var(--text-body);">
-                <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
-                    <input type="radio" name="git_mode" value="auto" onchange="toggleSettingsUI()"> Auto (Central Folder)
-                </label>
-                <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
-                    <input type="radio" name="git_mode" value="manual" onchange="toggleSettingsUI()"> Manual (Ask Path)
-                </label>
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:0; border-radius:8px; width:600px; height: 80vh; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <div style="padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:var(--bg-sec);">
+                <h3 style="margin:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Global Git Settings</h3>
+                <button onclick="document.getElementById('modal-settings').style.display='none'" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:16px;">✕</button>
             </div>
 
-            <div id="setting-root-path-group">
-                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Root Git Folder</label>
-                <input type="text" id="inp-setting-root" placeholder="~/documents/github/repos" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 5px 0; font-family:var(--font-mono); outline:none;">
+            <div style="flex:1; overflow-y:auto; padding:20px;">
+
+                <!-- Section: Configuration -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Repo Configuration</h4>
+                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Clone Mode</label>
+                <div style="margin:5px 0 15px 0; display:flex; gap:10px; color:var(--text-body);">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="git_mode" value="auto" onchange="toggleSettingsUI()"> Auto (Central Folder)
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="git_mode" value="manual" onchange="toggleSettingsUI()"> Manual (Ask Path)
+                    </label>
+                </div>
+
+                <div id="setting-root-path-group" style="margin-bottom:20px;">
+                    <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Root Git Folder</label>
+                    <input type="text" id="inp-setting-root" placeholder="~/documents/github/repos" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 5px 0; font-family:var(--font-mono); outline:none;">
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+
+                <!-- Section: Identity -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Git Identity (Global)</h4>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">User Name</label>
+                        <input type="text" id="inp-git-name" placeholder="John Doe" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">User Email</label>
+                        <input type="text" id="inp-git-email" placeholder="john@example.com" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+
+                <!-- Section: HTTPS Credentials -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">HTTPS Credentials (Saved Locally)</h4>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Username</label>
+                        <input type="text" id="inp-cred-user" placeholder="git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Token / Password</label>
+                        <input type="password" id="inp-cred-token" placeholder="ghp_..." style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+
+                <!-- Section: SSH Keys -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">SSH Keys</h4>
+                <div id="ssh-section-content">
+                    <div id="ssh-loading" style="display:none; color:var(--text-dim); padding:10px;">Checking SSH...</div>
+
+                    <div id="ssh-no-key" style="display:none; padding:10px; background:var(--bg-core); border:1px solid var(--border-color); border-radius:4px; text-align:center;">
+                        <p style="color:var(--text-body); margin:0 0 10px 0; font-size:12px;">No SSH key found.</p>
+                        <button class="tool-btn" style="background:var(--brand-color); color:#fff; border:none; margin:0 auto; padding:6px 12px;" onclick="generateSSHKey()">Generate SSH Key</button>
+                    </div>
+
+                    <div id="ssh-key-info" style="display:none;">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Public Key</label>
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <input type="text" id="ssh-pub-key" readonly style="flex:1; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-body); font-family:var(--font-mono); outline:none; font-size:11px;">
+                            <button class="tool-btn" onclick="copySSHKey()">Copy</button>
+                        </div>
+                        <div style="margin-top:5px; font-size:10px; color:var(--text-dim);">Fingerprint: <span id="ssh-fingerprint" style="color:var(--brand-color);"></span></div>
+                    </div>
+                </div>
+
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <div style="padding:15px; border-top:1px solid var(--border-color); background:var(--bg-sec); display:flex; justify-content:flex-end; gap:10px;">
                 <button class="tool-btn" onclick="document.getElementById('modal-settings').style.display='none'">Cancel</button>
-                <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="saveSettings()">Save</button>
+                <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="saveSettings()">Save Changes</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-ssh" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
-        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:500px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Git Identity (SSH)</h3>
-
-            <div id="ssh-loading" style="display:none; color:var(--text-dim); padding:20px; text-align:center;">Checking SSH Configuration...</div>
-
-            <div id="ssh-no-key" style="display:none; text-align:center; padding:10px;">
-                <p style="color:var(--text-body); margin-bottom:15px;">No SSH key found. Generate one to authenticate with private repositories.</p>
-                <button class="tool-btn" style="background:var(--brand-color); color:#fff; border:none; margin:0 auto; padding:8px 16px;" onclick="generateSSHKey()">Generate SSH Key</button>
-            </div>
-
-            <div id="ssh-key-info" style="display:none;">
-                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Public Key (Copy to GitHub/GitLab)</label>
-                <textarea id="ssh-pub-key" readonly style="width:100%; height:80px; margin:5px 0 10px 0; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-body); font-family:var(--font-mono); font-size:11px; padding:8px; resize:none;"></textarea>
-                <button class="tool-btn" onclick="copySSHKey()" style="width:100%; justify-content:center; margin-bottom:15px;">Copy to Clipboard</button>
-
-                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Key Fingerprint</label>
-                <pre id="ssh-fingerprint" style="background:var(--bg-core); border:1px solid var(--border-color); color:var(--brand-color); font-family:var(--font-mono); font-size:11px; padding:10px; overflow-x:auto;"></pre>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                <button class="tool-btn" onclick="document.getElementById('modal-ssh').style.display='none'">Close</button>
-            </div>
-        </div>
-    </div>
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
@@ -711,12 +737,28 @@
             } catch(e) { console.error(e); }
         }
 
-        function showSettings() {
-            // Populate
+        async function showSettings() {
+            // Populate Config
             const mode = currentSettings.git_root_mode || 'manual';
-            document.querySelector(`input[name="git_mode"][value="${mode}"]`).checked = true;
+            const radio = document.querySelector(`input[name="git_mode"][value="${mode}"]`);
+            if(radio) radio.checked = true;
             document.getElementById('inp-setting-root').value = currentSettings.git_root_path || '';
             toggleSettingsUI();
+
+            // Populate Credentials & Identity
+            try {
+                const creds = await fetchAPI('/api/git/credentials');
+                if (creds) {
+                    document.getElementById('inp-git-name').value = creds.git_name || '';
+                    document.getElementById('inp-git-email').value = creds.git_email || '';
+                    document.getElementById('inp-cred-user').value = creds.username || '';
+                    document.getElementById('inp-cred-token').value = creds.token || ''; // Masked
+                }
+            } catch(e) { console.error(e); }
+
+            // Initialize SSH
+            checkSSHStatus();
+
             document.getElementById('modal-settings').style.display = 'flex';
         }
 
@@ -727,24 +769,46 @@
         }
 
         async function saveSettings() {
-            const mode = document.querySelector('input[name="git_mode"]:checked').value;
-            const root = document.getElementById('inp-setting-root').value.trim();
+            const btn = event.target;
+            btn.innerText = "Saving...";
+            btn.disabled = true;
 
-            const payload = {
-                settings: {
-                    ...currentSettings,
-                    git_root_mode: mode,
-                    git_root_path: root
+            try {
+                // 1. Save Config
+                const mode = document.querySelector('input[name="git_mode"]:checked').value;
+                const root = document.getElementById('inp-setting-root').value.trim();
+
+                const payloadConfig = {
+                    settings: {
+                        ...currentSettings,
+                        git_root_mode: mode,
+                        git_root_path: root
+                    }
+                };
+                await fetchAPI('/api/config', 'POST', payloadConfig);
+
+                // 2. Save Credentials/Identity
+                const credsPayload = {
+                    git_name: document.getElementById('inp-git-name').value.trim() || null,
+                    git_email: document.getElementById('inp-git-email').value.trim() || null,
+                    username: document.getElementById('inp-cred-user').value.trim() || null,
+                    token: document.getElementById('inp-cred-token').value.trim() || null
+                };
+
+                if (credsPayload.token === "********") {
+                    credsPayload.token = null;
                 }
-            };
 
-            const res = await fetchAPI('/api/config', 'POST', payload);
-            if(res && res.success) {
+                await fetchAPI('/api/git/credentials', 'POST', credsPayload);
+
                 alert("Settings Saved");
                 document.getElementById('modal-settings').style.display = 'none';
                 loadSettings();
-            } else {
-                alert("Error saving settings");
+            } catch(e) {
+                alert("Error saving settings: " + e.message);
+            } finally {
+                btn.innerText = "Save Changes";
+                btn.disabled = false;
             }
         }
 
@@ -779,8 +843,6 @@
         async function doClone() {
             const url = document.getElementById('inp-clone-url').value.trim();
             const val = document.getElementById('inp-clone-path').value.trim(); // Name or Path depending on mode
-            const user = document.getElementById('inp-clone-user').value.trim();
-            const token = document.getElementById('inp-clone-token').value.trim();
             const mode = currentSettings.git_root_mode || 'manual';
 
             if(!url) { alert("URL is required."); return; }
@@ -792,10 +854,6 @@
             btn.disabled = true;
 
             const payload = { url };
-            if (user && token) {
-                payload.username = user;
-                payload.token = token;
-            }
 
             if (mode === 'auto') payload.name = val; // can be empty
             else payload.path = val;
@@ -848,8 +906,7 @@
             }
         }
 
-        async function setupSSH() {
-            document.getElementById('modal-ssh').style.display = 'flex';
+        async function checkSSHStatus() {
             document.getElementById('ssh-loading').style.display = 'block';
             document.getElementById('ssh-no-key').style.display = 'none';
             document.getElementById('ssh-key-info').style.display = 'none';
@@ -866,8 +923,8 @@
                     document.getElementById('ssh-no-key').style.display = 'block';
                 }
             } catch(e) {
-                alert("Error checking SSH: " + e.message);
-                document.getElementById('modal-ssh').style.display = 'none';
+                console.error("Error checking SSH", e);
+                document.getElementById('ssh-loading').innerText = "Error checking SSH";
             }
         }
 
@@ -879,7 +936,7 @@
             try {
                 const res = await fetchAPI('/api/git/ssh_key/generate', 'POST');
                 if (res && res.success) {
-                    setupSSH(); // Reload
+                    checkSSHStatus(); // Reload
                 } else {
                     alert("Generation Failed: " + (res.error || "Unknown"));
                 }

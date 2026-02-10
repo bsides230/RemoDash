@@ -490,6 +490,38 @@ class ShortcutsManager:
         self.shortcuts = [s for s in self.shortcuts if s.id != sid]
         self._save()
 
+# --- Git Credentials Manager ---
+class GitCredentialsManager:
+    def __init__(self, data_file="data/git_credentials.json"):
+        self.data_file = Path(data_file)
+        # Check permissions/ensure dir
+        try:
+            self.data_file.parent.mkdir(parents=True, exist_ok=True)
+        except: pass
+
+    def load(self) -> Dict[str, str]:
+        if not self.data_file.exists():
+            return {}
+        try:
+            with open(self.data_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def save(self, data: Dict[str, str]):
+        try:
+            with open(self.data_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            # Try to set permissions to 600
+            try:
+                os.chmod(self.data_file, 0o600)
+            except: pass
+        except Exception as e:
+            print(f"Failed to save git credentials: {e}")
+
+    def get_credentials(self):
+        return self.load()
+
 # --- Hardware Report Manager ---
 class HardwareReportManager:
     def __init__(self):
@@ -600,6 +632,7 @@ settings_manager = SettingsManager()
 shortcuts_manager = ShortcutsManager()
 vlc_manager = VLCManager()
 hw_report_manager = HardwareReportManager()
+git_cred_manager = GitCredentialsManager()
 
 # --- Pydantic Models ---
 class PresetModel(BaseModel):
@@ -623,6 +656,12 @@ class GitRepoRequest(BaseModel):
     branch: Optional[str] = None
     files: Optional[List[str]] = None
     delete_files: Optional[bool] = False
+
+class GitCredentialsRequest(BaseModel):
+    username: Optional[str] = None
+    token: Optional[str] = None
+    git_name: Optional[str] = None
+    git_email: Optional[str] = None
 
 class GitCloneRequest(BaseModel):
     url: str
@@ -1292,6 +1331,38 @@ def check_path_access(path: str) -> Path:
     # Fallback (should not happen)
     return target
 
+@app.get("/api/git/credentials", dependencies=[Depends(verify_token)])
+async def get_git_credentials():
+    creds = git_cred_manager.load()
+    # Mask token
+    if creds.get("token"):
+        creds["token"] = "********"
+    return creds
+
+@app.post("/api/git/credentials", dependencies=[Depends(verify_token)])
+async def save_git_credentials(req: GitCredentialsRequest):
+    current = git_cred_manager.load()
+
+    # Update fields if provided
+    if req.username is not None: current["username"] = req.username
+    if req.token is not None: current["token"] = req.token
+    if req.git_name is not None: current["git_name"] = req.git_name
+    if req.git_email is not None: current["git_email"] = req.git_email
+
+    git_cred_manager.save(current)
+
+    # Also set global git config if git_name/email provided
+    if git and (req.git_name or req.git_email):
+        try:
+            if req.git_name:
+                subprocess.run(["git", "config", "--global", "user.name", req.git_name], check=False)
+            if req.git_email:
+                subprocess.run(["git", "config", "--global", "user.email", req.git_email], check=False)
+        except Exception as e:
+            print(f"Failed to set git global config: {e}")
+
+    return {"success": True}
+
 @app.get("/api/git/repos", dependencies=[Depends(verify_token)])
 async def list_git_repos():
     repos = settings_manager.settings.get("git_repos", [])
@@ -1429,16 +1500,28 @@ async def git_clone(req: GitCloneRequest):
         env = os.environ.copy()
         env["GIT_SSH_COMMAND"] = "ssh -o StrictHostKeyChecking=no"
 
-        # Prepare URL for HTTPS Auth (if provided)
         clone_url = req.url
-        if req.username and req.token:
-            # Inject credentials: https://user:token@host/repo.git
-            safe_user = quote_plus(req.username)
-            safe_token = quote_plus(req.token)
-            if clone_url.startswith("https://"):
-                clone_url = clone_url.replace("https://", f"https://{safe_user}:{safe_token}@", 1)
-            elif clone_url.startswith("http://"):
-                clone_url = clone_url.replace("http://", f"http://{safe_user}:{safe_token}@", 1)
+
+        # Load Credentials (req or global)
+        creds = git_cred_manager.load()
+        username = req.username or creds.get("username")
+        token = req.token or creds.get("token")
+
+        if username and token:
+            askpass_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "git_askpass.py")
+            if os.path.exists(askpass_script):
+                 env["GIT_ASKPASS"] = askpass_script
+                 env["GIT_USERNAME"] = username
+                 env["GIT_PASSWORD"] = token
+                 env["GIT_TERMINAL_PROMPT"] = "0"
+            else:
+                 # Fallback: Inject into URL
+                 safe_user = quote_plus(username)
+                 safe_token = quote_plus(token)
+                 if clone_url.startswith("https://"):
+                     clone_url = clone_url.replace("https://", f"https://{safe_user}:{safe_token}@", 1)
+                 elif clone_url.startswith("http://"):
+                     clone_url = clone_url.replace("http://", f"http://{safe_user}:{safe_token}@", 1)
 
         git.Repo.clone_from(clone_url, str(p_obj), env=env)
 
@@ -1565,7 +1648,18 @@ async def git_push(req: GitRepoRequest):
     try:
         r = git.Repo(req.path)
         origin = r.remote(name='origin')
-        with r.git.custom_environment(GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'):
+
+        env = {"GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=no"}
+        creds = git_cred_manager.load()
+        if creds.get("username") and creds.get("token"):
+            askpass_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "git_askpass.py")
+            if os.path.exists(askpass_script):
+                 env["GIT_ASKPASS"] = askpass_script
+                 env["GIT_USERNAME"] = creds["username"]
+                 env["GIT_PASSWORD"] = creds["token"]
+                 env["GIT_TERMINAL_PROMPT"] = "0"
+
+        with r.git.custom_environment(**env):
             origin.push()
         return {"success": True}
     except Exception as e:
@@ -1578,7 +1672,18 @@ async def git_pull(req: GitRepoRequest):
     try:
         r = git.Repo(req.path)
         origin = r.remote(name='origin')
-        with r.git.custom_environment(GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no'):
+
+        env = {"GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=no"}
+        creds = git_cred_manager.load()
+        if creds.get("username") and creds.get("token"):
+            askpass_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "git_askpass.py")
+            if os.path.exists(askpass_script):
+                 env["GIT_ASKPASS"] = askpass_script
+                 env["GIT_USERNAME"] = creds["username"]
+                 env["GIT_PASSWORD"] = creds["token"]
+                 env["GIT_TERMINAL_PROMPT"] = "0"
+
+        with r.git.custom_environment(**env):
             origin.pull()
         return {"success": True}
     except Exception as e:
