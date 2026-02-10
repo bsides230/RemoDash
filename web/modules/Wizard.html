@@ -195,9 +195,10 @@
                 });
 
                 if (res.ok) {
-                    status.innerText = "Installation successful! Please restart the server.";
+                    status.innerText = "Installation successful!";
                     status.style.color = "var(--brand-color)";
                     fetchModules();
+                    window.parent.postMessage({ type: 'MODULE_INSTALLED' }, '*');
                 } else {
                     const err = await res.text();
                     status.innerText = "Installation failed: " + err;
@@ -226,8 +227,9 @@
                 });
 
                 if (res.ok) {
-                    alert("Module uninstalled. Please restart the server.");
+                    alert("Module uninstalled.");
                     fetchModules();
+                    window.parent.postMessage({ type: 'MODULE_INSTALLED' }, '*');
                 } else {
                     alert("Uninstall failed: " + await res.text());
                 }

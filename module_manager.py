@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import FastAPI, APIRouter
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Mount
 
 # --- Constants ---
 MODULES_DIR = Path("modules")
@@ -115,7 +116,25 @@ class ModuleManager:
                      break
 
             if not mounted:
-                app.mount(f"/modules/{mod_id}", StaticFiles(directory=str(web_path), html=True), name=f"module_{mod_id}")
+                # Manually create and insert the Mount to ensure it precedes the root catch-all
+                module_mount = Mount(
+                    path=f"/modules/{mod_id}",
+                    app=StaticFiles(directory=str(web_path), html=True),
+                    name=f"module_{mod_id}"
+                )
+
+                # Find index of catch-all route "/" if it exists
+                insert_idx = len(app.router.routes)
+                for idx, route in enumerate(app.router.routes):
+                    # Check for root path (can be "/" or "") or name="static"
+                    if hasattr(route, "path") and (route.path == "/" or route.path == ""):
+                        insert_idx = idx
+                        break
+                    if hasattr(route, "name") and route.name == "static":
+                        insert_idx = idx
+                        break
+
+                app.router.routes.insert(insert_idx, module_mount)
                 print(f"  - Mounted static files at /modules/{mod_id}")
 
         # 2. Load API (api.py)
