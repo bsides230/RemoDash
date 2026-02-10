@@ -655,7 +655,6 @@
     <div id="top-system-bar">
         <div class="bar-section">
             <div id="sys-status-server" class="status-light" title="Server Status: Disconnected" onclick="openConnectionPopup()"></div>
-            <span class="system-text" id="sys-cpu"></span>
             <span class="system-text" id="sys-date">...</span>
             <span class="system-text" id="sys-clock">...</span>
             <span class="system-text" id="sys-battery"></span>
@@ -993,7 +992,7 @@
         let MODULE_REGISTRY = [];
 
         let appSettings = {
-            activeModules: ['core_status', 'core_files', 'core_terminal', 'core_wizard', 'mod_shortcuts', 'mod_tasks', 'mod_git', 'mod_vlc'],
+            activeModules: [],
             dockPinned: true,
             dockPos: null,
             theme: 'dark', // 'light' or 'dark' (base mode)
@@ -1060,6 +1059,7 @@
         // Map: modId -> Array of { id: windowId, title: string }
         let runningInstances = {};
         let isEditMode = false;
+        let hasSavedSettings = false;
 
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
@@ -1887,7 +1887,10 @@
         function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
         function loadSettings() {
             const s = localStorage.getItem('lyrn-settings');
-            if(s) appSettings = { ...appSettings, ...JSON.parse(s) };
+            if(s) {
+                appSettings = { ...appSettings, ...JSON.parse(s) };
+                hasSavedSettings = true;
+            }
             if(!appSettings.customColors) appSettings.customColors = ['#333333', '#333333', '#333333', '#333333'];
             if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme);
         }
@@ -2203,12 +2206,7 @@
                 // Trigger Auth Check if connected and not done yet
                 if(!hasCheckedAuth) checkAuth();
 
-                const cpuText = `CPU: ${data.cpu.percent}%`;
-                const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
-                document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
-
             } catch (e) {
-                document.getElementById('sys-cpu').innerText = "";
                 setLight(srvLight, 'red', 'Disconnected / Offline');
             }
         }
@@ -2527,6 +2525,11 @@
                  installedMods.forEach(m => map.set(m.id, m));
 
                  MODULE_REGISTRY = Array.from(map.values());
+
+                 if(!hasSavedSettings && appSettings.activeModules.length === 0) {
+                     appSettings.activeModules = MODULE_REGISTRY.filter(m => !m.hidden).map(m => m.id);
+                     saveSettings();
+                 }
 
                  renderDock();
              } catch(e) { console.error("Failed to fetch modules", e); }
