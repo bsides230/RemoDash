@@ -1052,6 +1052,36 @@
                     '--text-body': '#a0b0a0'
                 },
                 brand: '#4caf50'
+            },
+            'sunset': {
+                name: 'Sunset',
+                colors: {
+                    '--bg-core': '#1a0505',
+                    '--bg-panel': '#2b0a0a',
+                    '--border-color': '#4a1a1a',
+                    '--text-body': '#d0a0a0'
+                },
+                brand: '#ff5533'
+            },
+            'nebula': {
+                name: 'Nebula',
+                colors: {
+                    '--bg-core': '#0b001a',
+                    '--bg-panel': '#15002b',
+                    '--border-color': '#2a0055',
+                    '--text-body': '#c0a0e0'
+                },
+                brand: '#aa00ff'
+            },
+            'retro': {
+                name: 'Retro',
+                colors: {
+                    '--bg-core': '#202020',
+                    '--bg-panel': '#2d2d2d',
+                    '--border-color': '#404040',
+                    '--text-body': '#e0e0e0'
+                },
+                brand: '#ffcc00'
             }
         };
 
@@ -1490,32 +1520,42 @@
            ========================================= */
 
         function handleDockClick(mod, btn) {
-            const instanceId = 'win_' + mod.id;
-            const el = document.getElementById(instanceId);
-
-            if (el) {
-                // Toggle logic
-                if (el.style.display === 'none') {
-                    // Show
-                    el.style.display = 'flex';
-                    el.style.zIndex = ++zIndexCounter;
-                    el.classList.remove('minimized');
-                } else {
-                    // It's visible, but is it on top?
-                    const topZ = zIndexCounter;
-                    if (parseInt(el.style.zIndex) === topZ) {
-                        // It is on top, so minimize it
-                        el.style.display = 'none';
-                    } else {
-                        // Bring to front
-                        el.style.zIndex = ++zIndexCounter;
-                    }
+            try {
+                if(!mod) {
+                    console.error("handleDockClick: Module is undefined");
+                    return;
                 }
-            } else {
-                // Create
-                createWindow(mod);
+
+                const instanceId = 'win_' + mod.id;
+                const el = document.getElementById(instanceId);
+
+                if (el) {
+                    // Toggle logic
+                    if (el.style.display === 'none') {
+                        // Show
+                        el.style.display = 'flex';
+                        el.style.zIndex = ++zIndexCounter;
+                        el.classList.remove('minimized');
+                    } else {
+                        // It's visible, but is it on top?
+                        const topZ = zIndexCounter;
+                        if (parseInt(el.style.zIndex) === topZ) {
+                            // It is on top, so minimize it
+                            el.style.display = 'none';
+                        } else {
+                            // Bring to front
+                            el.style.zIndex = ++zIndexCounter;
+                        }
+                    }
+                } else {
+                    // Create
+                    createWindow(mod);
+                }
+                updateDockIndicators();
+            } catch(e) {
+                console.error("Error launching app:", e);
+                alert("Failed to launch app: " + e.message);
             }
-            updateDockIndicators();
         }
 
         // Parent tracking for child windows
@@ -2199,6 +2239,14 @@
 
                 // Server OK
                 setLight(srvLight, 'green', 'Connected to Backend');
+
+                // Update Battery (Backend Fallback)
+                if(data.battery && typeof data.battery.percent !== 'undefined') {
+                    const charging = data.battery.power_plugged ? '⚡' : '';
+                    const pct = Math.round(data.battery.percent);
+                    const el = document.getElementById('sys-battery');
+                    if(el) el.innerText = charging + pct + '%';
+                }
 
                 // Hide connection popup if visible
                 document.getElementById('connection-popup').style.display = 'none';
