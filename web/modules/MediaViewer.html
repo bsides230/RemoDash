@@ -40,7 +40,7 @@
         async function getSessionKey() {
             if (!coreUrl || !authToken || authToken === 'NO_AUTH') return null;
             try {
-                const res = await fetch(coreUrl + '/api/session/terminal', {
+                const res = await fetch(coreUrl + '/api/auth/session/terminal', {
                     method: 'POST',
                     headers: { 'X-Token': authToken }
                 });

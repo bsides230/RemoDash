@@ -989,26 +989,11 @@
         /* =========================================================================
            CONFIG & STATE
            ========================================================================= */
-        const CORE_MODULES = [
-            { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "analytics" },
-            { id: "mod_wizard", file: "Wizard.html", name: "Wizard", icon: "extension" },
-            { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "rocket_launch" },
-            { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "folder" },
-            { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "terminal" },
-            { id: "mod_file_editor", file: "FileEditor.html", name: "Code Editor", icon: "edit_document" },
-            { id: "mod_tasks", file: "TaskManager.html", name: "Task Manager", icon: "bolt" },
-            { id: "mod_git", file: "GitManager.html", name: "Git Manager", icon: "deployed_code" },
-            { id: "mod_net", file: "NetworkMonitor.html", name: "Network", icon: "wifi" },
-            { id: "mod_logs", file: "LogViewer.html", name: "Logs", icon: "article" },
-            { id: "mod_cron", file: "CronManager.html", name: "Cron Jobs", icon: "schedule" },
-            { id: "mod_vlc", file: "VLCControl.html", name: "VLC Player", icon: "play_circle" },
-            { id: "mod_hw_report", file: "HardwareReport.html", name: "Hardware Report", icon: "hardware" },
-        ];
-
-        let MODULE_REGISTRY = [...CORE_MODULES];
+        let CORE_MODULES = [];
+        let MODULE_REGISTRY = [];
 
         let appSettings = {
-            activeModules: ['mod_server_status', 'mod_wizard', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
+            activeModules: ['core_status', 'core_files', 'core_terminal', 'core_wizard', 'mod_shortcuts', 'mod_tasks', 'mod_git', 'mod_vlc'],
             dockPinned: true,
             dockPos: null,
             theme: 'dark', // 'light' or 'dark' (base mode)
@@ -2168,7 +2153,7 @@
 
         async function verifyToken(token) {
             try {
-                const res = await fetch(coreUrl + '/api/verify_token', {
+                const res = await fetch(coreUrl + '/api/auth/verify_token', {
                     method: 'POST',
                     headers: { 'X-Token': token }
                 });
@@ -2516,11 +2501,19 @@
         async function fetchModules() {
              if(!coreUrl || !authToken) return;
              try {
+                 // 1. Fetch Core Manifest
+                 const coreRes = await fetch('core_manifest.json');
+                 if (coreRes.ok) {
+                     CORE_MODULES = await coreRes.json();
+                     // Fix URLs to be relative to dash if needed, but manifest says "modules/FileExplorer.html" which is correct
+                 }
+
+                 // 2. Fetch Installed Modules
                  const res = await fetch(coreUrl + '/api/modules', { headers: { 'X-Token': authToken } });
                  const modules = await res.json();
 
-                 // Map to registry format
-                 const newMods = modules.map(m => ({
+                 // Map installed to registry format
+                 const installedMods = modules.map(m => ({
                      id: m.id,
                      name: m.name,
                      icon: m.icon || 'extension',
@@ -2528,16 +2521,12 @@
                      isExternal: true
                  }));
 
-                 // Merge: Core + New. If ID conflict, New wins? Or Core wins?
-                 // Let's say New wins to allow overriding core modules.
+                 // Merge: Core + Installed
                  const map = new Map();
                  CORE_MODULES.forEach(m => map.set(m.id, m));
-                 newMods.forEach(m => map.set(m.id, m));
+                 installedMods.forEach(m => map.set(m.id, m));
 
                  MODULE_REGISTRY = Array.from(map.values());
-
-                 // Auto-add new modules to active list if not present?
-                 // Maybe not, user should enable them.
 
                  renderDock();
              } catch(e) { console.error("Failed to fetch modules", e); }

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "core_files",
+    "name": "File Explorer",
+    "icon": "folder",
+    "url": "modules/FileExplorer.html",
+    "core": true
+  },
+  {
+    "id": "core_terminal",
+    "name": "Terminal",
+    "icon": "terminal",
+    "url": "modules/Terminal.html",
+    "core": true
+  },
+  {
+    "id": "core_editor",
+    "name": "Code Editor",
+    "icon": "edit",
+    "url": "modules/FileEditor.html",
+    "core": true,
+    "hidden": true
+  },
+  {
+    "id": "core_status",
+    "name": "Server Status",
+    "icon": "analytics",
+    "url": "modules/ServerStatus.html",
+    "core": true
+  },
+  {
+    "id": "core_media",
+    "name": "Media Viewer",
+    "icon": "image",
+    "url": "modules/MediaViewer.html",
+    "core": true,
+    "hidden": true
+  },
+  {
+    "id": "core_wizard",
+    "name": "Module Manager",
+    "icon": "extension",
+    "url": "modules/Wizard.html",
+    "core": true
+  }
+]

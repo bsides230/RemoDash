@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "allowed_origins": [],
+    "git_repos": [],
+    "git_root_mode": "manual",
+    "git_root_path": "/home/jules/documents/github/repos"
+  },
+  "ui_settings": {
+    "font_size": 12,
+    "window_size": "1400x900",
+    "confirmation_preferences": {}
+  }
+}
