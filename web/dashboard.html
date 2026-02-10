@@ -989,7 +989,7 @@
         /* =========================================================================
            CONFIG & STATE
            ========================================================================= */
-        const MODULE_REGISTRY = [
+        const CORE_MODULES = [
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "analytics" },
             { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "rocket_launch" },
             { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "folder" },
@@ -1003,6 +1003,8 @@
             { id: "mod_vlc", file: "VLCControl.html", name: "VLC Player", icon: "play_circle" },
             { id: "mod_hw_report", file: "HardwareReport.html", name: "Hardware Report", icon: "hardware" },
         ];
+
+        let MODULE_REGISTRY = [...CORE_MODULES];
 
         let appSettings = {
             activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
@@ -2091,6 +2093,7 @@
                         broadcastToken();
                         hasCheckedAuth = true;
                         loadGlobalSettings();
+                        fetchModules(); // Fetch modules after auth
                         document.getElementById('auth-overlay').style.display = 'none';
                         return;
                     }
@@ -2107,6 +2110,7 @@
                     broadcastToken();
                     hasCheckedAuth = true;
                     loadGlobalSettings();
+                    fetchModules(); // Fetch modules after auth
                     return;
                 }
             }
@@ -2155,6 +2159,7 @@
                 broadcastToken();
                 hasCheckedAuth = true;
                 loadGlobalSettings();
+                fetchModules(); // Fetch modules after auth
             } else {
                 err.innerText = "Invalid Token. Please check admin_token.txt";
             }
@@ -2505,6 +2510,36 @@
                     document.getElementById('setting-device-name').value = settings.device_name;
                 }
             } catch(e) { console.error(e); }
+        }
+
+        async function fetchModules() {
+             if(!coreUrl || !authToken) return;
+             try {
+                 const res = await fetch(coreUrl + '/api/modules', { headers: { 'X-Token': authToken } });
+                 const modules = await res.json();
+
+                 // Map to registry format
+                 const newMods = modules.map(m => ({
+                     id: m.id,
+                     name: m.name,
+                     icon: m.icon || 'extension',
+                     file: `/modules/${m.id}/index.html`, // Standard convention
+                     isExternal: true
+                 }));
+
+                 // Merge: Core + New. If ID conflict, New wins? Or Core wins?
+                 // Let's say New wins to allow overriding core modules.
+                 const map = new Map();
+                 CORE_MODULES.forEach(m => map.set(m.id, m));
+                 newMods.forEach(m => map.set(m.id, m));
+
+                 MODULE_REGISTRY = Array.from(map.values());
+
+                 // Auto-add new modules to active list if not present?
+                 // Maybe not, user should enable them.
+
+                 renderDock();
+             } catch(e) { console.error("Failed to fetch modules", e); }
         }
 
         async function saveDeviceName(name) {

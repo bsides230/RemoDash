@@ -33,6 +33,7 @@ from pydantic import BaseModel
 import uvicorn
 
 from settings_manager import SettingsManager
+from module_manager import ModuleManager
 
 try:
     import pynvml
@@ -633,6 +634,7 @@ shortcuts_manager = ShortcutsManager()
 vlc_manager = VLCManager()
 hw_report_manager = HardwareReportManager()
 git_cred_manager = GitCredentialsManager()
+module_manager = ModuleManager()
 
 # --- Pydantic Models ---
 class PresetModel(BaseModel):
@@ -716,6 +718,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="RemoDash Server", lifespan=lifespan)
+
+# Load Modules
+module_manager.load_modules(app)
 
 # Determine allowed origins
 allowed_origins = settings_manager.settings.get("allowed_origins", [])
@@ -2318,6 +2323,10 @@ async def list_log_chunks(session_id: str):
 @app.get("/api/logs/sessions/{session_id}/chunks/{chunk_id}", dependencies=[Depends(verify_token)])
 async def get_log_chunk(session_id: str, chunk_id: str):
     return logger.get_chunk_content(session_id, chunk_id)
+
+@app.get("/api/modules", dependencies=[Depends(verify_token)])
+async def list_modules():
+    return module_manager.get_installed_modules()
 
 @app.get("/api/config", dependencies=[Depends(verify_token)])
 async def get_config():
