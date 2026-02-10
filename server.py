@@ -45,11 +45,6 @@ try:
 except ImportError:
     git = None
 
-try:
-    from crontab import CronTab
-except ImportError:
-    CronTab = None
-
 # --- Psutil Mock for Android/No-Dep environments ---
 if psutil is None:
     class MockPsutil:
@@ -523,116 +518,11 @@ class GitCredentialsManager:
     def get_credentials(self):
         return self.load()
 
-# --- Hardware Report Manager ---
-class HardwareReportManager:
-    def __init__(self):
-        # Tools to check
-        self.required_checks = [
-            ("lshw", "lshw"),
-            ("lspci", "pciutils"),
-            ("lsusb", "usbutils"),
-            ("dmidecode", "dmidecode"),
-            ("lsblk", "util-linux"),
-            ("ip", "net-tools"),
-            ("upower", "upower"),
-            ("sensors", "lm-sensors")
-        ]
-
-    def check_dependencies(self):
-        missing = []
-        for bin_name, pkg_name in self.required_checks:
-            if not shutil.which(bin_name):
-                # ip might be /usr/sbin/ip or /sbin/ip
-                if bin_name == "ip":
-                     if not (shutil.which("ip") or shutil.which("/sbin/ip") or shutil.which("/usr/sbin/ip")):
-                          missing.append(pkg_name)
-                else:
-                    missing.append(pkg_name)
-        return list(set(missing)) # Dedupe
-
-    def get_install_command(self):
-        return "sudo apt update && sudo apt install -y lshw pciutils usbutils dmidecode util-linux upower net-tools wireless-tools rfkill lm-sensors"
-
-    def run_command(self, cmd, timeout=30):
-        try:
-            # shell=False is safer, but user script used shell=True sometimes via bash -lc
-            # The user script constructed commands like ["bash", "-lc", "cat ..."]
-            p = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=timeout,
-                check=False
-            )
-            return p.returncode, p.stdout.strip(), p.stderr.strip()
-        except Exception as e:
-            return 127, "", str(e)
-
-    def generate(self):
-        # Adapted from user script
-        commands = [
-            ("uname", ["uname", "-a"]),
-            ("os_release", ["bash", "-lc", "cat /etc/os-release 2>/dev/null || true"]),
-            ("cpuinfo", ["bash", "-lc", "lscpu 2>/dev/null || cat /proc/cpuinfo | head -200"]),
-            ("meminfo", ["bash", "-lc", "free -h 2>/dev/null || cat /proc/meminfo | head -80"]),
-            ("disks_lsblk", ["lsblk", "-a", "-o", "NAME,SIZE,TYPE,FSTYPE,FSVER,MOUNTPOINTS,MODEL,SERIAL,TRAN"]),
-            ("disks_blkid", ["bash", "-lc", "blkid 2>/dev/null || true"]),
-            ("pci", ["bash", "-lc", "lspci -nnk 2>/dev/null || true"]),
-            ("usb", ["bash", "-lc", "lsusb 2>/dev/null || true"]),
-            ("usb_verbose", ["bash", "-lc", "lsusb -v 2>/dev/null | head -400 || true"]),
-            ("lshw_short", ["bash", "-lc", "lshw -short 2>/dev/null || true"]),
-            ("lshw_json", ["bash", "-lc", "lshw -json 2>/dev/null || true"]),
-            ("dmidecode", ["bash", "-lc", "dmidecode 2>/dev/null || true"]),
-            ("dmesg_warn_err", ["bash", "-lc", "dmesg -T 2>/dev/null | egrep -i 'error|warn|fail' | tail -200 || true"]),
-            ("ip_addr", ["bash", "-lc", "ip a 2>/dev/null || ifconfig -a 2>/dev/null || true"]),
-            ("wifi", ["bash", "-lc", "iw dev 2>/dev/null || true"]),
-            ("rfkill", ["bash", "-lc", "rfkill list 2>/dev/null || true"]),
-            ("bluetooth", ["bash", "-lc", "bluetoothctl show 2>/dev/null || true"]),
-            ("power_supply", ["bash", "-lc", "ls -1 /sys/class/power_supply 2>/dev/null || true"]),
-            ("upower_list", ["bash", "-lc", "upower -e 2>/dev/null || true"]),
-            ("upower_battery", ["bash", "-lc", "upower -i $(upower -e 2>/dev/null | grep -i battery | head -1) 2>/dev/null || true"]),
-            ("sensors", ["bash", "-lc", "sensors 2>/dev/null || true"]),
-        ]
-
-        timestamp = datetime.datetime.now().isoformat()
-        md = f"# Hardware Report\n\nGenerated: {timestamp}\n\n"
-
-        for key, cmd in commands:
-            rc, out, err = self.run_command(cmd, timeout=60 if key in ("lshw_json", "dmidecode") else 30)
-
-            # Format
-            preview = out
-            if key in ("lshw_json", "usb_verbose"):
-                if len(preview) > 6000:
-                    preview = preview[:6000] + "\n... (truncated)"
-
-            body = preview if preview else (f"(no output) rc={rc}\n{err}" if err else f"(no output) rc={rc}")
-            md += f"\n## {key}\n\n```\n{body}\n```\n"
-
-        return md
-
-    def save_to_docs(self, content, filename=None):
-        if not filename:
-            filename = f"hw_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-
-        # Determine Documents path
-        docs_dir = Path.home() / "Documents"
-        if not docs_dir.exists():
-            docs_dir.mkdir(parents=True, exist_ok=True)
-
-        path = docs_dir / filename
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
-
-        return str(path)
-
 # Global Logger
 logger = DiskJournalLogger()
 settings_manager = SettingsManager()
 shortcuts_manager = ShortcutsManager()
 vlc_manager = VLCManager()
-hw_report_manager = HardwareReportManager()
 git_cred_manager = GitCredentialsManager()
 module_manager = ModuleManager()
 
@@ -672,21 +562,14 @@ class GitCloneRequest(BaseModel):
     username: Optional[str] = None
     token: Optional[str] = None
 
-class TaskKillRequest(BaseModel):
-    pid: int
-
-class CronRequest(BaseModel):
-    lines: str
-
 class VLCLaunchRequest(BaseModel):
     path: str
 
 class VLCCommandRequest(BaseModel):
     command: str
 
-class HardwareReportSaveRequest(BaseModel):
-    report_content: str
-    filename: Optional[str] = None
+class WizardUninstallRequest(BaseModel):
+    module_id: str
 
 # --- App Setup ---
 
@@ -1040,68 +923,6 @@ async def shutdown_system():
             subprocess.run(["shutdown", "/s", "/t", "0"])
         else:
             subprocess.run(["sudo", "shutdown", "now"])
-        return {"success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- Task Manager Endpoints ---
-@app.get("/api/tasks", dependencies=[Depends(verify_token)])
-async def get_tasks():
-    processes = []
-    try:
-        # 'username' often causes PermissionError on Android
-        attrs = ['pid', 'name', 'cpu_percent', 'memory_percent', 'status']
-        if not ("ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", "")):
-             attrs.append('username')
-
-        for proc in psutil.process_iter(attrs):
-            try:
-                p_info = proc.info
-                # Polyfill username if missing
-                if 'username' not in p_info: p_info['username'] = "?"
-                processes.append(p_info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-    except Exception: pass
-    return processes
-
-@app.post("/api/tasks/kill", dependencies=[Depends(verify_token)])
-async def kill_task(req: TaskKillRequest):
-    try:
-        p = psutil.Process(req.pid)
-        p.terminate()
-        return {"success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- Network Monitor Endpoints ---
-@app.get("/api/network", dependencies=[Depends(verify_token)])
-async def get_network_stats():
-    try:
-        return psutil.net_io_counters()._asdict()
-    except (PermissionError, Exception, AttributeError):
-        return {}
-
-# --- Cron Manager Endpoints ---
-@app.get("/api/cron", dependencies=[Depends(verify_token)])
-async def get_cron():
-    if not CronTab:
-        raise HTTPException(status_code=501, detail="python-crontab not installed")
-    try:
-        cron = CronTab(user=True)
-        return {"lines": cron.render()}
-    except Exception as e:
-         raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/cron", dependencies=[Depends(verify_token)])
-async def save_cron(req: CronRequest):
-    try:
-        proc = subprocess.Popen(['crontab', '-'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = proc.communicate(input=req.lines.encode('utf-8'))
-
-        if proc.returncode != 0:
-             raise Exception(stderr.decode())
-
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2368,25 +2189,74 @@ async def save_config(data: Dict[str, Any]):
     return {"success": True, "message": "Settings saved."}
 
 # Serve dashboard at root
-# --- Hardware Report Endpoints ---
-@app.get("/api/hw_report/check_deps", dependencies=[Depends(verify_token)])
-async def hw_report_check_deps():
-    missing = hw_report_manager.check_dependencies()
-    return {"missing": missing, "install_cmd": hw_report_manager.get_install_command()}
-
-@app.post("/api/hw_report/generate", dependencies=[Depends(verify_token)])
-async def hw_report_generate():
+# --- Wizard Endpoints ---
+@app.post("/api/wizard/install", dependencies=[Depends(verify_token)])
+async def wizard_install(file: UploadFile = File(...)):
     try:
-        content = await asyncio.to_thread(hw_report_manager.generate)
-        return {"content": content}
+        # Save temp file
+        fd, temp_path = tempfile.mkstemp(suffix=".mdpk")
+        os.close(fd)
+
+        with open(temp_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        if not zipfile.is_zipfile(temp_path):
+            os.unlink(temp_path)
+            raise HTTPException(status_code=400, detail="Invalid zip file")
+
+        with zipfile.ZipFile(temp_path, 'r') as z:
+            if "module.json" not in z.namelist():
+                os.unlink(temp_path)
+                raise HTTPException(status_code=400, detail="Missing module.json")
+
+            with z.open("module.json") as f:
+                meta = json.load(f)
+
+            mod_id = meta.get("id")
+            if not mod_id:
+                os.unlink(temp_path)
+                raise HTTPException(status_code=400, detail="Module ID missing")
+
+            target_dir = Path("modules") / mod_id
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+
+            target_dir.mkdir(parents=True, exist_ok=True)
+            z.extractall(target_dir)
+
+            # Check requirements
+            req_file = target_dir / "requirements.txt"
+            if req_file.exists():
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+
+            # Register
+            module_manager.register_module(
+                mod_id=mod_id,
+                name=meta.get("name", mod_id),
+                icon=meta.get("icon", "extension"),
+                version=meta.get("version", "1.0")
+            )
+
+        os.unlink(temp_path)
+        return {"success": True, "module_id": mod_id}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/hw_report/save", dependencies=[Depends(verify_token)])
-async def hw_report_save(req: HardwareReportSaveRequest):
+@app.post("/api/wizard/uninstall", dependencies=[Depends(verify_token)])
+async def wizard_uninstall(req: WizardUninstallRequest):
     try:
-        path = await asyncio.to_thread(hw_report_manager.save_to_docs, req.report_content, req.filename)
-        return {"success": True, "path": path}
+        mod_id = req.module_id
+
+        # 1. Remove files
+        mod_dir = Path("modules") / mod_id
+        if mod_dir.exists():
+            shutil.rmtree(mod_dir)
+
+        # 2. Unregister
+        module_manager.unregister_module(mod_id)
+
+        return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

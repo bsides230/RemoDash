@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module Wizard</title>
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --brand-color: #10B981;
+            --border-color: #333333;
+            --font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        h2 {
+            color: var(--text-head);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .section {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: var(--brand-color);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        .file-upload {
+            border: 2px dashed var(--border-color);
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .file-upload:hover {
+            border-color: var(--brand-color);
+        }
+
+        .module-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .module-card {
+            background: var(--bg-core);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .module-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+            color: var(--text-head);
+        }
+
+        .module-info p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--text-body);
+        }
+
+        #upload-status {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Module Wizard</h2>
+
+    <div class="section">
+        <h3 style="margin-top:0">Install Module</h3>
+        <p>Upload a <code>.mdpk</code> file to install a new module.</p>
+        <div class="file-upload" onclick="document.getElementById('file-input').click()">
+            <span style="font-size: 24px;">📂</span><br>
+            <span>Click to Select File</span>
+            <input type="file" id="file-input" accept=".mdpk" style="display: none;" onchange="handleFileUpload(this)">
+        </div>
+        <div id="upload-status"></div>
+    </div>
+
+    <div class="section">
+        <h3 style="margin-top:0">Installed Modules</h3>
+        <div id="module-list" class="module-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script>
+        let CORE_URL = window.location.origin;
+        let AUTH_TOKEN = null;
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') CORE_URL = e.data.url;
+            if (e.data.type === 'TOKEN_UPDATE') {
+                AUTH_TOKEN = e.data.token;
+                fetchModules();
+            }
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+        });
+
+        async function fetchModules() {
+            if (!AUTH_TOKEN) return;
+            try {
+                const res = await fetch(`${CORE_URL}/api/modules`, {
+                    headers: { 'X-Token': AUTH_TOKEN }
+                });
+                const modules = await res.json();
+                renderModules(modules);
+            } catch (err) {
+                console.error("Failed to fetch modules:", err);
+            }
+        }
+
+        function renderModules(modules) {
+            const container = document.getElementById('module-list');
+            container.innerHTML = '';
+
+            if (modules.length === 0) {
+                container.innerHTML = '<p>No modules installed.</p>';
+                return;
+            }
+
+            modules.forEach(mod => {
+                const card = document.createElement('div');
+                card.className = 'module-card';
+                card.innerHTML = `
+                    <div class="module-info">
+                        <h3>${mod.name} (${mod.version || '1.0'})</h3>
+                        <p>ID: ${mod.id}</p>
+                    </div>
+                    <button class="btn btn-danger" onclick="uninstallModule('${mod.id}')">Uninstall</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const status = document.getElementById('upload-status');
+            status.innerText = "Uploading...";
+            status.style.color = "var(--text-body)";
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(`${CORE_URL}/api/wizard/install`, {
+                    method: 'POST',
+                    headers: { 'X-Token': AUTH_TOKEN },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    status.innerText = "Installation successful! Please restart the server.";
+                    status.style.color = "var(--brand-color)";
+                    fetchModules();
+                } else {
+                    const err = await res.text();
+                    status.innerText = "Installation failed: " + err;
+                    status.style.color = "#ef4444";
+                }
+            } catch (err) {
+                status.innerText = "Error: " + err.message;
+                status.style.color = "#ef4444";
+            }
+
+            // Clear input
+            input.value = '';
+        }
+
+        async function uninstallModule(modId) {
+            if (!confirm(`Are you sure you want to uninstall module '${modId}'?`)) return;
+
+            try {
+                const res = await fetch(`${CORE_URL}/api/wizard/uninstall`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Token': AUTH_TOKEN
+                    },
+                    body: JSON.stringify({ module_id: modId })
+                });
+
+                if (res.ok) {
+                    alert("Module uninstalled. Please restart the server.");
+                    fetchModules();
+                } else {
+                    alert("Uninstall failed: " + await res.text());
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            }
+        }
+    </script>
+</body>
+</html>

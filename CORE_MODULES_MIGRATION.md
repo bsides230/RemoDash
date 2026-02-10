@@ -1,4 +1,4 @@
-s# Core Modules Migration List
+# Core Modules Migration List
 
 This file tracks the migration of "core" modules (HTML files in `web/modules`) into standalone `.mdpk` packages.
 
@@ -15,15 +15,15 @@ This file tracks the migration of "core" modules (HTML files in `web/modules`) i
 
 ## Core Modules List
 
--   [ ] **CronManager** (`CronManager.html`)
+-   [x] **CronManager** (`CronManager.html`) -> `mod_cron.mdpk`
 -   [ ] **GitManager** (`GitManager.html`)
--   [ ] **HardwareReport** (`HardwareReport.html`)
+-   [x] **HardwareReport** (`HardwareReport.html`) -> `mod_hw_report.mdpk`
 -   [ ] **LogViewer** (`LogViewer.html`)
 -   [ ] **MediaViewer** (`MediaViewer.html`)
--   [ ] **NetworkMonitor** (`NetworkMonitor.html`)
+-   [x] **NetworkMonitor** (`NetworkMonitor.html`) -> `mod_net.mdpk`
 -   [ ] **ServerStatus** (`ServerStatus.html`)
 -   [x] **Shortcuts** (`Shortcuts.html`) -> `mod_shortcuts.mdpk` (Created)
--   [ ] **TaskManager** (`TaskManager.html`)
+-   [x] **TaskManager** (`TaskManager.html`) -> `mod_tasks.mdpk`
 -   [x] **VLCControl** (`VLCControl.html`) -> `mod_vlc.mdpk` (Created)
 
 ## Notes

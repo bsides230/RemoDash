@@ -991,6 +991,7 @@
            ========================================================================= */
         const CORE_MODULES = [
             { id: "mod_server_status", file: "ServerStatus.html", name: "System Status", icon: "analytics" },
+            { id: "mod_wizard", file: "Wizard.html", name: "Wizard", icon: "extension" },
             { id: "mod_shortcuts", file: "Shortcuts.html", name: "Shortcuts", icon: "rocket_launch" },
             { id: "mod_file_explorer", file: "FileExplorer.html", name: "File Explorer", icon: "folder" },
             { id: "mod_terminal", file: "Terminal.html", name: "Terminal", icon: "terminal" },
@@ -1007,7 +1008,7 @@
         let MODULE_REGISTRY = [...CORE_MODULES];
 
         let appSettings = {
-            activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
+            activeModules: ['mod_server_status', 'mod_wizard', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
             dockPinned: true,
             dockPos: null,
             theme: 'dark', // 'light' or 'dark' (base mode)
