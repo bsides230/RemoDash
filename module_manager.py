@@ -89,41 +89,60 @@ class ModuleManager:
             if not mod_id or not enabled:
                 continue
 
-            mod_path = MODULES_DIR / mod_id
-            if not mod_path.exists():
-                print(f"[ModuleManager] Module {mod_id} not found at {mod_path}")
-                continue
+            self.load_single_module(app, mod_entry)
 
-            print(f"[ModuleManager] Loading {mod_id}...")
+    def load_single_module(self, app: FastAPI, mod_entry: Dict[str, Any]):
+        """Loads a single module given its registry entry."""
+        mod_id = mod_entry.get("id")
+        if not mod_id:
+            return
 
-            # 1. Mount Static Files (web/)
-            web_path = mod_path / "web"
-            if web_path.exists() and web_path.is_dir():
+        mod_path = MODULES_DIR / mod_id
+        if not mod_path.exists():
+            print(f"[ModuleManager] Module {mod_id} not found at {mod_path}")
+            return
+
+        print(f"[ModuleManager] Loading {mod_id}...")
+
+        # 1. Mount Static Files (web/)
+        web_path = mod_path / "web"
+        if web_path.exists() and web_path.is_dir():
+            # Check if already mounted to avoid errors on reload
+            mounted = False
+            for route in app.router.routes:
+                 if hasattr(route, "path") and route.path == f"/modules/{mod_id}":
+                     mounted = True
+                     break
+
+            if not mounted:
                 app.mount(f"/modules/{mod_id}", StaticFiles(directory=str(web_path), html=True), name=f"module_{mod_id}")
                 print(f"  - Mounted static files at /modules/{mod_id}")
 
-            # 2. Load API (api.py)
-            api_path = mod_path / "api.py"
-            if api_path.exists():
-                try:
-                    spec = importlib.util.spec_from_file_location(f"modules.{mod_id}.api", api_path)
-                    if spec and spec.loader:
-                        module = importlib.util.module_from_spec(spec)
-                        sys.modules[f"modules.{mod_id}.api"] = module
-                        spec.loader.exec_module(module)
+        # 2. Load API (api.py)
+        api_path = mod_path / "api.py"
+        if api_path.exists():
+            try:
+                spec = importlib.util.spec_from_file_location(f"modules.{mod_id}.api", api_path)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    sys.modules[f"modules.{mod_id}.api"] = module
+                    spec.loader.exec_module(module)
 
-                        # Look for 'router' attribute
-                        if hasattr(module, "router") and isinstance(module.router, APIRouter):
-                            app.include_router(module.router, prefix=f"/api/modules/{mod_id}", tags=[f"Module: {mod_id}"])
-                            print(f"  - Registered API router at /api/modules/{mod_id}")
-                        else:
-                            print(f"  - No 'router' (APIRouter) found in api.py for {mod_id}")
-                except Exception as e:
-                    print(f"  - Failed to load API for {mod_id}: {e}")
+                    # Look for 'router' attribute
+                    if hasattr(module, "router") and isinstance(module.router, APIRouter):
+                        # Note: app.include_router doesn't easily support un-mounting or checking for duplicates by prefix.
+                        # It simply appends routes. Ideally we would check if these routes exist, but for now we append.
+                        app.include_router(module.router, prefix=f"/api/modules/{mod_id}", tags=[f"Module: {mod_id}"])
+                        print(f"  - Registered API router at /api/modules/{mod_id}")
+                    else:
+                        print(f"  - No 'router' (APIRouter) found in api.py for {mod_id}")
+            except Exception as e:
+                print(f"  - Failed to load API for {mod_id}: {e}")
 
-            self.modules[mod_id] = mod_entry
+        self.modules[mod_id] = mod_entry
 
     def get_installed_modules(self) -> List[Dict[str, Any]]:
+        self.load_registry()
         return self.registry
 
     def register_module(self, mod_id: str, name: str, icon: str, version: str = "1.0"):

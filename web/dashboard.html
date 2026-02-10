@@ -1058,20 +1058,20 @@
                 colors: {
                     '--bg-core': '#1a0505',
                     '--bg-panel': '#2b0a0a',
-                    '--border-color': '#4a1a1a',
-                    '--text-body': '#d0a0a0'
+                    '--border-color': '#ffcc00',
+                    '--text-body': '#ffdddd'
                 },
-                brand: '#ff5533'
+                brand: '#ff6600'
             },
             'nebula': {
                 name: 'Nebula',
                 colors: {
                     '--bg-core': '#0b001a',
                     '--bg-panel': '#15002b',
-                    '--border-color': '#2a0055',
-                    '--text-body': '#c0a0e0'
+                    '--border-color': '#00ccff',
+                    '--text-body': '#e0c0ff'
                 },
-                brand: '#aa00ff'
+                brand: '#ff00aa'
             },
             'retro': {
                 name: 'Retro',
@@ -1163,7 +1163,7 @@
                 btn.style.textAlign = 'center';
                 btn.style.border = (appSettings.activeThemePreset === id) ? '1px solid var(--brand-color)' : '1px solid var(--border-color)';
                 btn.innerText = preset.name;
-                btn.onclick = () => applyThemePreset(id);
+                btn.onclick = (e) => { e.stopPropagation(); applyThemePreset(id); };
                 container.appendChild(btn);
             }
         }

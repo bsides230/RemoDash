@@ -6,7 +6,7 @@ import tempfile
 import sys
 import subprocess
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from pydantic import BaseModel
 
 from module_manager import ModuleManager
@@ -19,7 +19,7 @@ class WizardUninstallRequest(BaseModel):
     module_id: str
 
 @router.post("/install", dependencies=[Depends(verify_token)])
-async def wizard_install(file: UploadFile = File(...)):
+async def wizard_install(request: Request, file: UploadFile = File(...)):
     try:
         # Save temp file
         fd, temp_path = tempfile.mkstemp(suffix=".mdpk")
@@ -64,6 +64,17 @@ async def wizard_install(file: UploadFile = File(...)):
                 icon=meta.get("icon", "extension"),
                 version=meta.get("version", "1.0")
             )
+
+            # Load dynamically
+            mod_entry = {
+                "id": mod_id,
+                "name": meta.get("name", mod_id),
+                "icon": meta.get("icon", "extension"),
+                "version": meta.get("version", "1.0"),
+                "enabled": True,
+                "path": str(target_dir)
+            }
+            module_manager.load_single_module(request.app, mod_entry)
 
         os.unlink(temp_path)
         return {"success": True, "module_id": mod_id}

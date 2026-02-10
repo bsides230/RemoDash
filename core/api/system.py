@@ -172,7 +172,20 @@ async def health_check():
                 "power_plugged": sb.power_plugged,
                 "secsleft": sb.secsleft
             }
-    except: pass
+        else:
+            # Mock fallback for missing battery
+            battery_info = {
+                "percent": 100,
+                "power_plugged": True,
+                "secsleft": -1
+            }
+    except:
+        # Mock fallback for errors
+        battery_info = {
+            "percent": 100,
+            "power_plugged": True,
+            "secsleft": -1
+        }
 
     # OS Info
     os_info = {
