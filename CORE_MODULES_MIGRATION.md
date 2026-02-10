@@ -1,4 +1,4 @@
-# Core Modules Migration List
+s# Core Modules Migration List
 
 This file tracks the migration of "core" modules (HTML files in `web/modules`) into standalone `.mdpk` packages.
 
@@ -16,21 +16,18 @@ This file tracks the migration of "core" modules (HTML files in `web/modules`) i
 ## Core Modules List
 
 -   [ ] **CronManager** (`CronManager.html`)
--   [ ] **FileEditor** (`FileEditor.html`)
--   [ ] **FileExplorer** (`FileExplorer.html`)
 -   [ ] **GitManager** (`GitManager.html`)
 -   [ ] **HardwareReport** (`HardwareReport.html`)
--   [ ] **ImageViewer** (`ImageViewer.html`)
 -   [ ] **LogViewer** (`LogViewer.html`)
 -   [ ] **MediaViewer** (`MediaViewer.html`)
 -   [ ] **NetworkMonitor** (`NetworkMonitor.html`)
 -   [ ] **ServerStatus** (`ServerStatus.html`)
 -   [x] **Shortcuts** (`Shortcuts.html`) -> `mod_shortcuts.mdpk` (Created)
 -   [ ] **TaskManager** (`TaskManager.html`)
--   [ ] **Terminal** (`Terminal.html`)
 -   [x] **VLCControl** (`VLCControl.html`) -> `mod_vlc.mdpk` (Created)
 
 ## Notes
 
 -   The goal is to decouple these modules from `server.py` to make the core server lighter and more maintainable.
 -   Once migrated, the original HTML files and backend logic in `server.py` can be removed.
+-   Several modules are missing from this list but they are to remain core modules and wont need to be installed.
