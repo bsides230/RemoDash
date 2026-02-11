@@ -90,6 +90,20 @@
                 document.body.setAttribute('data-theme', e.data.theme);
                 updateAllTerminalsTheme();
             }
+            if (e.data.type === 'THEME_CONFIG') {
+                const { theme, matchTheme, colors } = e.data;
+                currentTheme = theme;
+                document.body.setAttribute('data-theme', theme);
+
+                if (matchTheme && colors) {
+                    for (const [key, val] of Object.entries(colors)) {
+                        document.documentElement.style.setProperty(key, val);
+                    }
+                } else {
+                     ['--bg-core', '--bg-panel', '--text-head', '--text-body', '--text-dim', '--border-color'].forEach(k => document.documentElement.style.removeProperty(k));
+                }
+                updateAllTerminalsTheme();
+            }
             if (e.data.type === 'ADD_TAB') {
                 // External request to add tab (e.g. from Shortcut)
                 requestNewSession(e.data.cwd, e.data.command);
@@ -328,21 +342,13 @@
         }
 
         function getTermTheme() {
-            if(currentTheme === 'light') {
-                return {
-                    background: '#eef0f4',
-                    foreground: '#333333',
-                    cursor: '#333333',
-                    selection: 'rgba(0,0,0,0.1)'
-                };
-            } else {
-                return {
-                    background: '#050505',
-                    foreground: '#cccccc',
-                    cursor: '#ffffff',
-                    selection: 'rgba(255,255,255,0.1)'
-                };
-            }
+            const style = getComputedStyle(document.documentElement);
+            return {
+                background: style.getPropertyValue('--bg-core').trim(),
+                foreground: style.getPropertyValue('--text-body').trim() || '#cccccc',
+                cursor: style.getPropertyValue('--text-head').trim() || '#ffffff',
+                selection: (currentTheme === 'light') ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'
+            };
         }
 
         function updateAllTerminalsTheme() {

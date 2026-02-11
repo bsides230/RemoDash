@@ -1,0 +1,12 @@
+{
+  "modules": [
+    {
+      "id": "mod_git",
+      "name": "Git Manager",
+      "icon": "source_control",
+      "version": "1.0",
+      "enabled": true,
+      "path": "modules/mod_git"
+    }
+  ]
+}

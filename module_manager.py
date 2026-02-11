@@ -4,6 +4,7 @@ import shutil
 import zipfile
 import importlib.util
 import sys
+import traceback
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -141,6 +142,10 @@ class ModuleManager:
         api_path = mod_path / "api.py"
         if api_path.exists():
             try:
+                # Add root to sys.path if not present
+                if os.getcwd() not in sys.path:
+                    sys.path.append(os.getcwd())
+
                 spec = importlib.util.spec_from_file_location(f"modules.{mod_id}.api", api_path)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
@@ -157,6 +162,7 @@ class ModuleManager:
                         print(f"  - No 'router' (APIRouter) found in api.py for {mod_id}")
             except Exception as e:
                 print(f"  - Failed to load API for {mod_id}: {e}")
+                traceback.print_exc()
 
         self.modules[mod_id] = mod_entry
 

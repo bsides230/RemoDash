@@ -138,6 +138,17 @@
                 fetchModules();
             }
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+            if (e.data.type === 'THEME_CONFIG') {
+                const { theme, matchTheme, colors } = e.data;
+                document.body.setAttribute('data-theme', theme);
+                if (matchTheme && colors) {
+                    for (const [key, val] of Object.entries(colors)) {
+                        document.documentElement.style.setProperty(key, val);
+                    }
+                } else {
+                     ['--bg-core', '--bg-panel', '--text-head', '--text-body', '--brand-color', '--border-color'].forEach(k => document.documentElement.style.removeProperty(k));
+                }
+            }
         });
 
         async function fetchModules() {

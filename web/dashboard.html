@@ -955,6 +955,13 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+            <div class="settings-row">
+                <span>Match Theme Background</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-match-theme" onchange="toggleMatchTheme(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
 
             <div class="settings-header" style="margin-top:10px;">Theme Presets</div>
             <div id="theme-presets-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;"></div>
@@ -997,6 +1004,7 @@
             dockPos: null,
             theme: 'dark', // 'light' or 'dark' (base mode)
             activeThemePreset: 'default', // ID of active preset
+            matchTheme: false,
             fontSize: 12,
             brandColor: '#10B981',
             themeWindows: false,
@@ -1124,6 +1132,7 @@
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
             document.getElementById('setting-theme-windows').checked = appSettings.themeWindows || false;
+            document.getElementById('setting-match-theme').checked = appSettings.matchTheme || false;
 
             // Initialize Font Size Slider
             document.getElementById('setting-font-size').value = appSettings.fontSize;
@@ -1135,6 +1144,9 @@
             if(appSettings.activeThemePreset) applyThemePreset(appSettings.activeThemePreset, false);
             if(appSettings.brandColor) updateBrandColor(appSettings.brandColor);
             toggleWindowTheming(appSettings.themeWindows || false, false);
+
+            // Broadcast initial theme config after short delay to ensure styles applied
+            setTimeout(broadcastThemeConfig, 100);
 
             // Handle clicking outside
             document.addEventListener('click', (e) => {
@@ -1189,13 +1201,14 @@
 
             // Apply Brand if included
             if(preset.brand) {
-                updateBrandColor(preset.brand);
+                updateBrandColor(preset.brand); // This also saves
+            } else {
+                if(save) saveSettings();
             }
 
             // Update UI
             initThemePresets();
-
-            if(save) saveSettings();
+            broadcastThemeConfig();
         }
 
         function initCustomSlots() {
@@ -1641,7 +1654,7 @@
             const iframe = win.querySelector('iframe');
             // Inject Font Size on Load
             iframe.onload = () => {
-                iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
+                broadcastThemeConfig(); // Send full config instead of just THEME_CHANGE
                 iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
                 iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
                 if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
@@ -1879,10 +1892,32 @@
             document.body.setAttribute('data-theme', theme);
             appSettings.theme = theme;
             saveSettings();
+            broadcastThemeConfig();
+        }
 
-            // Broadcast
+        function toggleMatchTheme(checked) {
+            appSettings.matchTheme = checked;
+            saveSettings();
+            broadcastThemeConfig();
+        }
+
+        function broadcastThemeConfig() {
+            const config = {
+                type: 'THEME_CONFIG',
+                theme: appSettings.theme,
+                matchTheme: appSettings.matchTheme || false,
+                colors: {}
+            };
+
+            if (config.matchTheme) {
+                 const style = getComputedStyle(document.documentElement);
+                 ['--bg-core', '--bg-panel', '--text-head', '--text-body', '--text-dim', '--border-color'].forEach(v => {
+                     config.colors[v] = style.getPropertyValue(v).trim();
+                 });
+            }
+
             document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
+                f.contentWindow.postMessage(config, '*');
             });
         }
 
@@ -2020,6 +2055,7 @@
             document.querySelectorAll('iframe').forEach(f => {
                 f.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: color }, '*');
             });
+            broadcastThemeConfig(); // Also update theme config just in case
         }
 
         function startClock() {

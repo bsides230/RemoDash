@@ -1,0 +1,7 @@
+{
+  "id": "mod_git",
+  "name": "Git Manager",
+  "icon": "source",
+  "version": "1.0",
+  "description": "Manage Git repositories"
+}

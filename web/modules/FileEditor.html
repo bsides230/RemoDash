@@ -232,6 +232,17 @@
             if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
             if (e.data.type === 'TOKEN_UPDATE') authToken = e.data.token;
             if (e.data.type === 'THEME_CHANGE') setTheme(e.data.theme);
+            if (e.data.type === 'THEME_CONFIG') {
+                const { theme, matchTheme, colors } = e.data;
+                setTheme(theme);
+                if (matchTheme && colors) {
+                    for (const [key, val] of Object.entries(colors)) {
+                        document.documentElement.style.setProperty(key, val);
+                    }
+                } else {
+                     ['--bg-core', '--bg-panel', '--text-head', '--text-dim', '--border-color'].forEach(k => document.documentElement.style.removeProperty(k));
+                }
+            }
             if (e.data.type === 'FONT_CHANGE') setFont(e.data.fontSize);
             if (e.data.type === 'OPEN_FILE') openFile(e.data.path, e.data.name);
             if (e.data.type === 'COLOR_CHANGE') {
