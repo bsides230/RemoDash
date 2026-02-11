@@ -922,9 +922,15 @@
             </div>
 
             <div class="settings-row">
+                <span>UI Scale: <b id="ui-scale-display">1.0</b>x</span>
+                <input type="range" id="setting-ui-scale" min="0.5" max="1.5" step="0.1" value="1.0" oninput="updateUIScale(this.value)">
+            </div>
+
+            <div class="settings-row">
                 <span>Font Family</span>
                 <select id="setting-font-family" onchange="updateFontFamily(this.value)" style="background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; font-family:var(--font-family-base); max-width: 120px;">
                     <option value="'Inter', system-ui, sans-serif">Inter (Default)</option>
+                    <option value="Consolas, monospace">Consolas</option>
                 </select>
             </div>
 
@@ -965,7 +971,7 @@
             <div class="settings-header" style="margin-top:10px;">Custom Color</div>
             <div style="display:flex; gap:5px; align-items:center;">
                 <input type="color" id="inp-color-picker" style="width:40px; height:32px; border:none; background:none; cursor:pointer; padding:0;" onchange="updateBrandColor(this.value)">
-                <input type="text" id="inp-hex-color" placeholder="#RRGGBB" style="flex:1; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px;">
+                <input type="text" id="inp-hex-color" placeholder="#RRGGBB" style="width:80px; padding:6px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-head); font-family:'JetBrains Mono'; border-radius:4px;">
                 <button class="cta-btn" onclick="applyCustomHex()">Apply</button>
             </div>
 
@@ -998,6 +1004,7 @@
             theme: 'dark', // 'light' or 'dark' (base mode)
             activeThemePreset: 'default', // ID of active preset
             fontSize: 12,
+            uiScale: 1.0,
             brandColor: '#10B981',
             themeWindows: false,
             customColors: ['#333333', '#333333', '#333333', '#333333']
@@ -1010,7 +1017,9 @@
                     '--bg-core': '#050505',
                     '--bg-panel': '#0a0a0a',
                     '--border-color': '#333333',
+                    '--text-head': '#ffffff',
                     '--text-body': '#b0b0b0',
+                    '--text-dim': '#666666',
                     '--bg-pattern': 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(125, 125, 125, 0.03) 10px, rgba(125, 125, 125, 0.03) 11px)'
                 }
             },
@@ -1020,7 +1029,9 @@
                     '--bg-core': '#000b1e',
                     '--bg-panel': '#02122b',
                     '--border-color': '#00f0ff',
-                    '--text-body': '#a0c0ff',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#cccccc',
+                    '--text-dim': '#888888',
                     '--bg-pattern': 'linear-gradient(0deg, transparent 24%, rgba(0, 240, 255, .03) 25%, rgba(0, 240, 255, .03) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .03) 75%, rgba(0, 240, 255, .03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 240, 255, .03) 25%, rgba(0, 240, 255, .03) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .03) 75%, rgba(0, 240, 255, .03) 76%, transparent 77%, transparent)'
                 },
                 brand: '#fce300'
@@ -1031,7 +1042,9 @@
                     '--bg-core': '#001e26',
                     '--bg-panel': '#002b36',
                     '--border-color': '#073642',
-                    '--text-body': '#839496',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#bbbbbb',
+                    '--text-dim': '#666666',
                     '--bg-pattern': 'radial-gradient(circle at 50% 120%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 30%, transparent 30%, transparent 50%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.03) 70%, transparent 70%)'
                 },
                 brand: '#2aa198'
@@ -1042,7 +1055,9 @@
                     '--bg-core': '#000000',
                     '--bg-panel': '#050505',
                     '--border-color': '#222222',
+                    '--text-head': '#ffffff',
                     '--text-body': '#888888',
+                    '--text-dim': '#444444',
                     '--bg-pattern': 'radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)'
                 },
                 brand: '#7c5cff'
@@ -1053,7 +1068,9 @@
                     '--bg-core': '#051005',
                     '--bg-panel': '#0a1a0a',
                     '--border-color': '#1a331a',
-                    '--text-body': '#a0b0a0',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#bbbbbb',
+                    '--text-dim': '#666666',
                     '--bg-pattern': 'repeating-radial-gradient(circle at 0 0, transparent 0, transparent 20px, rgba(160, 255, 160, 0.03) 21px, transparent 22px)'
                 },
                 brand: '#4caf50'
@@ -1064,7 +1081,9 @@
                     '--bg-core': '#1a0505',
                     '--bg-panel': '#2b0a0a',
                     '--border-color': '#ffcc00',
-                    '--text-body': '#ffdddd',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#cccccc',
+                    '--text-dim': '#888888',
                     '--bg-pattern': 'repeating-conic-gradient(from 0deg at 50% 100%, transparent 0deg, transparent 10deg, rgba(255, 200, 100, 0.03) 10deg, rgba(255, 200, 100, 0.03) 15deg)'
                 },
                 brand: '#ff6600'
@@ -1075,7 +1094,9 @@
                     '--bg-core': '#0b001a',
                     '--bg-panel': '#15002b',
                     '--border-color': '#00ccff',
-                    '--text-body': '#e0c0ff',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#cccccc',
+                    '--text-dim': '#888888',
                     '--bg-pattern': 'radial-gradient(circle at 50% 50%, rgba(255, 0, 170, 0.05), transparent 60%), radial-gradient(circle at 80% 20%, rgba(0, 204, 255, 0.05), transparent 50%)'
                 },
                 brand: '#ff00aa'
@@ -1086,10 +1107,90 @@
                     '--bg-core': '#202020',
                     '--bg-panel': '#2d2d2d',
                     '--border-color': '#404040',
+                    '--text-head': '#ffffff',
                     '--text-body': '#e0e0e0',
+                    '--text-dim': '#888888',
                     '--bg-pattern': 'repeating-linear-gradient(to bottom, transparent, transparent 2px, rgba(0, 0, 0, 0.2) 3px, rgba(0, 0, 0, 0.2) 4px)'
                 },
                 brand: '#ffcc00'
+            },
+            'dispensary': {
+                name: 'Dispensary',
+                colors: {
+                    '--bg-core': '#051005',
+                    '--bg-panel': '#0a1a0a',
+                    '--border-color': '#1a331a',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#bbbbbb',
+                    '--text-dim': '#666666',
+                    '--bg-pattern': 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 255, 0, 0.03) 10px, rgba(0, 255, 0, 0.03) 11px)'
+                },
+                brand: '#ffcc00'
+            },
+            'pizza': {
+                name: 'Pizza Place',
+                colors: {
+                    '--bg-core': '#1a0505',
+                    '--bg-panel': '#2b0a0a',
+                    '--border-color': '#800000',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#cccccc',
+                    '--text-dim': '#888888',
+                    '--bg-pattern': 'radial-gradient(circle at 50% 50%, rgba(128, 0, 0, 0.1), transparent 60%)'
+                },
+                brand: '#ff4444'
+            },
+            'blackout': {
+                name: 'Blackout',
+                colors: {
+                    '--bg-core': '#000000',
+                    '--bg-panel': '#000000',
+                    '--border-color': '#333333',
+                    '--text-head': '#888888',
+                    '--text-body': '#666666',
+                    '--text-dim': '#444444',
+                    '--bg-pattern': 'none'
+                },
+                brand: '#666666'
+            },
+            'slate': {
+                name: 'Slate',
+                colors: {
+                    '--bg-core': '#1a202c',
+                    '--bg-panel': '#2d3748',
+                    '--border-color': '#4a5568',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#cbd5e0',
+                    '--text-dim': '#718096',
+                    '--bg-pattern': 'linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)'
+                },
+                brand: '#a0aec0'
+            },
+            'coffee': {
+                name: 'Coffee',
+                colors: {
+                    '--bg-core': '#1a120b',
+                    '--bg-panel': '#3c2a21',
+                    '--border-color': '#5c4033',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#d5c5b5',
+                    '--text-dim': '#8b7355',
+                    '--bg-pattern': 'repeating-radial-gradient(circle at 0 0, transparent 0, transparent 10px, rgba(139, 69, 19, 0.1) 11px, transparent 12px)'
+                },
+                brand: '#d2b48c'
+            },
+            'lavender': {
+                name: 'Lavender',
+                colors: {
+                    '--bg-core': '#1a0b2e',
+                    '--bg-panel': '#2d1b4e',
+                    '--border-color': '#4a2c7a',
+                    '--text-head': '#ffffff',
+                    '--text-body': '#dcd6f7',
+                    '--text-dim': '#a6b1e1',
+                    '--bg-pattern': 'radial-gradient(circle at 80% 20%, rgba(157, 78, 221, 0.1), transparent 50%)'
+                },
+                brand: '#c77dff'
             }
         };
 
@@ -1129,6 +1230,12 @@
             document.getElementById('setting-font-size').value = appSettings.fontSize;
             updateFontSize(appSettings.fontSize, false);
 
+            // Initialize UI Scale
+            if(appSettings.uiScale) {
+                document.getElementById('setting-ui-scale').value = appSettings.uiScale;
+                updateUIScale(appSettings.uiScale, false);
+            }
+
             if(appSettings.fontFamily) updateFontFamily(appSettings.fontFamily, false);
 
             // Apply Theme & Brand Color
@@ -1138,6 +1245,8 @@
 
             // Handle clicking outside
             document.addEventListener('click', (e) => {
+                if (e.target.isConnected === false) return;
+
                 // Settings Popup
                 const setPop = document.getElementById('settings-popup');
                 if(setPop.classList.contains('show') && !e.target.closest('#settings-popup') && !e.target.closest('#btn_settings')) {
@@ -1206,7 +1315,7 @@
                  div.className = 'custom-slot';
                  div.style.backgroundColor = c;
                  div.title = "Click to apply, Right-click to save current";
-                 div.onclick = () => updateBrandColor(c);
+                 div.onclick = (e) => { e.stopPropagation(); updateBrandColor(c); };
                  div.oncontextmenu = (e) => {
                      e.preventDefault();
                      appSettings.customColors[i] = appSettings.brandColor;
@@ -1252,6 +1361,10 @@
                 const btn = document.createElement('button');
                 btn.className = 'dock-btn';
                 if(isEditMode) btn.classList.add('wiggle');
+
+                // Color Logic
+                const color = getColorForModule(mod.id);
+                btn.style.color = color;
 
                 btn.id = 'btn_' + mod.id;
                 btn.innerHTML = `<span class="material-symbols-outlined">${mod.icon}</span><div class="active-dot"></div>`;
@@ -1899,6 +2012,25 @@
             });
         }
 
+        function updateUIScale(scale, save = true) {
+            document.body.style.zoom = scale;
+            document.getElementById('ui-scale-display').innerText = scale;
+
+            appSettings.uiScale = parseFloat(scale);
+            if(save) saveSettings();
+        }
+
+        function getColorForModule(modId) {
+            // Simple hash
+            let hash = 0;
+            for (let i = 0; i < modId.length; i++) {
+                hash = modId.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            // Use HSL for bright colors
+            const h = Math.abs(hash) % 360;
+            return `hsl(${h}, 70%, 60%)`;
+        }
+
         function toggleDockPin(pinned) {
             appSettings.dockPinned = pinned;
             const dock = document.getElementById('floating-dock');
@@ -1984,8 +2116,9 @@
             BRAND_COLORS.forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'color-opt';
+                div.dataset.color = c;
                 div.style.backgroundColor = c;
-                div.onclick = () => updateBrandColor(c);
+                div.onclick = (e) => { e.stopPropagation(); updateBrandColor(c); };
                 if(c.toUpperCase() === (appSettings.brandColor || '').toUpperCase()) div.classList.add('active');
                 grid.appendChild(div);
             });
@@ -2013,7 +2146,13 @@
             if(colInp) colInp.value = color;
 
             saveSettings();
-            initColorPicker(); // Update active state
+
+            // Update Active State (DOM only, don't rebuild)
+            document.querySelectorAll('.color-opt').forEach(el => {
+                if(el.dataset.color && el.dataset.color.toUpperCase() === color.toUpperCase()) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
             initCustomSlots(); // Update border colors potentially?
 
             // Broadcast
@@ -2692,7 +2831,10 @@
 
                 const select = document.getElementById('setting-font-family');
                 // Keep default
-                select.innerHTML = `<option value="'Inter', system-ui, sans-serif">Inter (Default)</option>`;
+                select.innerHTML = `
+                    <option value="'Inter', system-ui, sans-serif">Inter (Default)</option>
+                    <option value="Consolas, monospace">Consolas</option>
+                `;
 
                 fonts.forEach(filename => {
                     // Deduce name: MyFont-Regular.ttf -> MyFont-Regular

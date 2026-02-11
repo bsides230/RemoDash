@@ -77,6 +77,7 @@
         let activeTabId = null;
         let tabCounter = 0;
         let currentTheme = 'dark';
+        let currentFontSize = 13;
 
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
@@ -89,6 +90,10 @@
                 currentTheme = e.data.theme;
                 document.body.setAttribute('data-theme', e.data.theme);
                 updateAllTerminalsTheme();
+            }
+            if (e.data.type === 'FONT_CHANGE') {
+                currentFontSize = parseInt(e.data.fontSize) || 13;
+                updateAllTerminalsFont();
             }
             if (e.data.type === 'ADD_TAB') {
                 // External request to add tab (e.g. from Shortcut)
@@ -157,7 +162,7 @@
             // Init XTerm
             const term = new Terminal({
                 cursorBlink: true,
-                fontSize: 13,
+                fontSize: currentFontSize,
                 fontFamily: '"JetBrains Mono", monospace',
                 theme: getTermTheme()
             });
@@ -349,6 +354,14 @@
             const th = getTermTheme();
             tabs.forEach(t => {
                 t.term.options.theme = th;
+            });
+        }
+
+        function updateAllTerminalsFont() {
+            tabs.forEach(t => {
+                t.term.options.fontSize = currentFontSize;
+                // Force fit update
+                setTimeout(() => t.fitAddon.fit(), 10);
             });
         }
 
