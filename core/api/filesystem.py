@@ -48,12 +48,14 @@ def check_path_access(path: str) -> Path:
         if root_str:
             try:
                 allowed_roots.append(Path(root_str).expanduser().resolve())
-            except: pass
+            except Exception as e:
+                print(f"Error resolving filesystem root '{root_str}': {e}")
 
         for er in extra_roots:
             try:
                 allowed_roots.append(Path(er).expanduser().resolve())
-            except: pass
+            except Exception as e:
+                print(f"Error resolving extra root '{er}': {e}")
 
         if not allowed_roots:
             # If jailed but no roots configured, block everything

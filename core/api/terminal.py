@@ -50,7 +50,8 @@ class TerminalSession:
         if self.cwd:
             try:
                 check_path_access(self.cwd)
-            except:
+            except Exception as e:
+                print(f"Terminal CWD access denied, using fallback: {e}")
                 self.cwd = None # Fallback
 
         if self.os_type == "Windows":
@@ -151,7 +152,8 @@ class TerminalSession:
         for ws in self.subscribers:
             try:
                 await ws.send_text(msg)
-            except:
+            except Exception as e:
+                print(f"Error sending to WebSocket subscriber: {e}")
                 to_remove.append(ws)
         for ws in to_remove:
             self.subscribers.discard(ws)
@@ -182,12 +184,14 @@ class TerminalSession:
                 try:
                     self.process.stdin.write(data.encode())
                     self.process.stdin.flush()
-                except: pass
+                except Exception as e:
+                    print(f"Error writing to terminal stdin: {e}")
         else:
             if self.master_fd:
                 try:
                     os.write(self.master_fd, data.encode())
-                except: pass
+                except Exception as e:
+                    print(f"Error writing to terminal fd: {e}")
 
     def resize(self, cols, rows):
         self.cols = cols
@@ -196,7 +200,8 @@ class TerminalSession:
             try:
                 winsize = struct.pack("HHHH", rows, cols, 0, 0)
                 fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
-            except: pass
+            except Exception as e:
+                print(f"Error resizing terminal: {e}")
 
     def close(self):
         self.closed = True
@@ -204,7 +209,8 @@ class TerminalSession:
             self.process.terminate()
         if self.os_type != "Windows" and self.master_fd:
             try: os.close(self.master_fd)
-            except: pass
+            except Exception as e:
+                print(f"Error closing terminal fd: {e}")
         # Cancel reader?
         # if self.reader_task: self.reader_task.cancel()
 

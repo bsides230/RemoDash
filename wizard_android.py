@@ -85,7 +85,8 @@ def configure_general():
                 loaded = json.load(f)
                 if isinstance(loaded, dict):
                     data = loaded
-        except: pass
+        except Exception as e:
+            print(f"Error loading settings: {e}")
 
     if "settings" not in data: data["settings"] = {}
 
@@ -179,7 +180,8 @@ def configure_filesystem_mode():
                 loaded = json.load(f)
                 if isinstance(loaded, dict):
                     data = loaded
-        except: pass
+        except Exception as e:
+            print(f"Error loading settings: {e}")
 
     if "settings" not in data:
         data["settings"] = {}
@@ -224,8 +226,8 @@ def configure_port():
     if port_file.exists():
         try:
             current_port = port_file.read_text().strip()
-        except:
-            pass
+        except Exception as e:
+            print(f"Error reading port file: {e}")
 
     print(f"Current Port: {current_port}")
     choice = input(f"Change Port? (current: {current_port}) (y/N): ").strip().lower()

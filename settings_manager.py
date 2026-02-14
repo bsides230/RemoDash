@@ -53,7 +53,8 @@ class SettingsManager:
             if "git_root_path" not in self.settings:
                 try:
                     self.settings["git_root_path"] = str(Path.home() / "documents" / "github" / "repos")
-                except:
+                except Exception as e:
+                    print(f"Error resolving default git root path: {e}")
                     self.settings["git_root_path"] = ""
 
             self.detect_shell()
@@ -121,7 +122,8 @@ class SettingsManager:
         default_git = ""
         try:
             default_git = str(Path.home() / "documents" / "github" / "repos")
-        except: pass
+        except Exception as e:
+            print(f"Error resolving default git root path: {e}")
 
         return {
             "allowed_origins": [],
