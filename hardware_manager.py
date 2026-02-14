@@ -82,8 +82,8 @@ class HardwareManager:
                 for line in f:
                     if line.startswith("PRETTY_NAME="):
                         info["distro"] = line.split("=", 1)[1].strip().strip('"')
-        except Exception as e:
-            print(f"Error reading /etc/os-release: {e}")
+        except:
+            pass
         return info
 
     def _get_cpu_info(self):
@@ -92,8 +92,8 @@ class HardwareManager:
                 for line in f:
                     if "model name" in line:
                         return line.split(":", 1)[1].strip()
-        except Exception as e:
-            print(f"Error reading /proc/cpuinfo: {e}")
+        except:
+            pass
         return platform.processor()
 
     def _get_ram_info(self):
@@ -102,8 +102,8 @@ class HardwareManager:
                 for line in f:
                     if "MemTotal" in line:
                         return line.split(":", 1)[1].strip()
-        except Exception as e:
-            print(f"Error reading /proc/meminfo: {e}")
+        except:
+            pass
         return "Unknown"
 
     def _scan_usb(self):
@@ -257,8 +257,8 @@ class HardwareManager:
                          power["logind"]["HandlePowerKey"] = line.split("=")[1]
                      elif line.startswith("HandleLidSwitch="):
                          power["logind"]["HandleLidSwitch"] = line.split("=")[1]
-        except Exception as e:
-            print(f"Error reading logind.conf: {e}")
+        except:
+            pass
 
         return power
 
@@ -302,8 +302,7 @@ class HardwareManager:
         try:
             with open("/proc/asound/cards") as f:
                 cards = [line.strip() for line in f if line.strip()]
-        except Exception as e:
-            print(f"Error reading /proc/asound/cards: {e}")
+        except: pass
         return cards
 
     # --- Mapping Logic ---
@@ -627,8 +626,8 @@ class HardwareManager:
                         # We might need sudo, but assuming we run as root or user handles it
                         try:
                             target.parent.mkdir(parents=True, exist_ok=True)
-                        except Exception as e:
-                            print(f"Warning: Could not create {target.parent}: {e}")
+                        except:
+                            print(f"Warning: Could not create {target.parent}")
                             return
 
                     with open(target, "w") as f:

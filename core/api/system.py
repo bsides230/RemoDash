@@ -139,8 +139,7 @@ async def health_check():
         if freq:
             cpu_info["freq_current"] = freq.current
             cpu_info["freq_max"] = freq.max
-    except Exception as e:
-        print(f"Error reading CPU frequency: {e}")
+    except: pass
 
     # GPU Info
     gpu_stats = {}
@@ -180,8 +179,7 @@ async def health_check():
                 "power_plugged": True,
                 "secsleft": -1
             }
-    except Exception as e:
-        print(f"Error reading battery info: {e}")
+    except:
         # Mock fallback for errors
         battery_info = {
             "percent": 100,
@@ -236,8 +234,7 @@ async def get_sysinfo():
     hostname = socket.gethostname()
     try:
         ip_address = socket.gethostbyname(hostname)
-    except Exception as e:
-        print(f"Error resolving IP address: {e}")
+    except:
         ip_address = "Unknown"
 
     # CPU Model
@@ -245,8 +242,7 @@ async def get_sysinfo():
     if platform.system() == "Windows":
         try:
             cpu_model = subprocess.check_output(["wmic", "cpu", "get", "name"]).decode().split("\n")[1].strip()
-        except Exception as e:
-            print(f"Error getting CPU model (wmic): {e}")
+        except: pass
     elif platform.system() == "Linux":
         try:
             with open("/proc/cpuinfo", "r") as f:
@@ -254,8 +250,7 @@ async def get_sysinfo():
                     if "model name" in line:
                         cpu_model = line.split(":")[1].strip()
                         break
-        except Exception as e:
-            print(f"Error reading /proc/cpuinfo: {e}")
+        except: pass
 
     if cpu_model == "Unknown":
         cpu_model = platform.processor()
@@ -280,8 +275,7 @@ async def get_sysinfo():
                 })
             except OSError:
                 continue
-    except Exception as e:
-        print(f"Error reading disk partitions: {e}")
+    except: pass
 
     # Android Detection & Paths
     is_android = "ANDROID_ROOT" in os.environ or "com.termux" in os.environ.get("PREFIX", "")

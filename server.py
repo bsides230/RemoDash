@@ -19,18 +19,6 @@ from core.api.auth import verify_token, init_auth
 settings_manager = SettingsManager()
 module_manager = ModuleManager()
 
-def read_port(default=8000):
-    """Reads the port number from port.txt (created/updated by the wizard)."""
-    try:
-        if os.path.exists("port.txt"):
-            with open("port.txt", "r") as f:
-                val = f.read().strip()
-                if val.isdigit():
-                    return int(val)
-    except Exception as e:
-        print(f"Error reading port.txt: {e}")
-    return default
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize Auth (load token)
@@ -45,7 +33,14 @@ module_manager.load_modules(app)
 
 # Determine allowed origins
 allowed_origins = settings_manager.settings.get("allowed_origins", [])
-current_port = read_port()
+current_port = 8000
+try:
+    if os.path.exists("port.txt"):
+        with open("port.txt", "r") as f:
+            val = f.read().strip()
+            if val.isdigit():
+                current_port = int(val)
+except: pass
 
 defaults = [
     f"http://localhost:{current_port}",
@@ -86,7 +81,13 @@ async def get_config():
         settings_manager.load_or_detect_first_boot()
 
     # Read Port
-    port = read_port()
+    port = 8000
+    if os.path.exists("port.txt"):
+        try:
+            with open("port.txt", "r") as f:
+                val = f.read().strip()
+                if val.isdigit(): port = int(val)
+        except: pass
 
     return {
         "settings": settings_manager.settings,
@@ -137,7 +138,15 @@ async def read_root():
 app.mount("/", StaticFiles(directory="web", html=True), name="static")
 
 if __name__ == "__main__":
-    port = read_port()
+    port = 8000
+    try:
+        if os.path.exists("port.txt"):
+            with open("port.txt", "r") as f:
+                val = f.read().strip()
+                if val.isdigit():
+                    port = int(val)
+    except Exception as e:
+        print(f"Failed to load port.txt: {e}")
 
     print(f"Starting RemoDash server on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
