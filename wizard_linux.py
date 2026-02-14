@@ -28,8 +28,7 @@ def save_wizard_state(key, value):
                 loaded = json.load(f)
                 if isinstance(loaded, dict):
                     data = loaded
-        except Exception as e:
-            print(f"Error loading settings: {e}")
+        except: pass
 
     if "wizard_state" not in data:
         data["wizard_state"] = {}
@@ -47,8 +46,7 @@ def load_wizard_state(key, default=None):
             with open(settings_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("wizard_state", {}).get(key, default)
-        except Exception as e:
-            print(f"Error loading wizard state: {e}")
+        except: pass
     return default
 
 def install_dependencies():
@@ -148,8 +146,7 @@ def configure_general():
                 loaded = json.load(f)
                 if isinstance(loaded, dict):
                     data = loaded
-        except Exception as e:
-            print(f"Error loading settings: {e}")
+        except: pass
 
     if "settings" not in data: data["settings"] = {}
 
@@ -247,8 +244,7 @@ def configure_filesystem_mode():
                 loaded = json.load(f)
                 if isinstance(loaded, dict):
                     data = loaded
-        except Exception as e:
-            print(f"Error loading settings: {e}")
+        except: pass
 
     if "settings" not in data:
         data["settings"] = {}
@@ -379,8 +375,8 @@ def configure_port():
     if port_file.exists():
         try:
             current_port = port_file.read_text().strip()
-        except Exception as e:
-            print(f"Error reading port file: {e}")
+        except:
+            pass
 
     print(f"Current Port: {current_port}")
     choice = input(f"Change Port? (current: {current_port}) (y/N): ").strip().lower()
@@ -439,8 +435,7 @@ def get_wifi_interfaces():
             line = line.strip()
             if line.startswith("Interface "):
                 interfaces.append(line.split()[1])
-    except Exception as e:
-        print(f"Error running iw dev: {e}")
+    except: pass
 
     if not interfaces:
         try:
@@ -451,8 +446,7 @@ def get_wifi_interfaces():
                     parts = line.split(": ")
                     if len(parts) >= 2:
                         interfaces.append(parts[1])
-        except Exception as e:
-            print(f"Error running ip link: {e}")
+        except: pass
 
     return list(set(interfaces))
 
@@ -541,8 +535,7 @@ def wifi_connect(iface, ssid, password):
                 match = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", ip_out)
                 if match:
                     print(f"IP Address: {match.group(1)}")
-            except Exception as e:
-                print(f"Error getting IP address: {e}")
+            except: pass
 
             return True
 
@@ -695,8 +688,7 @@ def bt_scan(timeout=10):
         # We can run it with timeout if supported, otherwise manual kill.
         try:
             subprocess.run(["bluetoothctl", "--timeout", str(timeout), "scan", "on"], check=False)
-        except Exception as e:
-            print(f"Bluetoothctl timeout scan failed, using fallback: {e}")
+        except:
             # Fallback
             proc = subprocess.Popen(["bluetoothctl", "scan", "on"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             time.sleep(timeout)
@@ -714,8 +706,7 @@ def bt_list_devices():
             parts = line.split(" ", 2)
             if len(parts) >= 3 and parts[0] == "Device":
                 devices.append({"mac": parts[1], "name": parts[2]})
-    except Exception as e:
-        print(f"Error listing bluetooth devices: {e}")
+    except: pass
     return devices
 
 def bt_pair_connect(mac):
