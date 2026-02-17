@@ -11,7 +11,8 @@
             --bg-core: #050505;
             --bg-panel: #0a0a0a;
             --bg-card: #111;
-            --brand-purple: #7c5cff;
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
             --text-head: #ffffff;
             --text-body: #b0b0b0;
             --text-dim: #666666;
@@ -24,7 +25,6 @@
             --bg-core: #eef0f4;
             --bg-panel: #ffffff;
             --bg-card: #f8f9fa;
-            --brand-purple: #6a4ce0;
             --text-head: #111111;
             --text-body: #333333;
             --text-dim: #555555;
@@ -56,7 +56,7 @@
             transition: all 0.2s; display: flex; align-items: center; gap: 6px;
         }
         .btn:hover { border-color: var(--text-dim); background: var(--bg-card); }
-        .btn.primary { background: var(--brand-purple); border-color: var(--brand-purple); color: #fff; }
+        .btn.primary { background: var(--brand-color); border-color: var(--brand-color); color: #fff; }
         .btn.primary:hover { opacity: 0.9; }
         .btn.danger { color: var(--error-color); border-color: rgba(255,68,68,0.3); }
         .btn.danger:hover { background: var(--error-color); color: #fff; }
@@ -111,7 +111,7 @@
             width: 100%; padding: 8px; background: var(--bg-core); border: 1px solid var(--border-color);
             color: var(--text-head); border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
         }
-        .form-input:focus { border-color: var(--brand-purple); outline: none; }
+        .form-input:focus { border-color: var(--brand-color); outline: none; }
 
         .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer; user-select: none; }
         .checkbox-group input { cursor: pointer; }
@@ -226,6 +226,22 @@
         let authToken = localStorage.getItem('lyrn_admin_token');
         let shortcuts = [];
 
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
                 coreUrl = e.data.url;
@@ -236,6 +252,20 @@
                 loadShortcuts();
             }
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+            if (e.data.type === 'COLOR_CHANGE') document.documentElement.style.setProperty('--brand-color', e.data.color);
+            if (e.data.type === 'THEME_UPDATE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+                document.documentElement.style.setProperty('--brand-color', e.data.brandColor);
+                const hex = e.data.brandColor.replace('#', '');
+                const r = parseInt(hex.substring(0,2), 16);
+                const g = parseInt(hex.substring(2,4), 16);
+                const b = parseInt(hex.substring(4,6), 16);
+                document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+                document.documentElement.style.setProperty('--font-size-base', e.data.fontSize + 'px');
+
+                if (e.data.themeCssUrl) loadThemeCSS(e.data.themeCssUrl);
+                else clearThemeCSS();
+            }
             if (e.data.type === 'OPEN_ADD_MODAL') {
                 // Sent from File Explorer
                 openEditModal(null, e.data.payload);

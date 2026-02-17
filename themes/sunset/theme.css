@@ -1,0 +1,9 @@
+:root {
+    --bg-core: #1a0505;
+    --bg-panel: #2b0a0a;
+    --border-color: #ffcc00;
+    --text-head: #ffffff;
+    --text-body: #cccccc;
+    --text-dim: #888888;
+    --bg-pattern: repeating-conic-gradient(from 0deg at 50% 100%, transparent 0deg, transparent 10deg, rgba(255, 200, 100, 0.03) 10deg, rgba(255, 200, 100, 0.03) 15deg);
+}

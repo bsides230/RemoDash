@@ -131,6 +131,22 @@
         let CORE_URL = window.location.origin;
         let AUTH_TOKEN = null;
 
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') CORE_URL = e.data.url;
             if (e.data.type === 'TOKEN_UPDATE') {
@@ -138,6 +154,13 @@
                 fetchModules();
             }
             if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+            if (e.data.type === 'COLOR_CHANGE') document.documentElement.style.setProperty('--brand-color', e.data.color);
+            if (e.data.type === 'THEME_UPDATE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+                document.documentElement.style.setProperty('--brand-color', e.data.brandColor);
+                if (e.data.themeCssUrl) loadThemeCSS(e.data.themeCssUrl);
+                else clearThemeCSS();
+            }
         });
 
         async function fetchModules() {

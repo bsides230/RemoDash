@@ -1,0 +1,9 @@
+:root {
+    --bg-core: #000000;
+    --bg-panel: #000000;
+    --border-color: #333333;
+    --text-head: #888888;
+    --text-body: #666666;
+    --text-dim: #444444;
+    --bg-pattern: none;
+}

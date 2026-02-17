@@ -12,15 +12,13 @@
             --text-head: #ffffff;
             --text-body: #b0b0b0;
             --text-dim: #666666;
-            --brand-purple: #7c5cff;
-            --brand-purple-dim: rgba(124, 92, 255, 0.1);
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
             --border-color: #222222;
         }
 
         body[data-theme="light"] {
             --bg-core: #eef0f4;
-            --brand-purple: #6a4ce0;
-            --brand-purple-dim: rgba(106, 76, 224, 0.1);
             --text-head: #111111;
             --text-body: #333333;
             --text-dim: #555555;
@@ -30,7 +28,7 @@
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
-        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-purple); }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-color); }
 
         body {
             background-color: var(--bg-core);
@@ -50,7 +48,7 @@
             transition: all 0.2s;
         }
         .tab-btn:hover { color: var(--text-head); }
-        .tab-btn.active { color: var(--brand-purple); border-bottom-color: var(--brand-purple); }
+        .tab-btn.active { color: var(--brand-color); border-bottom-color: var(--brand-color); }
 
         .tab-content { display: none; animation: fadeIn 0.2s; }
         .tab-content.active { display: block; }
@@ -58,7 +56,7 @@
 
         /* Bars */
         .progress-bg { width: 100%; height: 6px; background: rgba(128,128,128,0.2); border-radius: 3px; overflow: hidden; margin-top: 5px; }
-        .progress-fill { height: 100%; background: var(--brand-purple); width: 0%; transition: width 0.5s; }
+        .progress-fill { height: 100%; background: var(--brand-color); width: 0%; transition: width 0.5s; }
 
         /* Pop Out Button */
         .pop-out-btn {
@@ -66,7 +64,7 @@
             background: transparent; color: var(--text-dim); padding: 2px 6px;
             border-radius: 4px; cursor: pointer; margin-top: -35px;
         }
-        .pop-out-btn:hover { color: var(--text-head); border-color: var(--brand-purple); }
+        .pop-out-btn:hover { color: var(--text-head); border-color: var(--brand-color); }
 
         h2 {
             font-family: 'JetBrains Mono', monospace;
@@ -82,7 +80,7 @@
             font-size: 12px;
         }
         .stat-label { font-weight: 500; }
-        .stat-value { font-family: 'JetBrains Mono', monospace; color: var(--brand-purple); }
+        .stat-value { font-family: 'JetBrains Mono', monospace; color: var(--brand-color); }
 
         /* Widget Mode Styles */
         body.widget-mode {
@@ -188,6 +186,22 @@
             }, '*');
         }
 
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
         // Listen for messages
         window.addEventListener('message', (e) => {
             if (e.data.type === 'CORE_URL_CHANGE') {
@@ -208,6 +222,19 @@
                     startMonitoring();
                     fetchSysInfo();
                 }
+            }
+            if (e.data.type === 'THEME_UPDATE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+                document.documentElement.style.setProperty('--brand-color', e.data.brandColor);
+                const hex = e.data.brandColor.replace('#', '');
+                const r = parseInt(hex.substring(0,2), 16);
+                const g = parseInt(hex.substring(2,4), 16);
+                const b = parseInt(hex.substring(4,6), 16);
+                document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+                document.documentElement.style.setProperty('--font-size-base', e.data.fontSize + 'px');
+
+                if (e.data.themeCssUrl) loadThemeCSS(e.data.themeCssUrl);
+                else clearThemeCSS();
             }
         });
 

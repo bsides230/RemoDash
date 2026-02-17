@@ -148,3 +148,18 @@
 - **Delete Files:** Added option to delete repository files from disk when removing a repository.
   - Added "Also delete files from disk" checkbox to the removal confirmation modal in `GitManager.html`.
   - Updated backend to support file deletion via `shutil.rmtree`.
+
+## Updates - Today
+
+### Theme System Refactor
+- **New Package Format (.tmpk):** Introduced `.tmpk` (Theme Package) format, a ZIP archive containing `theme.json` and `theme.css`.
+- **Backend Theme Manager:** Implemented `ThemeManager` and `/api/themes` endpoints for dynamic theme installation, listing, and serving.
+- **Frontend Architecture:**
+  - Extracted core UI variables into `web/assets/base.css`.
+  - Deprecated JS-based `THEME_PRESETS` in favor of backend-served CSS.
+  - Added "Manage Themes" UI in settings for installing `.tmpk` files.
+  - Implemented `THEME_UPDATE` broadcast message for robust, real-time theme synchronization across all modules.
+- **Module Standardization:**
+  - Standardized CSS variables across all core modules (`--brand-color`, `--brand-color-dim`).
+  - Updated all modules to listen for `THEME_UPDATE` and dynamically load theme CSS.
+- **Migration:** Converted all 14 existing theme presets into independent `.tmpk` packages.

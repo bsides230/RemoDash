@@ -10,7 +10,8 @@
             --bg-panel: #0a0a0a;
             --text-dim: #666666;
             --border-color: #222222;
-            --brand-purple: #7c5cff;
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
         }
 
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg-core); font-family: sans-serif; }
@@ -26,7 +27,7 @@
             background: var(--bg-panel); min-width: 100px; max-width: 200px;
         }
         .tab:hover { background: #111; color: #ccc; }
-        .tab.active { background: var(--bg-core); color: #fff; border-bottom: 2px solid var(--brand-purple); }
+        .tab.active { background: var(--bg-core); color: #fff; border-bottom: 2px solid var(--brand-color); }
 
         .tab-close {
             width: 14px; height: 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -35,7 +36,7 @@
         .tab-close:hover { background: #cc3333; color: white; opacity: 1; }
 
         .tab-popout { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.5; margin-right: 2px; }
-        .tab-popout:hover { color: var(--brand-purple); opacity: 1; }
+        .tab-popout:hover { color: var(--brand-color); opacity: 1; }
 
         .new-tab-btn {
             width: 30px; height: 100%; display: flex; align-items: center; justify-content: center;
@@ -332,29 +333,40 @@
             removeTabUI(tabId);
         }
 
-        function getTermTheme() {
-            if(currentTheme === 'light') {
-                return {
-                    background: '#eef0f4',
-                    foreground: '#333333',
-                    cursor: '#333333',
-                    selection: 'rgba(0,0,0,0.1)'
-                };
-            } else {
-                return {
-                    background: '#050505',
-                    foreground: '#cccccc',
-                    cursor: '#ffffff',
-                    selection: 'rgba(255,255,255,0.1)'
-                };
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
             }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
+        function getTermTheme() {
+            const style = getComputedStyle(document.documentElement);
+            return {
+                background: style.getPropertyValue('--bg-core').trim(),
+                foreground: style.getPropertyValue('--text-body').trim(),
+                cursor: style.getPropertyValue('--text-head').trim(),
+                selection: style.getPropertyValue('--brand-color-dim').trim() || 'rgba(16, 185, 129, 0.1)'
+            };
         }
 
         function updateAllTerminalsTheme() {
-            const th = getTermTheme();
-            tabs.forEach(t => {
-                t.term.options.theme = th;
-            });
+            // Need a slight delay to allow CSS to apply?
+            setTimeout(() => {
+                const th = getTermTheme();
+                tabs.forEach(t => {
+                    t.term.options.theme = th;
+                });
+            }, 50);
         }
 
         function updateAllTerminalsFont() {

@@ -11,51 +11,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" /> -->
     <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/base.css">
+    <link id="theme-css" rel="stylesheet" href="">
     <link rel="manifest" href="manifest.json" />
 
     <style>
-        /* =========================================
-           1. CORE VARIABLES & THEME
-           ========================================= */
-        :root {
-            --font-family-base: 'Inter', system-ui, sans-serif;
-            --bg-core: #050505;
-            --bg-panel: #0a0a0a;
-            --brand-color: #10B981; /* Default Emerald */
-            --brand-color-dim: rgba(16, 185, 129, 0.1);
-            --brand-color-glow: rgba(16, 185, 129, 0.4);
-            --brand-bg-gradient: rgba(16, 185, 129, 0.15); /* Stronger background */
-            --text-head: #ffffff;
-            --text-body: #b0b0b0;
-            --text-dim: #666666;
-            --border-color: #333333; /* Slightly lighter default */
-
-            --dock-bg: rgba(20, 20, 20, 0.6);
-            --dock-border: rgba(255, 255, 255, 0.1);
-            --dock-blur: 20px;
-
-            --font-size-base: 12px;
-
-            --bg-input: #050505;
-            --error-color: #ff4444;
-        }
-
-        body[data-theme="light"] {
-            --bg-core: #eef0f4;
-            --bg-panel: #ffffff;
-            /* --brand-color override moved to JS for consistency or kept dynamic */
-            --brand-color-dim: rgba(0,0,0, 0.05);
-            --brand-color-glow: rgba(0,0,0, 0.1);
-            --brand-bg-gradient: rgba(0,0,0, 0.05);
-            --text-head: #111111;
-            --text-body: #333333;
-            --text-dim: #555555;
-            --border-color: #d1d5db;
-            --dock-bg: rgba(255, 255, 255, 0.6);
-            --dock-border: rgba(0, 0, 0, 0.1);
-            --bg-input: #ffffff;
-        }
-
         * { box-sizing: border-box; }
 
         body {
@@ -451,7 +411,7 @@
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 320px; background: var(--bg-panel);
             border: 1px solid var(--brand-color);
-            box-shadow: 0 0 30px rgba(124, 92, 255, 0.2);
+            box-shadow: 0 0 30px var(--brand-color-dim);
             border-radius: 12px; z-index: 22000;
             display: none; flex-direction: column;
             animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -682,7 +642,7 @@
     </div>
 
     <div id="auth-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); backdrop-filter:blur(15px); z-index:30000; align-items:center; justify-content:center; flex-direction:column;">
-        <div style="background:var(--bg-panel); border:1px solid var(--brand-color); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px rgba(124,92,255,0.2);">
+        <div style="background:var(--bg-panel); border:1px solid var(--brand-color); padding:30px; border-radius:12px; width:350px; text-align:center; box-shadow:0 0 50px var(--brand-color-dim);">
             <h2 style="margin:0 0 20px 0; color:var(--text-head); font-family:'JetBrains Mono'; text-transform:uppercase; font-size:16px;">Authentication Required</h2>
             <p style="font-size:12px; color:var(--text-body); margin-bottom:20px; line-height:1.4;">Please enter your Admin Token to access the system.</p>
             <div style="margin-bottom: 15px; text-align: center;">
@@ -965,6 +925,12 @@
             <div class="settings-header" style="margin-top:10px;">Theme Presets</div>
             <div id="theme-presets-container" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;"></div>
 
+            <div class="settings-header" style="margin-top:10px;">Manage Themes</div>
+            <div class="settings-row">
+                <input type="file" id="inp-theme-upload" accept=".tmpk" style="display:none" onchange="handleThemeUpload(this.files)">
+                <button class="btn-full-width" onclick="document.getElementById('inp-theme-upload').click()">Install Theme (.tmpk)</button>
+            </div>
+
             <div class="settings-header" style="margin-top:10px;">Accent Color</div>
             <div class="color-grid" id="color-picker-grid"></div>
 
@@ -994,8 +960,10 @@
         /* =========================================================================
            CONFIG & STATE
            ========================================================================= */
+        const APP_CONFIG = { name: 'RemoDash', settingsKey: 'lyrn-settings', defaultBrandColor: '#10B981' };
         let CORE_MODULES = [];
         let MODULE_REGISTRY = [];
+        let THEME_PRESETS = {};
 
         let appSettings = {
             activeModules: [],
@@ -1008,190 +976,6 @@
             brandColor: '#10B981',
             themeWindows: false,
             customColors: ['#333333', '#333333', '#333333', '#333333']
-        };
-
-        const THEME_PRESETS = {
-            'default': {
-                name: 'Default',
-                colors: {
-                    '--bg-core': '#050505',
-                    '--bg-panel': '#0a0a0a',
-                    '--border-color': '#333333',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#b0b0b0',
-                    '--text-dim': '#666666',
-                    '--bg-pattern': 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(125, 125, 125, 0.03) 10px, rgba(125, 125, 125, 0.03) 11px)'
-                }
-            },
-            'cyberpunk': {
-                name: 'Cyberpunk',
-                colors: {
-                    '--bg-core': '#000b1e',
-                    '--bg-panel': '#02122b',
-                    '--border-color': '#00f0ff',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#cccccc',
-                    '--text-dim': '#888888',
-                    '--bg-pattern': 'linear-gradient(0deg, transparent 24%, rgba(0, 240, 255, .03) 25%, rgba(0, 240, 255, .03) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .03) 75%, rgba(0, 240, 255, .03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 240, 255, .03) 25%, rgba(0, 240, 255, .03) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .03) 75%, rgba(0, 240, 255, .03) 76%, transparent 77%, transparent)'
-                },
-                brand: '#fce300'
-            },
-            'ocean': {
-                name: 'Ocean Deep',
-                colors: {
-                    '--bg-core': '#001e26',
-                    '--bg-panel': '#002b36',
-                    '--border-color': '#073642',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#bbbbbb',
-                    '--text-dim': '#666666',
-                    '--bg-pattern': 'radial-gradient(circle at 50% 120%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.03) 30%, transparent 30%, transparent 50%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.03) 70%, transparent 70%)'
-                },
-                brand: '#2aa198'
-            },
-            'midnight': {
-                name: 'Midnight',
-                colors: {
-                    '--bg-core': '#000000',
-                    '--bg-panel': '#050505',
-                    '--border-color': '#222222',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#888888',
-                    '--text-dim': '#444444',
-                    '--bg-pattern': 'radial-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)'
-                },
-                brand: '#7c5cff'
-            },
-            'forest': {
-                name: 'Forest',
-                colors: {
-                    '--bg-core': '#051005',
-                    '--bg-panel': '#0a1a0a',
-                    '--border-color': '#1a331a',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#bbbbbb',
-                    '--text-dim': '#666666',
-                    '--bg-pattern': 'repeating-radial-gradient(circle at 0 0, transparent 0, transparent 20px, rgba(160, 255, 160, 0.03) 21px, transparent 22px)'
-                },
-                brand: '#4caf50'
-            },
-            'sunset': {
-                name: 'Sunset',
-                colors: {
-                    '--bg-core': '#1a0505',
-                    '--bg-panel': '#2b0a0a',
-                    '--border-color': '#ffcc00',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#cccccc',
-                    '--text-dim': '#888888',
-                    '--bg-pattern': 'repeating-conic-gradient(from 0deg at 50% 100%, transparent 0deg, transparent 10deg, rgba(255, 200, 100, 0.03) 10deg, rgba(255, 200, 100, 0.03) 15deg)'
-                },
-                brand: '#ff6600'
-            },
-            'nebula': {
-                name: 'Nebula',
-                colors: {
-                    '--bg-core': '#0b001a',
-                    '--bg-panel': '#15002b',
-                    '--border-color': '#00ccff',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#cccccc',
-                    '--text-dim': '#888888',
-                    '--bg-pattern': 'radial-gradient(circle at 50% 50%, rgba(255, 0, 170, 0.05), transparent 60%), radial-gradient(circle at 80% 20%, rgba(0, 204, 255, 0.05), transparent 50%)'
-                },
-                brand: '#ff00aa'
-            },
-            'retro': {
-                name: 'Retro',
-                colors: {
-                    '--bg-core': '#202020',
-                    '--bg-panel': '#2d2d2d',
-                    '--border-color': '#404040',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#e0e0e0',
-                    '--text-dim': '#888888',
-                    '--bg-pattern': 'repeating-linear-gradient(to bottom, transparent, transparent 2px, rgba(0, 0, 0, 0.2) 3px, rgba(0, 0, 0, 0.2) 4px)'
-                },
-                brand: '#ffcc00'
-            },
-            'dispensary': {
-                name: 'Dispensary',
-                colors: {
-                    '--bg-core': '#051005',
-                    '--bg-panel': '#0a1a0a',
-                    '--border-color': '#1a331a',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#bbbbbb',
-                    '--text-dim': '#666666',
-                    '--bg-pattern': 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 255, 0, 0.03) 10px, rgba(0, 255, 0, 0.03) 11px)'
-                },
-                brand: '#ffcc00'
-            },
-            'pizza': {
-                name: 'Pizza Place',
-                colors: {
-                    '--bg-core': '#1a0505',
-                    '--bg-panel': '#2b0a0a',
-                    '--border-color': '#800000',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#cccccc',
-                    '--text-dim': '#888888',
-                    '--bg-pattern': 'radial-gradient(circle at 50% 50%, rgba(128, 0, 0, 0.1), transparent 60%)'
-                },
-                brand: '#ff4444'
-            },
-            'blackout': {
-                name: 'Blackout',
-                colors: {
-                    '--bg-core': '#000000',
-                    '--bg-panel': '#000000',
-                    '--border-color': '#333333',
-                    '--text-head': '#888888',
-                    '--text-body': '#666666',
-                    '--text-dim': '#444444',
-                    '--bg-pattern': 'none'
-                },
-                brand: '#666666'
-            },
-            'slate': {
-                name: 'Slate',
-                colors: {
-                    '--bg-core': '#1a202c',
-                    '--bg-panel': '#2d3748',
-                    '--border-color': '#4a5568',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#cbd5e0',
-                    '--text-dim': '#718096',
-                    '--bg-pattern': 'linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)'
-                },
-                brand: '#a0aec0'
-            },
-            'coffee': {
-                name: 'Coffee',
-                colors: {
-                    '--bg-core': '#1a120b',
-                    '--bg-panel': '#3c2a21',
-                    '--border-color': '#5c4033',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#d5c5b5',
-                    '--text-dim': '#8b7355',
-                    '--bg-pattern': 'repeating-radial-gradient(circle at 0 0, transparent 0, transparent 10px, rgba(139, 69, 19, 0.1) 11px, transparent 12px)'
-                },
-                brand: '#d2b48c'
-            },
-            'lavender': {
-                name: 'Lavender',
-                colors: {
-                    '--bg-core': '#1a0b2e',
-                    '--bg-panel': '#2d1b4e',
-                    '--border-color': '#4a2c7a',
-                    '--text-head': '#ffffff',
-                    '--text-body': '#dcd6f7',
-                    '--text-dim': '#a6b1e1',
-                    '--bg-pattern': 'radial-gradient(circle at 80% 20%, rgba(157, 78, 221, 0.1), transparent 50%)'
-                },
-                brand: '#c77dff'
-            }
         };
 
         let zIndexCounter = 100;
@@ -1270,10 +1054,22 @@
 
         function openThemeSettings() { showSettingsPage('theme'); }
 
-        function initThemePresets() {
+        async function initThemePresets() {
             const container = document.getElementById('theme-presets-container');
             if(!container) return;
             container.innerHTML = '';
+
+            // Fetch from API if empty
+            if (Object.keys(THEME_PRESETS).length === 0) {
+                try {
+                    const res = await fetch(coreUrl + '/api/themes/list', { headers: { 'X-Token': authToken } });
+                    if (res.ok) {
+                        const list = await res.json();
+                        list.forEach(t => { THEME_PRESETS[t.id] = t; });
+                    }
+                } catch(e) { console.error("Failed to fetch themes", e); }
+            }
+
             for(const [id, preset] of Object.entries(THEME_PRESETS)) {
                 const btn = document.createElement('button');
                 btn.className = 'btn-full-width';
@@ -1285,16 +1081,18 @@
             }
         }
 
-        function applyThemePreset(id, save = true) {
+        async function applyThemePreset(id, save = true) {
+            // Ensure loaded
+            if(Object.keys(THEME_PRESETS).length === 0) await initThemePresets();
+
             const preset = THEME_PRESETS[id];
             if(!preset) return;
 
             appSettings.activeThemePreset = id;
 
-            // Apply CSS variables
-            for(const [key, val] of Object.entries(preset.colors)) {
-                document.documentElement.style.setProperty(key, val);
-            }
+            // Load CSS dynamically
+            const link = document.getElementById('theme-css');
+            link.href = `${coreUrl}/api/themes/${id}/theme.css?v=${Date.now()}`;
 
             // Apply Brand if included
             if(preset.brand) {
@@ -1305,6 +1103,35 @@
             initThemePresets();
 
             if(save) saveSettings();
+
+            // Broadcast
+            broadcastThemeToIframes();
+        }
+
+        async function handleThemeUpload(files) {
+            if(files.length === 0) return;
+            const file = files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(coreUrl + '/api/themes/install', {
+                    method: 'POST',
+                    headers: { 'X-Token': authToken },
+                    body: formData
+                });
+                if(res.ok) {
+                    alert("Theme installed successfully.");
+                    // Reload themes
+                    THEME_PRESETS = {};
+                    await initThemePresets();
+                } else {
+                    alert("Failed to install theme: " + await res.text());
+                }
+            } catch(e) {
+                alert("Error installing theme: " + e.message);
+            }
+            document.getElementById('inp-theme-upload').value = '';
         }
 
         function initCustomSlots() {
@@ -1754,8 +1581,21 @@
             const iframe = win.querySelector('iframe');
             // Inject Font Size on Load
             iframe.onload = () => {
+                const payload = {
+                    type: 'THEME_UPDATE',
+                    theme: appSettings.theme,
+                    brandColor: appSettings.brandColor,
+                    fontSize: appSettings.fontSize,
+                    themePreset: appSettings.activeThemePreset,
+                    themeCssUrl: `${coreUrl}/api/themes/${appSettings.activeThemePreset}/theme.css`
+                };
+                iframe.contentWindow.postMessage(payload, '*');
+
+                // Legacy
                 iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
                 iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
+                iframe.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: appSettings.brandColor }, '*');
+
                 iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
                 if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
 
@@ -1994,9 +1834,7 @@
             saveSettings();
 
             // Broadcast
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
-            });
+            broadcastThemeToIframes();
         }
 
         function updateFontSize(size, save = true) {
@@ -2007,9 +1845,7 @@
             if(save) saveSettings();
 
             // Broadcast to all active windows
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: size }, '*');
-            });
+            broadcastThemeToIframes();
         }
 
         function updateUIScale(scale, save = true) {
@@ -2064,9 +1900,9 @@
 
         function toggleModuleActive(modId, active) { if(active) { if(!appSettings.activeModules.includes(modId)) appSettings.activeModules.push(modId); } else { appSettings.activeModules = appSettings.activeModules.filter(m => m !== modId); } saveSettings(); renderDock(); }
         function toggleMaximize(btn) { const win = btn.closest('.lyrn-window'); if(win.classList.contains('maximized')) { win.classList.remove('maximized'); win.style.cssText = win.dataset.cache || ''; } else { win.dataset.cache = win.style.cssText; win.classList.add('maximized'); win.style.top = '32px'; win.style.left = '0'; win.style.width = '100%'; win.style.height = 'calc(100% - 32px)'; } }
-        function saveSettings() { localStorage.setItem('lyrn-settings', JSON.stringify(appSettings)); }
+        function saveSettings() { localStorage.setItem(APP_CONFIG.settingsKey, JSON.stringify(appSettings)); }
         function loadSettings() {
-            const s = localStorage.getItem('lyrn-settings');
+            const s = localStorage.getItem(APP_CONFIG.settingsKey);
             if(s) {
                 appSettings = { ...appSettings, ...JSON.parse(s) };
                 hasSavedSettings = true;
@@ -2156,8 +1992,25 @@
             initCustomSlots(); // Update border colors potentially?
 
             // Broadcast
+            broadcastThemeToIframes();
+        }
+
+        function broadcastThemeToIframes() {
+            const payload = {
+                type: 'THEME_UPDATE',
+                theme: appSettings.theme,
+                brandColor: appSettings.brandColor,
+                fontSize: appSettings.fontSize,
+                themePreset: appSettings.activeThemePreset,
+                themeCssUrl: `${coreUrl}/api/themes/${appSettings.activeThemePreset}/theme.css`
+            };
+
             document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: color }, '*');
+                f.contentWindow.postMessage(payload, '*');
+                // Legacy support
+                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
+                f.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: appSettings.brandColor }, '*');
+                f.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
             });
         }
 
@@ -2269,6 +2122,7 @@
                         broadcastToken();
                         hasCheckedAuth = true;
                         loadGlobalSettings();
+                        initThemePresets();
                         fetchModules(); // Fetch modules after auth
                         document.getElementById('auth-overlay').style.display = 'none';
                         return;
@@ -2286,6 +2140,7 @@
                     broadcastToken();
                     hasCheckedAuth = true;
                     loadGlobalSettings();
+                    initThemePresets();
                     fetchModules(); // Fetch modules after auth
                     return;
                 }
@@ -2335,6 +2190,7 @@
                 broadcastToken();
                 hasCheckedAuth = true;
                 loadGlobalSettings();
+                initThemePresets();
                 fetchModules(); // Fetch modules after auth
             } else {
                 err.innerText = "Invalid Token. Please check admin_token.txt";

@@ -121,6 +121,23 @@
         let coreUrl = ""; // Will be set by dashboard
 
         // 1. LISTEN FOR MESSAGES
+
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
         window.addEventListener('message', (e) => {
             const data = e.data;
             if(!data) return;
@@ -137,14 +154,29 @@
                     coreUrl = data.url;
                     break;
 
+                case 'THEME_UPDATE':
+                    document.body.setAttribute('data-theme', data.theme);
+                    document.documentElement.style.setProperty('--brand-color', data.brandColor);
+
+                    const hex = data.brandColor.replace('#', '');
+                    const r = parseInt(hex.substring(0,2), 16);
+                    const g = parseInt(hex.substring(2,4), 16);
+                    const b = parseInt(hex.substring(4,6), 16);
+                    document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+
+                    document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
+
+                    if (data.themeCssUrl) loadThemeCSS(data.themeCssUrl);
+                    else clearThemeCSS();
+                    break;
+
+                // Legacy
                 case 'THEME_CHANGE':
-                    // e.g. 'dark' or 'light' - not strictly needed if using CSS vars,
-                    // but useful for JS logic or specific overrides
+                    document.body.setAttribute('data-theme', data.theme);
                     break;
 
                 case 'COLOR_CHANGE':
                     document.documentElement.style.setProperty('--brand-color', data.color);
-                    // Update derived colors if needed
                     break;
 
                 case 'FONT_CHANGE':

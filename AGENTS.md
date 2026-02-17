@@ -58,3 +58,18 @@ LYRN is not just a framework; it's the foundation for much larger ambitions. The
 
 1.  **A Multi-Agent Dashboard:** A visual interface, imagined as a security camera manager, where each "cam feed" is a containerized LYRN agent. This dashboard will allow for the command and control of multiple agents, both local and remote, leveraging LYRN's simple, text-based nature for communication.
 2.  **A Generative World Engine:** A system for creating vast, detailed, and persistent worlds for gaming, simulation, or even real-world mapping. This is not a pre-written world database; it's a true generative engine. The world is created on the fly as the user explores it. When a user interacts with an object, the LLM is triggered to "lazy load" its details by filling out a template based on the rich, hierarchical context of the player's location. The world itself is an emergent property of the LLM's interaction with the template system.
+
+---
+
+## Package Formats
+
+### Modules (.mdpk)
+Modules are distributed as `.mdpk` files, which are standard ZIP archives containing:
+- `module.json`: Metadata (id, name, version, entry points).
+- `api.py`: Optional backend logic (FastAPI router).
+- `web/`: Frontend assets (HTML, JS, CSS).
+
+### Themes (.tmpk)
+Themes are distributed as `.tmpk` files, which are standard ZIP archives containing:
+- `theme.json`: Metadata (id, name, version, author, description, brand color).
+- `theme.css`: CSS file containing `:root` variable overrides.

@@ -13,11 +13,13 @@ import uvicorn
 
 from settings_manager import SettingsManager
 from module_manager import ModuleManager
-from core.api import auth, system, filesystem, terminal, wizard
+from theme_manager import ThemeManager
+from core.api import auth, system, filesystem, terminal, wizard, themes
 from core.api.auth import verify_token, init_auth
 
 settings_manager = SettingsManager()
 module_manager = ModuleManager()
+theme_manager = ThemeManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +32,7 @@ app = FastAPI(title="RemoDash Server", lifespan=lifespan)
 
 # Load Modules
 module_manager.load_modules(app)
+app.state.theme_manager = theme_manager
 
 # Determine allowed origins
 allowed_origins = settings_manager.settings.get("allowed_origins", [])
@@ -66,6 +69,7 @@ app.include_router(system.router, prefix="/api", tags=["System"]) # /api/sysinfo
 app.include_router(filesystem.router, prefix="/api/files", tags=["Files"])
 app.include_router(terminal.router, prefix="/api/terminal", tags=["Terminal"])
 app.include_router(wizard.router, prefix="/api/wizard", tags=["Wizard"])
+app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
 
 # --- Legacy / Root Endpoints ---
 

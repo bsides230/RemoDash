@@ -1,0 +1,9 @@
+:root {
+    --bg-core: #050505;
+    --bg-panel: #0a0a0a;
+    --border-color: #333333;
+    --text-head: #ffffff;
+    --text-body: #b0b0b0;
+    --text-dim: #666666;
+    --bg-pattern: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(125, 125, 125, 0.03) 10px, rgba(125, 125, 125, 0.03) 11px);
+}

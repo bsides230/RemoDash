@@ -41,9 +41,11 @@ When your iframe loads, the dashboard will inject the current theme (Light/Dark)
 | `--text-dim` | Dimmed/Label text color |
 | `--border-color` | Border color |
 | `--brand-color` | The user's chosen accent color (Emerald, Blue, etc.) |
-| `--brand-color-dim` | Low opacity version of accent color |
+| `--brand-color-dim` | Low opacity version of accent color (approx 10%) |
 | `--font-size-base` | Base font size (controlled by user slider) |
 | `--error-color` | Standard error red |
+
+*Deprecated:* `--brand-purple` (use `--brand-color`), `--brand-purple-dim` (use `--brand-color-dim`).
 
 ### Font Family
 The dashboard loads `Inter` and `JetBrains Mono`. You can use:
@@ -90,38 +92,69 @@ window.parent.postMessage({ type: 'CLOSE_DASHBOARD' }, '*');
 
 You should set up a `message` listener to handle updates from the core.
 
+**Primary Theme Message (Recommended)**
+
 ```javascript
-window.addEventListener('message', (e) => {
-    const data = e.data;
+        // Helper to load theme CSS
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
 
-    switch (data.type) {
-        case 'THEME_CHANGE':
-            // data.theme is 'dark' or 'light'
-            document.body.setAttribute('data-theme', data.theme);
-            break;
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
 
-        case 'COLOR_CHANGE':
-            // data.color is the hex code (e.g., '#10B981')
-            document.documentElement.style.setProperty('--brand-color', data.color);
-            break;
+        window.addEventListener('message', (e) => {
+            const data = e.data;
 
-        case 'FONT_CHANGE':
-            // data.fontSize is an integer (e.g., 12)
-            document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
-            break;
+            if (data.type === 'THEME_UPDATE') {
+                // Apply Base Theme Mode
+                document.body.setAttribute('data-theme', data.theme);
 
-        case 'TOKEN_UPDATE':
-            // data.token is the Admin Token for API calls
-            window.authToken = data.token;
-            break;
+                // Apply Accent Color
+                document.documentElement.style.setProperty('--brand-color', data.brandColor);
 
-        case 'CORE_URL_CHANGE':
-             // data.url is the backend URL (e.g., http://localhost:8000)
-             window.coreUrl = data.url;
-             break;
-    }
-});
+                // Derive Dim Color (Optional, usually handled by CSS variables if hex)
+                const hex = data.brandColor.replace('#', '');
+                const r = parseInt(hex.substring(0,2), 16);
+                const g = parseInt(hex.substring(2,4), 16);
+                const b = parseInt(hex.substring(4,6), 16);
+                document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+
+                // Apply Font Size
+                document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
+
+                // Load Theme Preset CSS (Dynamic Variables)
+                if (data.themeCssUrl) {
+                    loadThemeCSS(data.themeCssUrl);
+                } else {
+                    clearThemeCSS();
+                }
+            }
+
+            // ... handle other messages ...
+        });
 ```
+
+**Legacy Messages (Deprecated)**
+*Supported for backward compatibility, but use `THEME_UPDATE` for new modules.*
+
+*   `THEME_CHANGE`: Only sends dark/light mode.
+*   `COLOR_CHANGE`: Only sends accent color.
+*   `FONT_CHANGE`: Only sends font size.
+
+**System Messages**
+
+*   `TOKEN_UPDATE`: Sends Admin Token.
+*   `CORE_URL_CHANGE`: Sends Backend URL.
 
 ---
 

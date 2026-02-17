@@ -1,0 +1,9 @@
+:root {
+    --bg-core: #000b1e;
+    --bg-panel: #02122b;
+    --border-color: #00f0ff;
+    --text-head: #ffffff;
+    --text-body: #cccccc;
+    --text-dim: #888888;
+    --bg-pattern: linear-gradient(0deg, transparent 24%, rgba(0, 240, 255, .03) 25%, rgba(0, 240, 255, .03) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .03) 75%, rgba(0, 240, 255, .03) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(0, 240, 255, .03) 25%, rgba(0, 240, 255, .03) 26%, transparent 27%, transparent 74%, rgba(0, 240, 255, .03) 75%, rgba(0, 240, 255, .03) 76%, transparent 77%, transparent);
+}
