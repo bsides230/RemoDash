@@ -9,6 +9,8 @@ import time
 import threading
 import uuid
 import logging
+import platform
+import requests
 from pathlib import Path
 from datetime import datetime
 
@@ -38,20 +40,31 @@ model_state = {
     "loaded": False,
     "loading": False,
     "error": None,
-    "model_name": "tts_models/multilingual/multi-dataset/xtts_v2"
+    "model_name": "xtts_v2"
 }
 
 tts_instance = None
 
-# --- TTS Import ---
+# --- Constants ---
+XTTS_FILES = {
+    "model.pth": "https://huggingface.co/coqui/XTTS-v2/resolve/main/model.pth",
+    "config.json": "https://huggingface.co/coqui/XTTS-v2/resolve/main/config.json",
+    "vocab.json": "https://huggingface.co/coqui/XTTS-v2/resolve/main/vocab.json",
+    "speakers_xtts.pth": "https://huggingface.co/coqui/XTTS-v2/resolve/main/speakers_xtts.pth",
+    "dvae.pth": "https://huggingface.co/coqui/XTTS-v2/resolve/main/dvae.pth",
+    "mel_stats.pth": "https://huggingface.co/coqui/XTTS-v2/resolve/main/mel_stats.pth"
+}
+
+# --- Dependencies Import ---
+# We expect coqui-tts to be installed.
 try:
     import torch
     import torchaudio
     from TTS.api import TTS
     logger.info("Coqui TTS imported successfully.")
 except ImportError as e:
-    logger.error(f"Coqui TTS not found: {e}. Please install dependencies.")
-    # We do NOT enable MOCK_MODE here as requested. We let it fail later or raise errors.
+    logger.error(f"CRITICAL: Coqui TTS not found. Please pip install coqui-tts. Error: {e}")
+    # We allow the module to load so we can serve the API, but model loading will fail.
 
 # --- Helper Functions ---
 
@@ -86,13 +99,62 @@ def get_device():
     device_pref = settings.get("device", "cpu")
 
     if device_pref == "vulkan":
-        # Check if vulkan is available in torch (experimental usually)
-        # For now, we trust the user. If it fails, we catch it.
         return "vulkan"
     elif device_pref == "cuda" and torch.cuda.is_available():
         return "cuda"
 
     return "cpu"
+
+def download_file(url, dest_path):
+    logger.info(f"Downloading {url} to {dest_path}...")
+    try:
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(dest_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        logger.info(f"Download complete: {dest_path}")
+    except Exception as e:
+        logger.error(f"Failed to download {url}: {e}")
+        # Clean up partial file
+        if dest_path.exists():
+            dest_path.unlink()
+        raise e
+
+def check_system_dependencies():
+    """Checks for system dependencies like espeak-ng."""
+    if not shutil.which("espeak-ng"):
+        logger.warning("espeak-ng is NOT found in PATH.")
+        if platform.system() == "Windows":
+            msi_url = "https://github.com/espeak-ng/espeak-ng/releases/download/1.51/espeak-ng-X64.msi"
+            msi_path = OUTPUT_DIR / "espeak-ng.msi"
+            if not msi_path.exists():
+                logger.info("Downloading espeak-ng MSI installer for Windows...")
+                try:
+                    download_file(msi_url, msi_path)
+                    logger.warning(f"Downloaded espeak-ng installer to: {msi_path}")
+                    logger.warning("PLEASE RUN THIS INSTALLER TO ENABLE TTS.")
+                except Exception as e:
+                    logger.error(f"Failed to download espeak-ng MSI: {e}")
+            else:
+                logger.warning(f"Installer already exists at {msi_path}. Please run it.")
+        else:
+            logger.warning("On Linux/Mac, please install espeak-ng (e.g., 'sudo apt-get install espeak-ng').")
+    else:
+        logger.info("espeak-ng is found.")
+
+def ensure_model_files():
+    """Checks for XTTS v2 files and downloads them if missing."""
+    target_dir = MODELS_DIR / "xtts_v2"
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    for filename, url in XTTS_FILES.items():
+        file_path = target_dir / filename
+        if not file_path.exists():
+            logger.info(f"Model file {filename} missing. Downloading...")
+            download_file(url, file_path)
+
+    return target_dir
 
 def load_model_task():
     global tts_instance, model_state
@@ -104,12 +166,29 @@ def load_model_task():
     model_state["error"] = None
 
     try:
-        device = get_device()
-        logger.info(f"Loading TTS model on {device}...")
+        # 1. Check System Deps
+        check_system_dependencies()
 
-        # Initialize TTS
-        # This will download the model if not present in TTS_HOME
-        tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+        # 2. Check/Download Model Files
+        model_dir = ensure_model_files()
+
+        device = get_device()
+        logger.info(f"Loading TTS model from {model_dir} on {device}...")
+
+        config_path = model_dir / "config.json"
+        # FIX: Point to the actual model file, not the directory
+        model_path = model_dir / "model.pth"
+
+        tts = TTS(
+            model_path=str(model_path),
+            config_path=str(config_path),
+            progress_bar=False,
+            gpu=(device == "cuda")
+        )
+
+        # Force device move just in case
+        tts.to(device)
+
         tts_instance = tts
         model_state["loaded"] = True
         logger.info("TTS Model loaded successfully.")
@@ -141,7 +220,6 @@ class SettingsUpdate(BaseModel):
 
 @router.get("/status")
 def get_status():
-    logger.info("Status check requested")
     return model_state
 
 @router.post("/download")
@@ -178,7 +256,7 @@ def list_voices():
 async def add_voice(name: str = Form(...), audio: UploadFile = File(...)):
     logger.info(f"Adding voice: {name}")
     if not tts_instance:
-        raise HTTPException(status_code=400, detail="Model is not loaded. Cannot calculate latents.")
+        raise HTTPException(status_code=400, detail="Model is not loaded.")
 
     # 1. Create Voice Dir
     voice_id = str(uuid.uuid4())
@@ -192,11 +270,8 @@ async def add_voice(name: str = Form(...), audio: UploadFile = File(...)):
 
     # 3. Calculate Latents
     try:
-        if tts_instance:
-            gpt_cond_latent, speaker_embedding = tts_instance.get_conditioning_latents(audio_path=[str(ref_path)])
-        else:
-            # Should only happen if logic above fails, fallback for safety
-            gpt_cond_latent, speaker_embedding = ([0.0], [0.0])
+        # FIX: Access get_conditioning_latents via synthesizer.tts_model
+        gpt_cond_latent, speaker_embedding = tts_instance.synthesizer.tts_model.get_conditioning_latents(audio_path=[str(ref_path)])
 
         # Save latents
         # Convert tensors to lists if necessary
@@ -259,7 +334,6 @@ def generate_speech(req: GenerateRequest):
 
     # Load Latents
     latents_path = voice_path / "latents.json"
-    ref_path = voice_path / "reference.wav"
 
     gpt_cond_latent = None
     speaker_embedding = None
@@ -280,51 +354,53 @@ def generate_speech(req: GenerateRequest):
     output_path = OUTPUT_DIR / filename
 
     try:
-        if tts_instance:
-            # Depending on version, we pass latents or wav
-            # tts_to_file(text, speaker_wav=..., language=..., file_path=...)
-            # If we have latents, we might need to use `tts.tts()` which returns wav, then save it?
-            # Or pass latents to `tts_to_file` if supported.
-            # Looking at source, `tts_to_file` often re-computes.
-            # Ideally we use `tts.tts(text, language, gpt_cond_latent=..., speaker_embedding=...)` -> wav -> save.
+        # We need to handle tensor conversion if data was loaded from JSON
+        import torch
+        if gpt_cond_latent and isinstance(gpt_cond_latent, list):
+            gpt_cond_latent = torch.tensor(gpt_cond_latent)
+        if speaker_embedding and isinstance(speaker_embedding, list):
+            speaker_embedding = torch.tensor(speaker_embedding)
 
-            if gpt_cond_latent and speaker_embedding:
-                # We have latents, try to use them
-                # Check method signature via introspection or just try
-                # XTTS v2 specific:
-                wav = tts_instance.tts(
-                    text=req.text,
-                    language=req.language,
-                    gpt_cond_latent=gpt_cond_latent,
-                    speaker_embedding=speaker_embedding
-                )
-                # Save wav
-                # tts.tts returns a list of floats/tensor usually.
-                # We need to save it.
-                # Torchaudio or internal method?
-                # TTS usually has `save_wav`
-                try:
-                    tts_instance.synthesizer.save_wav(wav, str(output_path))
-                except:
-                    # Fallback if helper not found, use torchaudio if installed
-                    import torch
-                    import torchaudio
-                    if isinstance(wav, list):
-                        wav = torch.tensor(wav).unsqueeze(0)
-                    elif isinstance(wav, torch.Tensor):
-                        if wav.dim() == 1:
-                            wav = wav.unsqueeze(0)
-                    # XTTS sample rate is usually 24000
-                    torchaudio.save(str(output_path), wav, 24000)
+        # Depending on device, we might need to move tensors
+        device = get_device()
+        if device == "cuda":
+            if gpt_cond_latent is not None: gpt_cond_latent = gpt_cond_latent.to(device)
+            if speaker_embedding is not None: speaker_embedding = speaker_embedding.to(device)
 
-            else:
-                # Fallback to re-computing from reference wav
-                tts_instance.tts_to_file(
-                    text=req.text,
-                    speaker_wav=str(ref_path),
-                    language=req.language,
-                    file_path=str(output_path)
-                )
+        # Generate
+        if gpt_cond_latent is not None and speaker_embedding is not None:
+            # TTS wrapper's tts() method handles kwargs to underlying model
+            wav = tts_instance.tts(
+                text=req.text,
+                language=req.language,
+                gpt_cond_latent=gpt_cond_latent,
+                speaker_embedding=speaker_embedding
+            )
+        else:
+            # Fallback (slower, recomputes latents)
+            # tts_to_file writes directly, but we want consistent path handling
+            tts_instance.tts_to_file(
+                text=req.text,
+                speaker_wav=str(voice_path / "reference.wav"),
+                language=req.language,
+                file_path=str(output_path)
+            )
+            return {"filename": filename, "path": f"/api/modules/mod_xtts/output/{filename}"}
+
+        # Save wav if tts() was used
+        if wav is not None:
+             import torchaudio
+             if isinstance(wav, list):
+                 wav = torch.tensor(wav)
+
+             if isinstance(wav, torch.Tensor):
+                 if wav.dim() == 1:
+                     wav = wav.unsqueeze(0)
+                 # Move to CPU for saving
+                 wav = wav.cpu()
+
+             # XTTS usually 24000 sample rate
+             torchaudio.save(str(output_path), wav, 24000)
 
     except Exception as e:
         logger.error(f"Generation failed: {e}")
@@ -345,8 +421,6 @@ def generate_speech(req: GenerateRequest):
 
 @router.get("/history")
 def get_history():
-    # Verify files exist, clean up if missing?
-    # For now just return list
     return load_history()
 
 @router.get("/output/{filename}")
@@ -366,7 +440,6 @@ def delete_history(req: DeleteHistoryRequest):
 
     for item in history:
         if item["filename"] in to_delete:
-            # Delete file
             p = OUTPUT_DIR / item["filename"]
             if p.exists():
                 p.unlink()
