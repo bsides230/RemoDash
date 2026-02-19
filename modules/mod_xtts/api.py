@@ -171,6 +171,7 @@ def run_installer():
 
     try:
         # Run pip install
+        # We use check_call to ensure it raises an exception if it fails
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(MODULE_DIR / "requirements.txt")])
         logger.info("Dependency installation complete.")
 
@@ -186,6 +187,14 @@ def run_installer():
         # Trigger model load
         load_model_task()
 
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Pip installation failed: {e}")
+        model_state["error"] = f"Installation failed: pip returned error code {e.returncode}"
+        model_state["installing_deps"] = False
+    except ImportError as e:
+        logger.error(f"Import failed after install: {e}")
+        model_state["error"] = f"Installation succeeded, but import failed: {e}. Please restart."
+        model_state["installing_deps"] = False
     except Exception as e:
         logger.error(f"Installation failed: {e}")
         model_state["error"] = f"Installation failed: {e}"
@@ -198,8 +207,9 @@ def load_model_task():
     if TTS is None:
         try:
             from TTS.api import TTS
-        except ImportError:
-             model_state["error"] = "Dependency 'coqui-tts' is missing."
+        except ImportError as e:
+             logger.error(f"Dynamic import failed: {e}")
+             model_state["error"] = f"Dependency 'coqui-tts' is missing or broken: {e}"
              model_state["dependency_missing"] = True
              return
 
