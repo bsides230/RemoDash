@@ -185,6 +185,20 @@
             width: 400px;
             border: 1px solid var(--border-color);
         }
+
+        /* Installation Wizard */
+        .wizard-container {
+            background: var(--secondary-bg);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--accent-color);
+            margin-bottom: 20px;
+        }
+        .wizard-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -202,7 +216,16 @@
         </div>
     </header>
 
-    <div class="content-area">
+    <div id="dependencyWizard" class="wizard-container hidden">
+        <div class="wizard-icon">📦</div>
+        <h3>Missing Dependencies</h3>
+        <p>This module requires additional Python libraries (coqui-tts) to function.</p>
+        <p style="color: #aaa; font-size: 0.9em;">Click below to automatically install them.</p>
+        <button id="installDepsBtn" onclick="installDependencies()">Install Dependencies</button>
+        <div id="installStatus" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
+
+    <div class="content-area" id="mainContent">
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('generate')">Generate</button>
             <button class="tab-btn" onclick="switchTab('history')">History</button>
@@ -347,6 +370,38 @@
                 const msg = document.getElementById('modelMsg');
                 const dlSec = document.getElementById('downloadSection');
 
+                // Dependency Handling
+                const depWizard = document.getElementById('dependencyWizard');
+                const mainContent = document.getElementById('mainContent');
+                const installStatus = document.getElementById('installStatus');
+                const installBtn = document.getElementById('installDepsBtn');
+
+                if (status.dependency_missing || status.installing_deps) {
+                    depWizard.classList.remove('hidden');
+                    mainContent.classList.add('hidden');
+
+                    if (status.installing_deps) {
+                        installStatus.innerHTML = '<span class="loader"></span> Installing dependencies... This may take a few minutes.';
+                        installBtn.disabled = true;
+                        setTimeout(checkStatus, 3000); // Poll slower
+                    } else {
+                        installStatus.innerHTML = '';
+                        installBtn.disabled = false;
+                        if (status.error) {
+                             installStatus.innerText = 'Error: ' + status.error;
+                             installStatus.style.color = 'var(--accent-color)'; // or red
+                        }
+                    }
+
+                    el.className = 'status-badge status-err';
+                    el.innerText = 'Missing Deps';
+                    return; // Stop processing normal status
+                } else {
+                    depWizard.classList.add('hidden');
+                    mainContent.classList.remove('hidden');
+                }
+
+                // Normal Status Handling
                 if (status.loaded) {
                     el.className = 'status-badge status-ok';
                     el.innerText = 'Model Loaded';
@@ -371,6 +426,15 @@
                 }
             } catch (e) {
                 console.error(e);
+            }
+        }
+
+        async function installDependencies() {
+            try {
+                await api('/install_dependencies', 'POST');
+                checkStatus();
+            } catch (e) {
+                alert('Failed to start installation: ' + e.message);
             }
         }
 

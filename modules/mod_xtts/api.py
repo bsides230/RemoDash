@@ -11,6 +11,8 @@ import uuid
 import logging
 import platform
 import requests
+import subprocess
+import sys
 from pathlib import Path
 from datetime import datetime
 
@@ -40,10 +42,13 @@ model_state = {
     "loaded": False,
     "loading": False,
     "error": None,
-    "model_name": "xtts_v2"
+    "model_name": "xtts_v2",
+    "dependency_missing": False,
+    "installing_deps": False
 }
 
 tts_instance = None
+TTS = None
 
 # --- Constants ---
 XTTS_FILES = {
@@ -65,6 +70,8 @@ try:
 except ImportError as e:
     logger.error(f"CRITICAL: Coqui TTS not found. Please pip install coqui-tts. Error: {e}")
     # We allow the module to load so we can serve the API, but model loading will fail.
+    model_state["dependency_missing"] = True
+    model_state["error"] = "Missing dependencies (coqui-tts). Please install them."
 
 # --- Helper Functions ---
 
@@ -156,8 +163,45 @@ def ensure_model_files():
 
     return target_dir
 
+def run_installer():
+    global model_state, TTS
+    model_state["installing_deps"] = True
+    model_state["error"] = None
+    logger.info("Starting dependency installation...")
+
+    try:
+        # Run pip install
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(MODULE_DIR / "requirements.txt")])
+        logger.info("Dependency installation complete.")
+
+        # Try to import
+        import torch
+        import torchaudio
+        from TTS.api import TTS
+
+        # If successful
+        model_state["dependency_missing"] = False
+        model_state["installing_deps"] = False
+
+        # Trigger model load
+        load_model_task()
+
+    except Exception as e:
+        logger.error(f"Installation failed: {e}")
+        model_state["error"] = f"Installation failed: {e}"
+        model_state["installing_deps"] = False
+
 def load_model_task():
-    global tts_instance, model_state
+    global tts_instance, model_state, TTS
+
+    # Attempt dynamic import if missing
+    if TTS is None:
+        try:
+            from TTS.api import TTS
+        except ImportError:
+             model_state["error"] = "Dependency 'coqui-tts' is missing."
+             model_state["dependency_missing"] = True
+             return
 
     if model_state["loading"] or model_state["loaded"]:
         return
@@ -221,6 +265,14 @@ class SettingsUpdate(BaseModel):
 @router.get("/status")
 def get_status():
     return model_state
+
+@router.post("/install_dependencies")
+def install_dependencies(background_tasks: BackgroundTasks):
+    if model_state["installing_deps"]:
+        return {"status": "busy", "message": "Installation already in progress."}
+
+    background_tasks.add_task(run_installer)
+    return {"status": "started", "message": "Dependency installation started in background."}
 
 @router.post("/download")
 def download_model(req: DownloadRequest, background_tasks: BackgroundTasks):
