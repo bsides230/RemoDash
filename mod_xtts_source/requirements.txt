@@ -1,4 +1,6 @@
-coqui-tts>=0.22.0
+coqui-tts
 torch
 torchaudio
 requests
+transformers==4.36.2
+accelerate==0.26.0

@@ -45,6 +45,7 @@
             width: 100%;
             height: 40px;
             outline: none;
+            filter: invert(0.9);
         }
 
         /* Scrollable Content Area */
@@ -422,7 +423,7 @@
                         installBtn.disabled = false;
                         if (status.error) {
                              installStatus.innerText = 'Error: ' + status.error;
-                             installStatus.style.color = 'var(--accent-color)'; // or red
+                             installStatus.style.color = '#ffffff'; // White as requested
                              logsDiv.classList.remove('hidden'); // Keep logs visible on error
                         } else {
                             logsDiv.classList.add('hidden');

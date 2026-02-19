@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XTTS v2</title>
-    <!-- Use base styles from dashboard if possible, or simple Tailwind-like classes -->
     <style>
         :root {
             --bg-color: #1e1e1e;
@@ -16,7 +15,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: transparent; /* Use dashboard bg */
+            background-color: transparent;
             color: var(--text-color);
             margin: 0;
             padding: 20px;
@@ -27,12 +26,44 @@
             flex-direction: column;
         }
 
+        /* Persistent Header */
+        header {
+            flex: 0 0 auto;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .main-player-container {
+            background: var(--secondary-bg);
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        audio {
+            width: 100%;
+            height: 40px;
+            outline: none;
+            filter: invert(0.9);
+        }
+
+        /* Scrollable Content Area */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+            display: flex;
+            flex-direction: column;
+        }
+
         /* Tabs */
         .tabs {
             display: flex;
             gap: 10px;
             border-bottom: 2px solid var(--border-color);
             margin-bottom: 20px;
+            flex-shrink: 0;
         }
         .tab-btn {
             background: none;
@@ -51,8 +82,6 @@
         .tab-content {
             display: none;
             flex: 1;
-            overflow-y: auto;
-            padding-right: 5px; /* Scrollbar space */
         }
         .tab-content.active {
             display: block;
@@ -100,8 +129,8 @@
             background-color: #d32f2f;
         }
 
-        /* Tables & Lists */
-        .list-item, .table-row {
+        /* Lists */
+        .list-item {
             display: flex;
             align-items: center;
             padding: 10px;
@@ -116,13 +145,6 @@
         .col-date { width: 150px; color: #aaa; font-size: 0.9em; }
         .col-actions { display: flex; gap: 5px; }
 
-        /* Audio Player Customization */
-        audio {
-            width: 100%;
-            height: 40px;
-            margin-top: 10px;
-        }
-
         /* Status Badge */
         .status-badge {
             display: inline-block;
@@ -135,7 +157,6 @@
         .status-warn { background-color: #f9a825; color: black; }
         .status-err { background-color: #c62828; color: white; }
 
-        /* Loader */
         .loader {
             border: 4px solid #f3f3f3;
             border-top: 4px solid var(--accent-color);
@@ -165,89 +186,131 @@
             width: 400px;
             border: 1px solid var(--border-color);
         }
+
+        /* Installation Wizard */
+        .wizard-container {
+            background: var(--secondary-bg);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--accent-color);
+            margin-bottom: 20px;
+        }
+        .wizard-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        #installLogs {
+            margin-top: 15px;
+            background-color: #111;
+            color: #0f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            white-space: pre-wrap;
+            border: 1px solid #444;
+        }
     </style>
 </head>
 <body>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('generate')">Generate</button>
-        <button class="tab-btn" onclick="switchTab('history')">History</button>
-        <button class="tab-btn" onclick="switchTab('voices')">Voices</button>
-        <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
-    </div>
-
-    <!-- GENERATE TAB -->
-    <div id="tab-generate" class="tab-content active">
-        <div class="form-group">
-            <label>Voice Profile</label>
-            <select id="voiceSelect">
-                <option value="">Loading voices...</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Text to Speak</label>
-            <textarea id="TextInput" placeholder="Type something here..."></textarea>
-        </div>
-        <div class="form-group">
-            <button id="generateBtn" onclick="generateSpeech()">Generate Audio</button>
-            <span id="genStatus" style="margin-left: 10px;"></span>
-        </div>
-
-        <div id="resultArea" class="hidden" style="margin-top: 20px; padding: 15px; background: var(--secondary-bg); border-radius: 8px;">
-            <h3 style="margin-top:0">Result</h3>
-            <div id="audioContainer"></div>
-            <p id="resultText" style="color:#aaa; font-style:italic; font-size:0.9em;"></p>
-        </div>
-    </div>
-
-    <!-- HISTORY TAB -->
-    <div id="tab-history" class="tab-content">
-        <div style="margin-bottom: 10px; display: flex; justify-content: space-between;">
-            <button class="danger" onclick="deleteSelectedHistory()">Delete Selected</button>
-            <button onclick="loadHistory()">Refresh</button>
-        </div>
-        <div id="historyList">
-            <!-- Populated via JS -->
-        </div>
-    </div>
-
-    <!-- VOICES TAB -->
-    <div id="tab-voices" class="tab-content">
-        <div style="margin-bottom: 10px;">
-            <button onclick="showAddVoiceModal()">+ Add New Voice</button>
-        </div>
-        <div id="voiceList">
-            <!-- Populated via JS -->
-        </div>
-    </div>
-
-    <!-- SETTINGS TAB -->
-    <div id="tab-settings" class="tab-content">
-        <div class="form-group">
-            <h3>Model Status</h3>
-            <div id="modelStatus" class="status-badge status-warn">Checking...</div>
-            <p id="modelMsg" style="color:#aaa; font-size: 0.9em;"></p>
-        </div>
-
-        <div id="downloadSection" class="hidden form-group" style="padding: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
-            <h4>Download Model</h4>
-            <p>The XTTS v2 model is licensed under the Coqui Public Model License (CPML).</p>
-            <div style="margin-bottom: 10px;">
-                <input type="checkbox" id="licenseCheck" style="width:auto;">
-                <label for="licenseCheck" style="display:inline;">I agree to the CPML terms.</label>
+    <header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin:0;">XTTS v2</h2>
+            <div>
+                <span id="modelStatus" class="status-badge status-warn">Checking...</span>
             </div>
-            <button onclick="downloadModel()">Download Model</button>
+        </div>
+        <div class="main-player-container">
+             <audio id="mainAudio" controls></audio>
+             <div id="nowPlayingText" style="font-size: 0.8em; color: #aaa; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ready to play.</div>
+        </div>
+    </header>
+
+    <div id="dependencyWizard" class="wizard-container hidden">
+        <div class="wizard-icon">📦</div>
+        <h3>Missing Dependencies</h3>
+        <p>This module requires additional Python libraries (coqui-tts) to function.</p>
+        <p style="color: #aaa; font-size: 0.9em;">Click below to automatically install them.</p>
+        <button id="installDepsBtn" onclick="installDependencies()">Install Dependencies</button>
+        <div id="installStatus" style="margin-top: 10px; font-weight: bold;"></div>
+        <div id="installLogs" class="hidden"></div>
+    </div>
+
+    <div class="content-area" id="mainContent">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('generate')">Generate</button>
+            <button class="tab-btn" onclick="switchTab('history')">History</button>
+            <button class="tab-btn" onclick="switchTab('voices')">Voices</button>
+            <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
         </div>
 
-        <div class="form-group">
-            <h3>Device Settings</h3>
-            <label>Processing Device</label>
-            <select id="deviceSelect">
-                <option value="cpu">CPU (Safe)</option>
-                <option value="vulkan">Vulkan (Experimental/Intel iGPU)</option>
-                <option value="cuda">CUDA (NVIDIA GPU)</option>
-            </select>
-            <button onclick="saveSettings()" style="margin-top: 10px;">Save Settings</button>
+        <!-- GENERATE TAB -->
+        <div id="tab-generate" class="tab-content active">
+            <div class="form-group">
+                <label>Voice Profile</label>
+                <select id="voiceSelect">
+                    <option value="">Loading voices...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Text to Speak</label>
+                <textarea id="TextInput" placeholder="Type something here..."></textarea>
+            </div>
+            <div class="form-group">
+                <button id="generateBtn" onclick="generateSpeech()">Generate Audio</button>
+                <span id="genStatus" style="margin-left: 10px;"></span>
+            </div>
+        </div>
+
+        <!-- HISTORY TAB -->
+        <div id="tab-history" class="tab-content">
+            <div style="margin-bottom: 10px; display: flex; justify-content: space-between;">
+                <button class="danger" onclick="deleteSelectedHistory()">Delete Selected</button>
+                <button onclick="loadHistory()">Refresh</button>
+            </div>
+            <div id="historyList"></div>
+        </div>
+
+        <!-- VOICES TAB -->
+        <div id="tab-voices" class="tab-content">
+            <div style="margin-bottom: 10px;">
+                <button onclick="showAddVoiceModal()">+ Add New Voice</button>
+            </div>
+            <div id="voiceList"></div>
+        </div>
+
+        <!-- SETTINGS TAB -->
+        <div id="tab-settings" class="tab-content">
+            <div class="form-group">
+                <p id="modelMsg" style="color:#aaa; font-size: 0.9em;"></p>
+            </div>
+
+            <div id="downloadSection" class="hidden form-group" style="padding: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+                <h4>Download Model</h4>
+                <p>The XTTS v2 model is licensed under the Coqui Public Model License (CPML).</p>
+                <div style="margin-bottom: 10px;">
+                    <input type="checkbox" id="licenseCheck" style="width:auto;">
+                    <label for="licenseCheck" style="display:inline;">I agree to the CPML terms.</label>
+                </div>
+                <button onclick="downloadModel()">Download Model</button>
+            </div>
+
+            <div class="form-group">
+                <h3>Device Settings</h3>
+                <label>Processing Device</label>
+                <select id="deviceSelect">
+                    <option value="cpu">CPU (Safe)</option>
+                    <option value="vulkan">Vulkan (Experimental/Intel iGPU)</option>
+                    <option value="cuda">CUDA (NVIDIA GPU)</option>
+                </select>
+                <button onclick="saveSettings()" style="margin-top: 10px;">Save Settings</button>
+            </div>
         </div>
     </div>
 
@@ -272,6 +335,8 @@
 
     <script>
         const API_BASE = '/api/modules/mod_xtts';
+        const mainAudio = document.getElementById('mainAudio');
+        const nowPlayingText = document.getElementById('nowPlayingText');
 
         // --- Tabs ---
         function switchTab(tabId) {
@@ -307,7 +372,16 @@
             return res.json();
         }
 
+        // --- Player ---
+        function playAudio(url, text) {
+            mainAudio.src = url;
+            mainAudio.play();
+            nowPlayingText.innerText = text || 'Playing...';
+        }
+
         // --- Status & Settings ---
+        let logPollInterval = null;
+
         async function checkStatus() {
             try {
                 const status = await api('/status');
@@ -315,6 +389,56 @@
                 const msg = document.getElementById('modelMsg');
                 const dlSec = document.getElementById('downloadSection');
 
+                // Dependency Handling
+                const depWizard = document.getElementById('dependencyWizard');
+                const mainContent = document.getElementById('mainContent');
+                const installStatus = document.getElementById('installStatus');
+                const installBtn = document.getElementById('installDepsBtn');
+                const logsDiv = document.getElementById('installLogs');
+
+                if (status.dependency_missing || status.installing_deps) {
+                    depWizard.classList.remove('hidden');
+                    mainContent.classList.add('hidden');
+
+                    if (status.installing_deps) {
+                        installStatus.innerHTML = '<span class="loader"></span> Installing dependencies... This may take a few minutes.';
+                        installBtn.disabled = true;
+                        logsDiv.classList.remove('hidden');
+
+                        // Start polling logs if not already
+                        if (!logPollInterval) {
+                            pollLogs();
+                            logPollInterval = setInterval(pollLogs, 1000);
+                        }
+
+                        setTimeout(checkStatus, 3000); // Poll slower
+                    } else {
+                        // Stopped installing
+                        if (logPollInterval) {
+                            clearInterval(logPollInterval);
+                            logPollInterval = null;
+                        }
+
+                        installStatus.innerHTML = '';
+                        installBtn.disabled = false;
+                        if (status.error) {
+                             installStatus.innerText = 'Error: ' + status.error;
+                             installStatus.style.color = '#ffffff'; // White as requested
+                             logsDiv.classList.remove('hidden'); // Keep logs visible on error
+                        } else {
+                            logsDiv.classList.add('hidden');
+                        }
+                    }
+
+                    el.className = 'status-badge status-err';
+                    el.innerText = 'Missing Deps';
+                    return; // Stop processing normal status
+                } else {
+                    depWizard.classList.add('hidden');
+                    mainContent.classList.remove('hidden');
+                }
+
+                // Normal Status Handling
                 if (status.loaded) {
                     el.className = 'status-badge status-ok';
                     el.innerText = 'Model Loaded';
@@ -322,7 +446,7 @@
                     dlSec.classList.add('hidden');
                 } else if (status.loading) {
                     el.className = 'status-badge status-warn';
-                    el.innerHTML = '<span class="loader"></span> Loading/Downloading...';
+                    el.innerHTML = '<span class="loader"></span> Loading...';
                     msg.innerText = 'Please wait...';
                     dlSec.classList.add('hidden');
                     setTimeout(checkStatus, 2000); // Poll
@@ -340,6 +464,27 @@
             } catch (e) {
                 console.error(e);
             }
+        }
+
+        async function installDependencies() {
+            try {
+                document.getElementById('installLogs').innerHTML = '';
+                await api('/install_dependencies', 'POST');
+                checkStatus();
+            } catch (e) {
+                alert('Failed to start installation: ' + e.message);
+            }
+        }
+
+        async function pollLogs() {
+            try {
+                const logs = await api('/install_logs');
+                const div = document.getElementById('installLogs');
+                if (logs && logs.length > 0) {
+                    div.innerText = logs.join('\n');
+                    div.scrollTop = div.scrollHeight;
+                }
+            } catch(e) { console.error("Log poll error", e); }
         }
 
         async function downloadModel() {
@@ -413,8 +558,7 @@
         }
 
         function playReference(vid) {
-            const audio = new Audio(API_BASE + '/voices/' + vid + '/reference');
-            audio.play();
+            playAudio(API_BASE + '/voices/' + vid + '/reference', 'Reference Audio');
         }
 
         async function deleteVoice(vid) {
@@ -490,12 +634,8 @@
             try {
                 const res = await api('/generate', 'POST', { text, voice_id: vid });
 
-                // Show Result
-                const container = document.getElementById('audioContainer');
-                container.innerHTML = `<audio controls autoplay src="${res.path}"></audio>`;
-
-                document.getElementById('resultText').innerText = text;
-                document.getElementById('resultArea').classList.remove('hidden');
+                // Play Result in persistent player
+                playAudio(res.path, text);
 
                 status.innerHTML = '';
             } catch (e) {
@@ -530,7 +670,7 @@
                         </div>
                         <div class="col-date">${h.date}</div>
                         <div class="col-actions">
-                            <button style="padding:5px 10px;" onclick="playHistory('${h.filename}')">▶</button>
+                            <button style="padding:5px 10px;" onclick="playHistory('${h.filename}', '${h.text.replace(/'/g, "\\'")}')">▶</button>
                             <button class="danger" style="padding:5px 10px;" onclick="deleteSingleHistory('${h.filename}')">🗑</button>
                         </div>
                     `;
@@ -539,9 +679,8 @@
             } catch (e) { console.error(e); }
         }
 
-        function playHistory(filename) {
-            const audio = new Audio(API_BASE + '/output/' + filename);
-            audio.play();
+        function playHistory(filename, text) {
+            playAudio(API_BASE + '/output/' + filename, text);
         }
 
         async function deleteSingleHistory(filename) {
