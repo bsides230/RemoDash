@@ -171,8 +171,13 @@ def run_installer():
 
     try:
         # Run pip install
-        # We use check_call to ensure it raises an exception if it fails
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(MODULE_DIR / "requirements.txt")])
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(MODULE_DIR / "requirements.txt")],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
         logger.info("Dependency installation complete.")
 
         # Try to import
@@ -188,9 +193,18 @@ def run_installer():
         load_model_task()
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Pip installation failed: {e}")
-        model_state["error"] = f"Installation failed: pip returned error code {e.returncode}"
+        logger.error(f"Pip installation failed: {e.stderr}")
+
+        # Rust Check
+        if "rust" in e.stderr.lower() or "cargo" in e.stderr.lower():
+             model_state["error"] = "Installation failed: Rust compiler missing. Please install Rust (https://rustup.rs) or use Python 3.10-3.12."
+        else:
+             # Capture last few lines of error
+             err_lines = e.stderr.strip().splitlines()[-3:]
+             model_state["error"] = f"Installation failed: {' '.join(err_lines)}"
+
         model_state["installing_deps"] = False
+
     except ImportError as e:
         logger.error(f"Import failed after install: {e}")
         model_state["error"] = f"Installation succeeded, but import failed: {e}. Please restart."
