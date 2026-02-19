@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XTTS v2</title>
+    <!-- Use base styles from dashboard if possible, or simple Tailwind-like classes -->
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #ffffff;
+            --accent-color: #6200ea;
+            --secondary-bg: #2d2d2d;
+            --border-color: #444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: transparent; /* Use dashboard bg */
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: color 0.2s, border-bottom 0.2s;
+        }
+        .tab-btn.active {
+            color: var(--text-color);
+            border-bottom: 2px solid var(--accent-color);
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px; /* Scrollbar space */
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        button.danger {
+            background-color: #d32f2f;
+        }
+
+        /* Tables & Lists */
+        .list-item, .table-row {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            gap: 10px;
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .col-check { width: 30px; }
+        .col-grow { flex: 1; }
+        .col-date { width: 150px; color: #aaa; font-size: 0.9em; }
+        .col-actions { display: flex; gap: 5px; }
+
+        /* Audio Player Customization */
+        audio {
+            width: 100%;
+            height: 40px;
+            margin-top: 10px;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .status-ok { background-color: #2e7d32; color: white; }
+        .status-warn { background-color: #f9a825; color: black; }
+        .status-err { background-color: #c62828; color: white; }
+
+        /* Loader */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none !important; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top:0; left:0; right:0; bottom:0;
+            background: rgba(0,0,0,0.7);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            border: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('generate')">Generate</button>
+        <button class="tab-btn" onclick="switchTab('history')">History</button>
+        <button class="tab-btn" onclick="switchTab('voices')">Voices</button>
+        <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
+    </div>
+
+    <!-- GENERATE TAB -->
+    <div id="tab-generate" class="tab-content active">
+        <div class="form-group">
+            <label>Voice Profile</label>
+            <select id="voiceSelect">
+                <option value="">Loading voices...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Text to Speak</label>
+            <textarea id="TextInput" placeholder="Type something here..."></textarea>
+        </div>
+        <div class="form-group">
+            <button id="generateBtn" onclick="generateSpeech()">Generate Audio</button>
+            <span id="genStatus" style="margin-left: 10px;"></span>
+        </div>
+
+        <div id="resultArea" class="hidden" style="margin-top: 20px; padding: 15px; background: var(--secondary-bg); border-radius: 8px;">
+            <h3 style="margin-top:0">Result</h3>
+            <div id="audioContainer"></div>
+            <p id="resultText" style="color:#aaa; font-style:italic; font-size:0.9em;"></p>
+        </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-content">
+        <div style="margin-bottom: 10px; display: flex; justify-content: space-between;">
+            <button class="danger" onclick="deleteSelectedHistory()">Delete Selected</button>
+            <button onclick="loadHistory()">Refresh</button>
+        </div>
+        <div id="historyList">
+            <!-- Populated via JS -->
+        </div>
+    </div>
+
+    <!-- VOICES TAB -->
+    <div id="tab-voices" class="tab-content">
+        <div style="margin-bottom: 10px;">
+            <button onclick="showAddVoiceModal()">+ Add New Voice</button>
+        </div>
+        <div id="voiceList">
+            <!-- Populated via JS -->
+        </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div id="tab-settings" class="tab-content">
+        <div class="form-group">
+            <h3>Model Status</h3>
+            <div id="modelStatus" class="status-badge status-warn">Checking...</div>
+            <p id="modelMsg" style="color:#aaa; font-size: 0.9em;"></p>
+        </div>
+
+        <div id="downloadSection" class="hidden form-group" style="padding: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <h4>Download Model</h4>
+            <p>The XTTS v2 model is licensed under the Coqui Public Model License (CPML).</p>
+            <div style="margin-bottom: 10px;">
+                <input type="checkbox" id="licenseCheck" style="width:auto;">
+                <label for="licenseCheck" style="display:inline;">I agree to the CPML terms.</label>
+            </div>
+            <button onclick="downloadModel()">Download Model</button>
+        </div>
+
+        <div class="form-group">
+            <h3>Device Settings</h3>
+            <label>Processing Device</label>
+            <select id="deviceSelect">
+                <option value="cpu">CPU (Safe)</option>
+                <option value="vulkan">Vulkan (Experimental/Intel iGPU)</option>
+                <option value="cuda">CUDA (NVIDIA GPU)</option>
+            </select>
+            <button onclick="saveSettings()" style="margin-top: 10px;">Save Settings</button>
+        </div>
+    </div>
+
+    <!-- ADD VOICE MODAL -->
+    <div id="addVoiceModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h3>Add New Voice</h3>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="newVoiceName" placeholder="e.g. My Voice">
+            </div>
+            <div class="form-group">
+                <label>Reference Audio (WAV/MP3, ~10s)</label>
+                <input type="file" id="newVoiceFile" accept="audio/*">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="closeAddVoiceModal()" style="background:#555">Cancel</button>
+                <button onclick="addVoice()">Create Voice</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/modules/mod_xtts';
+
+        // --- Tabs ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add('active');
+
+            if (tabId === 'history') loadHistory();
+            if (tabId === 'voices') loadVoices();
+            if (tabId === 'settings') checkStatus();
+        }
+
+        // --- Init ---
+        window.addEventListener('load', () => {
+            checkStatus();
+            loadVoices();
+            loadSettings();
+        });
+
+        // --- API Helpers ---
+        async function api(endpoint, method = 'GET', body = null) {
+            const opts = { method };
+            if (body) {
+                opts.headers = { 'Content-Type': 'application/json' };
+                opts.body = JSON.stringify(body);
+            }
+            const res = await fetch(API_BASE + endpoint, opts);
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'API Error');
+            }
+            return res.json();
+        }
+
+        // --- Status & Settings ---
+        async function checkStatus() {
+            try {
+                const status = await api('/status');
+                const el = document.getElementById('modelStatus');
+                const msg = document.getElementById('modelMsg');
+                const dlSec = document.getElementById('downloadSection');
+
+                if (status.loaded) {
+                    el.className = 'status-badge status-ok';
+                    el.innerText = 'Model Loaded';
+                    msg.innerText = 'Ready to generate.';
+                    dlSec.classList.add('hidden');
+                } else if (status.loading) {
+                    el.className = 'status-badge status-warn';
+                    el.innerHTML = '<span class="loader"></span> Loading/Downloading...';
+                    msg.innerText = 'Please wait...';
+                    dlSec.classList.add('hidden');
+                    setTimeout(checkStatus, 2000); // Poll
+                } else if (status.error) {
+                    el.className = 'status-badge status-err';
+                    el.innerText = 'Error';
+                    msg.innerText = status.error;
+                    dlSec.classList.remove('hidden');
+                } else {
+                    el.className = 'status-badge status-warn';
+                    el.innerText = 'Not Loaded';
+                    msg.innerText = 'Model files missing or not loaded.';
+                    dlSec.classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function downloadModel() {
+            if (!document.getElementById('licenseCheck').checked) {
+                alert('Please agree to the license terms.');
+                return;
+            }
+            try {
+                await api('/download', 'POST', { agree: true });
+                checkStatus();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function loadSettings() {
+            try {
+                const s = await api('/settings');
+                document.getElementById('deviceSelect').value = s.device || 'cpu';
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveSettings() {
+            const dev = document.getElementById('deviceSelect').value;
+            try {
+                await api('/settings', 'POST', { device: dev });
+                alert('Settings saved. If changing device, the model may reload next time.');
+            } catch (e) { alert(e.message); }
+        }
+
+        // --- Voices ---
+        async function loadVoices() {
+            try {
+                const voices = await api('/voices');
+                const list = document.getElementById('voiceList');
+                const select = document.getElementById('voiceSelect');
+
+                list.innerHTML = '';
+                select.innerHTML = '';
+
+                if (voices.length === 0) {
+                    list.innerHTML = '<p style="color:#aaa; text-align:center;">No voices found. Add one!</p>';
+                    select.innerHTML = '<option value="">No voices available</option>';
+                    return;
+                }
+
+                voices.forEach(v => {
+                    // List Item
+                    const item = document.createElement('div');
+                    item.className = 'list-item';
+                    item.innerHTML = `
+                        <div class="col-grow">
+                            <strong>${v.name}</strong>
+                        </div>
+                        <div class="col-actions">
+                            <button style="padding:5px 10px;" onclick="playReference('${v.id}')">▶ Ref</button>
+                            <button class="danger" style="padding:5px 10px;" onclick="deleteVoice('${v.id}')">🗑</button>
+                        </div>
+                    `;
+                    list.appendChild(item);
+
+                    // Dropdown Option
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.innerText = v.name;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function playReference(vid) {
+            const audio = new Audio(API_BASE + '/voices/' + vid + '/reference');
+            audio.play();
+        }
+
+        async function deleteVoice(vid) {
+            if (!confirm('Delete this voice profile?')) return;
+            try {
+                await api('/voices/' + vid, 'DELETE');
+                loadVoices();
+            } catch (e) { alert(e.message); }
+        }
+
+        function showAddVoiceModal() {
+            document.getElementById('addVoiceModal').classList.remove('hidden');
+        }
+        function closeAddVoiceModal() {
+            document.getElementById('addVoiceModal').classList.add('hidden');
+        }
+
+        async function addVoice() {
+            const name = document.getElementById('newVoiceName').value;
+            const file = document.getElementById('newVoiceFile').files[0];
+
+            if (!name || !file) {
+                alert('Please provide a name and an audio file.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('audio', file);
+
+            const btn = document.querySelector('#addVoiceModal button:last-child');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = 'Processing...';
+
+            try {
+                const res = await fetch(API_BASE + '/voices/add', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Failed');
+                }
+
+                closeAddVoiceModal();
+                loadVoices();
+                alert('Voice added successfully!');
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        }
+
+        // --- Generate ---
+        async function generateSpeech() {
+            const text = document.getElementById('TextInput').value;
+            const vid = document.getElementById('voiceSelect').value;
+
+            if (!text || !vid) {
+                alert('Please enter text and select a voice.');
+                return;
+            }
+
+            const btn = document.getElementById('generateBtn');
+            const status = document.getElementById('genStatus');
+
+            btn.disabled = true;
+            status.innerHTML = '<span class="loader"></span> Generating...';
+
+            try {
+                const res = await api('/generate', 'POST', { text, voice_id: vid });
+
+                // Show Result
+                const container = document.getElementById('audioContainer');
+                container.innerHTML = `<audio controls autoplay src="${res.path}"></audio>`;
+
+                document.getElementById('resultText').innerText = text;
+                document.getElementById('resultArea').classList.remove('hidden');
+
+                status.innerHTML = '';
+            } catch (e) {
+                status.innerText = 'Error: ' + e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- History ---
+        async function loadHistory() {
+            try {
+                const history = await api('/history');
+                const list = document.getElementById('historyList');
+                list.innerHTML = '';
+
+                if (history.length === 0) {
+                    list.innerHTML = '<p style="color:#aaa; text-align:center;">No history.</p>';
+                    return;
+                }
+
+                history.forEach(h => {
+                    const row = document.createElement('div');
+                    row.className = 'list-item';
+                    row.innerHTML = `
+                        <div class="col-check">
+                            <input type="checkbox" class="hist-check" value="${h.filename}">
+                        </div>
+                        <div class="col-grow">
+                            <div style="font-weight:bold;">${h.text.substring(0, 50)}${h.text.length > 50 ? '...' : ''}</div>
+                            <div style="font-size:0.8em; color:#aaa;">Voice ID: ${h.voice_id}</div>
+                        </div>
+                        <div class="col-date">${h.date}</div>
+                        <div class="col-actions">
+                            <button style="padding:5px 10px;" onclick="playHistory('${h.filename}')">▶</button>
+                            <button class="danger" style="padding:5px 10px;" onclick="deleteSingleHistory('${h.filename}')">🗑</button>
+                        </div>
+                    `;
+                    list.appendChild(row);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function playHistory(filename) {
+            const audio = new Audio(API_BASE + '/output/' + filename);
+            audio.play();
+        }
+
+        async function deleteSingleHistory(filename) {
+            if (!confirm('Delete this item?')) return;
+            await doDelete([filename]);
+        }
+
+        async function deleteSelectedHistory() {
+            const checks = document.querySelectorAll('.hist-check:checked');
+            if (checks.length === 0) return;
+            if (!confirm(`Delete ${checks.length} items?`)) return;
+
+            const filenames = Array.from(checks).map(c => c.value);
+            await doDelete(filenames);
+        }
+
+        async function doDelete(filenames) {
+            try {
+                await api('/history/delete', 'POST', { filenames });
+                loadHistory();
+            } catch (e) { alert(e.message); }
+        }
+
+    </script>
+</body>
+</html>
