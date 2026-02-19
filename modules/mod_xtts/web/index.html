@@ -199,6 +199,21 @@
             font-size: 48px;
             margin-bottom: 10px;
         }
+
+        #installLogs {
+            margin-top: 15px;
+            background-color: #111;
+            color: #0f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            white-space: pre-wrap;
+            border: 1px solid #444;
+        }
     </style>
 </head>
 <body>
@@ -223,6 +238,7 @@
         <p style="color: #aaa; font-size: 0.9em;">Click below to automatically install them.</p>
         <button id="installDepsBtn" onclick="installDependencies()">Install Dependencies</button>
         <div id="installStatus" style="margin-top: 10px; font-weight: bold;"></div>
+        <div id="installLogs" class="hidden"></div>
     </div>
 
     <div class="content-area" id="mainContent">
@@ -363,6 +379,8 @@
         }
 
         // --- Status & Settings ---
+        let logPollInterval = null;
+
         async function checkStatus() {
             try {
                 const status = await api('/status');
@@ -375,6 +393,7 @@
                 const mainContent = document.getElementById('mainContent');
                 const installStatus = document.getElementById('installStatus');
                 const installBtn = document.getElementById('installDepsBtn');
+                const logsDiv = document.getElementById('installLogs');
 
                 if (status.dependency_missing || status.installing_deps) {
                     depWizard.classList.remove('hidden');
@@ -383,13 +402,30 @@
                     if (status.installing_deps) {
                         installStatus.innerHTML = '<span class="loader"></span> Installing dependencies... This may take a few minutes.';
                         installBtn.disabled = true;
+                        logsDiv.classList.remove('hidden');
+
+                        // Start polling logs if not already
+                        if (!logPollInterval) {
+                            pollLogs();
+                            logPollInterval = setInterval(pollLogs, 1000);
+                        }
+
                         setTimeout(checkStatus, 3000); // Poll slower
                     } else {
+                        // Stopped installing
+                        if (logPollInterval) {
+                            clearInterval(logPollInterval);
+                            logPollInterval = null;
+                        }
+
                         installStatus.innerHTML = '';
                         installBtn.disabled = false;
                         if (status.error) {
                              installStatus.innerText = 'Error: ' + status.error;
                              installStatus.style.color = 'var(--accent-color)'; // or red
+                             logsDiv.classList.remove('hidden'); // Keep logs visible on error
+                        } else {
+                            logsDiv.classList.add('hidden');
                         }
                     }
 
@@ -431,11 +467,23 @@
 
         async function installDependencies() {
             try {
+                document.getElementById('installLogs').innerHTML = '';
                 await api('/install_dependencies', 'POST');
                 checkStatus();
             } catch (e) {
                 alert('Failed to start installation: ' + e.message);
             }
+        }
+
+        async function pollLogs() {
+            try {
+                const logs = await api('/install_logs');
+                const div = document.getElementById('installLogs');
+                if (logs && logs.length > 0) {
+                    div.innerText = logs.join('\n');
+                    div.scrollTop = div.scrollHeight;
+                }
+            } catch(e) { console.error("Log poll error", e); }
         }
 
         async function downloadModel() {

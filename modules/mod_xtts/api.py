@@ -47,6 +47,7 @@ model_state = {
     "installing_deps": False
 }
 
+install_logs = []
 tts_instance = None
 TTS = None
 
@@ -164,20 +165,37 @@ def ensure_model_files():
     return target_dir
 
 def run_installer():
-    global model_state, TTS
+    global model_state, TTS, install_logs
     model_state["installing_deps"] = True
     model_state["error"] = None
+    install_logs.clear()
+    install_logs.append("Starting dependency installation...")
     logger.info("Starting dependency installation...")
 
     try:
-        # Run pip install
-        result = subprocess.run(
+        # Run pip install with Popen for real-time logging
+        process = subprocess.Popen(
             [sys.executable, "-m", "pip", "install", "-r", str(MODULE_DIR / "requirements.txt")],
-            check=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
         )
+
+        # Read output line by line
+        for line in process.stdout:
+            line = line.strip()
+            if line:
+                install_logs.append(line)
+                logger.info(f"INSTALL: {line}")
+
+        process.wait()
+
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, process.args)
+
+        install_logs.append("Dependency installation complete.")
         logger.info("Dependency installation complete.")
 
         # Try to import
@@ -193,24 +211,26 @@ def run_installer():
         load_model_task()
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Pip installation failed: {e.stderr}")
+        logger.error(f"Pip installation failed: {e}")
+        install_logs.append(f"Installation failed with return code {e.returncode}")
 
-        # Rust Check
-        if "rust" in e.stderr.lower() or "cargo" in e.stderr.lower():
+        # Check logs for specific errors
+        full_log = "\n".join(install_logs).lower()
+        if "rust" in full_log or "cargo" in full_log:
              model_state["error"] = "Installation failed: Rust compiler missing. Please install Rust (https://rustup.rs) or use Python 3.10-3.12."
         else:
-             # Capture last few lines of error
-             err_lines = e.stderr.strip().splitlines()[-3:]
-             model_state["error"] = f"Installation failed: {' '.join(err_lines)}"
+             model_state["error"] = "Installation failed. Check logs."
 
         model_state["installing_deps"] = False
 
     except ImportError as e:
         logger.error(f"Import failed after install: {e}")
+        install_logs.append(f"Import failed: {e}")
         model_state["error"] = f"Installation succeeded, but import failed: {e}. Please restart."
         model_state["installing_deps"] = False
     except Exception as e:
         logger.error(f"Installation failed: {e}")
+        install_logs.append(f"Error: {e}")
         model_state["error"] = f"Installation failed: {e}"
         model_state["installing_deps"] = False
 
@@ -289,6 +309,10 @@ class SettingsUpdate(BaseModel):
 @router.get("/status")
 def get_status():
     return model_state
+
+@router.get("/install_logs")
+def get_install_logs():
+    return install_logs
 
 @router.post("/install_dependencies")
 def install_dependencies(background_tasks: BackgroundTasks):
