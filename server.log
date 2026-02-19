@@ -1,7 +1,9 @@
-INFO:     Started server process [9087]
+ERROR:mod_xtts:Coqui TTS not found: No module named 'torch'. Please install dependencies.
+INFO:     Started server process [2851]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8050 (Press CTRL+C to quit)
+INFO:mod_xtts:Status check requested
 No settings.json found - First boot detected. Creating default settings.
 Settings saved successfully
 Settings loaded successfully
@@ -9,107 +11,16 @@ Settings loaded successfully
 Settings saved successfully
 Settings loaded successfully
 [ModuleManager] Loading modules...
+[ModuleManager] Loading mod_xtts...
+  - Mounted static files at /modules/mod_xtts
+  - Registered API router at /api/modules/mod_xtts
 [System] Allowed Origins: ['http://localhost:8050', 'http://127.0.0.1:8050']
 Starting RemoDash server on port 8050...
 [System] RemoDash Server started.
-INFO:     127.0.0.1:41420 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41420 - "GET /assets/style.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /assets/base.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41420 - "GET /sw.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41420 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41420 - "GET /manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /favicon.ico HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41420 - "GET /api/themes/list HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:41422 - "GET /api/themes/list HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:41422 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41420 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /assets/fonts/JetBrainsMono-Bold.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:41422 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56754 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56754 - "GET /assets/style.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56758 - "GET /assets/base.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56754 - "GET /sw.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56754 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56758 - "GET /manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /favicon.ico HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56758 - "GET /api/themes/list HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56754 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /api/themes/list HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56754 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56758 - "GET /api/themes/default/theme.css?v=1771306613769 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56758 - "GET /api/config HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /core_manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /api/modules HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:56774 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /assets/style.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49150 - "GET /assets/base.css HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49150 - "GET /sw.js HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49150 - "GET /manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /favicon.ico HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49150 - "GET /api/themes/list HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /api/themes/list HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49158 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49164 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49164 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49164 - "GET /api/auth/status HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49164 - "GET /api/config HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49158 - "GET /api/themes/default/theme.css?v=1771306672325 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /core_manifest.json HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /api/modules HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /assets/fonts/Inter-SemiBold.woff2 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /api/themes/cyberpunk/theme.css?v=1771306674162 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49136 - "GET /health HTTP/1.1" 200 OK
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [9087]
+INFO:     127.0.0.1:59152 - "GET /api/modules/mod_xtts/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49578 - "GET /modules/mod_xtts/index.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60442 - "GET /modules/mod_xtts/index.html HTTP/1.1" 200 OK
+INFO:mod_xtts:Status check requested
+INFO:     127.0.0.1:60442 - "GET /api/modules/mod_xtts/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60448 - "GET /api/modules/mod_xtts/voices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60460 - "GET /api/modules/mod_xtts/settings HTTP/1.1" 200 OK

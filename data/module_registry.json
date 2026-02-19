@@ -1,0 +1,12 @@
+{
+  "modules": [
+    {
+      "id": "mod_xtts",
+      "name": "XTTS v2",
+      "icon": "record_voice_over",
+      "version": "1.0.0",
+      "enabled": true,
+      "path": "modules/mod_xtts"
+    }
+  ]
+}
