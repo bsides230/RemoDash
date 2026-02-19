@@ -1,4 +1,4 @@
-coqui-tts
+coqui-tts==0.22.0
 torch
 torchaudio
 requests
