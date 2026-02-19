@@ -1,5 +1,4 @@
-coqui-tts>=0.22.0
-transformers==4.41.2
+coqui-tts==0.22.0
 torch
 torchaudio
 requests
