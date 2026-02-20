@@ -187,33 +187,74 @@
             border: 1px solid var(--border-color);
         }
 
-        /* Installation Wizard */
-        .wizard-container {
+        /* Manual Install UI */
+        .missing-deps-container {
             background: var(--secondary-bg);
             padding: 20px;
             border-radius: 8px;
-            text-align: center;
             border: 1px solid var(--accent-color);
             margin-bottom: 20px;
+            overflow-y: auto;
         }
-        .wizard-icon {
-            font-size: 48px;
+
+        .os-tabs {
+            display: flex;
+            gap: 5px;
             margin-bottom: 10px;
         }
 
-        #installLogs {
-            margin-top: 15px;
-            background-color: #111;
-            color: #0f0;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.85em;
-            padding: 10px;
+        .os-tab {
+            padding: 8px 16px;
+            background: #444;
+            border: none;
             border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            text-align: left;
-            white-space: pre-wrap;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .os-tab.active {
+            background: var(--accent-color);
+            color: white;
+            font-weight: bold;
+        }
+
+        .code-block-container {
+            position: relative;
+            background: #111;
+            padding: 15px;
+            border-radius: 4px;
             border: 1px solid #444;
+        }
+
+        .code-block {
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: #0f0;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            font-size: 0.8em;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .copy-btn:hover {
+            background: #555;
+        }
+
+        .missing-list {
+            margin: 10px 0;
+            padding-left: 20px;
+            color: #ff5555;
         }
     </style>
 </head>
@@ -232,14 +273,37 @@
         </div>
     </header>
 
-    <div id="dependencyWizard" class="wizard-container hidden">
-        <div class="wizard-icon">📦</div>
-        <h3>Missing Dependencies</h3>
-        <p>This module requires additional Python libraries (coqui-tts) to function.</p>
-        <p style="color: #aaa; font-size: 0.9em;">Click below to automatically install them.</p>
-        <button id="installDepsBtn" onclick="installDependencies()">Install Dependencies</button>
-        <div id="installStatus" style="margin-top: 10px; font-weight: bold;"></div>
-        <div id="installLogs" class="hidden"></div>
+    <!-- Missing Dependencies Manual Install Section -->
+    <div id="missingDepsSection" class="missing-deps-container hidden">
+        <h3 style="margin-top:0;">⚠️ Missing Requirements</h3>
+        <p>The following dependencies are missing or failed to load:</p>
+        <ul id="missingList" class="missing-list"></ul>
+        <p>Please manually install them using the commands below:</p>
+
+        <div class="os-tabs">
+            <button class="os-tab active" onclick="switchOS('win')">Windows</button>
+            <button class="os-tab" onclick="switchOS('mac')">Mac</button>
+            <button class="os-tab" onclick="switchOS('lin')">Linux</button>
+        </div>
+
+        <div id="cmd-win" class="code-block-container">
+            <pre class="code-block">pip install coqui-tts==0.22.0 torch torchaudio transformers==4.36.2 accelerate==0.26.0</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+
+        <div id="cmd-mac" class="code-block-container hidden">
+            <pre class="code-block">pip install coqui-tts==0.22.0 torch torchaudio transformers==4.36.2 accelerate==0.26.0</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+
+        <div id="cmd-lin" class="code-block-container hidden">
+            <pre class="code-block">pip3 install coqui-tts==0.22.0 torch torchaudio transformers==4.36.2 accelerate==0.26.0</pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+
+        <p style="font-size: 0.9em; color: #aaa; margin-top: 10px;">
+            After installing, please <button onclick="location.reload()" style="padding: 2px 8px; font-size: 0.9em;">Refresh</button> this module.
+        </p>
     </div>
 
     <div class="content-area" id="mainContent">
@@ -355,6 +419,12 @@
             checkStatus();
             loadVoices();
             loadSettings();
+
+            // Detect OS for manual install tab
+            const p = navigator.platform.toLowerCase();
+            if (p.includes('mac')) switchOS('mac');
+            else if (p.includes('linux')) switchOS('lin');
+            else switchOS('win');
         });
 
         // --- API Helpers ---
@@ -380,8 +450,6 @@
         }
 
         // --- Status & Settings ---
-        let logPollInterval = null;
-
         async function checkStatus() {
             try {
                 const status = await api('/status');
@@ -390,51 +458,31 @@
                 const dlSec = document.getElementById('downloadSection');
 
                 // Dependency Handling
-                const depWizard = document.getElementById('dependencyWizard');
+                const missingSec = document.getElementById('missingDepsSection');
                 const mainContent = document.getElementById('mainContent');
-                const installStatus = document.getElementById('installStatus');
-                const installBtn = document.getElementById('installDepsBtn');
-                const logsDiv = document.getElementById('installLogs');
+                const missingList = document.getElementById('missingList');
 
-                if (status.dependency_missing || status.installing_deps) {
-                    depWizard.classList.remove('hidden');
+                if (status.dependency_missing) {
+                    missingSec.classList.remove('hidden');
                     mainContent.classList.add('hidden');
 
-                    if (status.installing_deps) {
-                        installStatus.innerHTML = '<span class="loader"></span> Installing dependencies... This may take a few minutes.';
-                        installBtn.disabled = true;
-                        logsDiv.classList.remove('hidden');
-
-                        // Start polling logs if not already
-                        if (!logPollInterval) {
-                            pollLogs();
-                            logPollInterval = setInterval(pollLogs, 1000);
-                        }
-
-                        setTimeout(checkStatus, 3000); // Poll slower
+                    // Populate missing list
+                    missingList.innerHTML = '';
+                    if (status.missing_deps && status.missing_deps.length > 0) {
+                        status.missing_deps.forEach(dep => {
+                           const li = document.createElement('li');
+                           li.innerText = dep;
+                           missingList.appendChild(li);
+                        });
                     } else {
-                        // Stopped installing
-                        if (logPollInterval) {
-                            clearInterval(logPollInterval);
-                            logPollInterval = null;
-                        }
-
-                        installStatus.innerHTML = '';
-                        installBtn.disabled = false;
-                        if (status.error) {
-                             installStatus.innerText = 'Error: ' + status.error;
-                             installStatus.style.color = '#ffffff'; // White as requested
-                             logsDiv.classList.remove('hidden'); // Keep logs visible on error
-                        } else {
-                            logsDiv.classList.add('hidden');
-                        }
+                        missingList.innerHTML = '<li>Check server logs for import error.</li>';
                     }
 
                     el.className = 'status-badge status-err';
                     el.innerText = 'Missing Deps';
                     return; // Stop processing normal status
                 } else {
-                    depWizard.classList.add('hidden');
+                    missingSec.classList.add('hidden');
                     mainContent.classList.remove('hidden');
                 }
 
@@ -466,25 +514,27 @@
             }
         }
 
-        async function installDependencies() {
-            try {
-                document.getElementById('installLogs').innerHTML = '';
-                await api('/install_dependencies', 'POST');
-                checkStatus();
-            } catch (e) {
-                alert('Failed to start installation: ' + e.message);
-            }
+        // --- Manual Install UI Helpers ---
+        function switchOS(os) {
+            document.querySelectorAll('.os-tab').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.os-tab[onclick="switchOS('${os}')"]`).classList.add('active');
+
+            document.getElementById('cmd-win').classList.add('hidden');
+            document.getElementById('cmd-mac').classList.add('hidden');
+            document.getElementById('cmd-lin').classList.add('hidden');
+
+            document.getElementById('cmd-' + os).classList.remove('hidden');
         }
 
-        async function pollLogs() {
-            try {
-                const logs = await api('/install_logs');
-                const div = document.getElementById('installLogs');
-                if (logs && logs.length > 0) {
-                    div.innerText = logs.join('\n');
-                    div.scrollTop = div.scrollHeight;
-                }
-            } catch(e) { console.error("Log poll error", e); }
+        function copyCode(btn) {
+            const code = btn.previousElementSibling.innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const original = btn.innerText;
+                btn.innerText = 'Copied!';
+                setTimeout(() => btn.innerText = original, 2000);
+            }).catch(err => {
+                alert('Failed to copy');
+            });
         }
 
         async function downloadModel() {

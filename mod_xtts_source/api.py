@@ -11,6 +11,8 @@ import uuid
 import logging
 import platform
 import requests
+import sys
+import importlib.util
 from pathlib import Path
 from datetime import datetime
 
@@ -40,7 +42,9 @@ model_state = {
     "loaded": False,
     "loading": False,
     "error": None,
-    "model_name": "xtts_v2"
+    "model_name": "xtts_v2",
+    "dependency_missing": False,
+    "missing_deps": []  # List of missing requirements for UI
 }
 
 tts_instance = None
@@ -55,18 +59,25 @@ XTTS_FILES = {
     "mel_stats.pth": "https://huggingface.co/coqui/XTTS-v2/resolve/main/mel_stats.pth"
 }
 
-# --- Dependencies Import ---
-# We expect coqui-tts to be installed.
-try:
-    import torch
-    import torchaudio
-    from TTS.api import TTS
-    logger.info("Coqui TTS imported successfully.")
-except ImportError as e:
-    logger.error(f"CRITICAL: Coqui TTS not found. Please pip install coqui-tts. Error: {e}")
-    # We allow the module to load so we can serve the API, but model loading will fail.
-
 # --- Helper Functions ---
+
+def check_dependencies():
+    """Checks if critical python dependencies are importable."""
+    missing = []
+
+    # Check for TTS (coqui-tts)
+    if importlib.util.find_spec("TTS") is None:
+        missing.append("coqui-tts")
+
+    # Check for torch
+    if importlib.util.find_spec("torch") is None:
+        missing.append("torch")
+
+    # Check for torchaudio
+    if importlib.util.find_spec("torchaudio") is None:
+        missing.append("torchaudio")
+
+    return missing
 
 def load_settings():
     if SETTINGS_FILE.exists():
@@ -98,10 +109,17 @@ def get_device():
     settings = load_settings()
     device_pref = settings.get("device", "cpu")
 
+    # We need torch to check for cuda, so we do a lazy import here if needed
+    if device_pref == "cuda":
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "cuda"
+        except ImportError:
+            pass
+
     if device_pref == "vulkan":
         return "vulkan"
-    elif device_pref == "cuda" and torch.cuda.is_available():
-        return "cuda"
 
     return "cpu"
 
@@ -120,28 +138,6 @@ def download_file(url, dest_path):
         if dest_path.exists():
             dest_path.unlink()
         raise e
-
-def check_system_dependencies():
-    """Checks for system dependencies like espeak-ng."""
-    if not shutil.which("espeak-ng"):
-        logger.warning("espeak-ng is NOT found in PATH.")
-        if platform.system() == "Windows":
-            msi_url = "https://github.com/espeak-ng/espeak-ng/releases/download/1.51/espeak-ng-X64.msi"
-            msi_path = OUTPUT_DIR / "espeak-ng.msi"
-            if not msi_path.exists():
-                logger.info("Downloading espeak-ng MSI installer for Windows...")
-                try:
-                    download_file(msi_url, msi_path)
-                    logger.warning(f"Downloaded espeak-ng installer to: {msi_path}")
-                    logger.warning("PLEASE RUN THIS INSTALLER TO ENABLE TTS.")
-                except Exception as e:
-                    logger.error(f"Failed to download espeak-ng MSI: {e}")
-            else:
-                logger.warning(f"Installer already exists at {msi_path}. Please run it.")
-        else:
-            logger.warning("On Linux/Mac, please install espeak-ng (e.g., 'sudo apt-get install espeak-ng').")
-    else:
-        logger.info("espeak-ng is found.")
 
 def ensure_model_files():
     """Checks for XTTS v2 files and downloads them if missing."""
@@ -166,8 +162,34 @@ def load_model_task():
     model_state["error"] = None
 
     try:
-        # 1. Check System Deps
-        check_system_dependencies()
+        # 1. Check Python Deps (Lazy Import)
+        logger.info("Attempting to import Coqui TTS...")
+        try:
+            import torch
+            import torchaudio
+            from TTS.api import TTS
+        except ImportError as e:
+            logger.error(f"Import failed: {e}")
+            model_state["error"] = f"Failed to import dependencies: {e}"
+            model_state["dependency_missing"] = True
+            model_state["missing_deps"] = check_dependencies()
+            # If check_dependencies didn't find anything (meaning packages exist but import failed)
+            # we manually add a generic error indicator or the specific one
+            if not model_state["missing_deps"]:
+                 model_state["missing_deps"] = ["Import Error: Incompatible Versions?"]
+
+            model_state["loaded"] = False
+            model_state["loading"] = False
+            return
+        except Exception as e:
+            # Catch other startup crashes like the transformers error
+            logger.error(f"Critical error during import: {e}")
+            model_state["error"] = f"Critical import error: {e}"
+            model_state["dependency_missing"] = True
+            model_state["missing_deps"] = ["Check Console for Detail"]
+            model_state["loaded"] = False
+            model_state["loading"] = False
+            return
 
         # 2. Check/Download Model Files
         model_dir = ensure_model_files()
@@ -176,7 +198,6 @@ def load_model_task():
         logger.info(f"Loading TTS model from {model_dir} on {device}...")
 
         config_path = model_dir / "config.json"
-        # FIX: Point to the actual model file, not the directory
         model_path = model_dir / "model.pth"
 
         tts = TTS(
@@ -220,6 +241,20 @@ class SettingsUpdate(BaseModel):
 
 @router.get("/status")
 def get_status():
+    # Perform a lightweight check if not loaded
+    if not model_state["loaded"] and not model_state["loading"]:
+        missing = check_dependencies()
+        if missing:
+            model_state["dependency_missing"] = True
+            model_state["missing_deps"] = missing
+        else:
+            # If imports are present, we don't set dependency_missing=True yet
+            # It will be set if load_model_task fails.
+            # But we can try to reset it if it was previously set
+            if not model_state["error"]:
+                model_state["dependency_missing"] = False
+                model_state["missing_deps"] = []
+
     return model_state
 
 @router.post("/download")
@@ -270,7 +305,7 @@ async def add_voice(name: str = Form(...), audio: UploadFile = File(...)):
 
     # 3. Calculate Latents
     try:
-        # FIX: Access get_conditioning_latents via synthesizer.tts_model
+        # Access get_conditioning_latents via synthesizer.tts_model
         gpt_cond_latent, speaker_embedding = tts_instance.synthesizer.tts_model.get_conditioning_latents(audio_path=[str(ref_path)])
 
         # Save latents
@@ -378,7 +413,6 @@ def generate_speech(req: GenerateRequest):
             )
         else:
             # Fallback (slower, recomputes latents)
-            # tts_to_file writes directly, but we want consistent path handling
             tts_instance.tts_to_file(
                 text=req.text,
                 speaker_wav=str(voice_path / "reference.wav"),
