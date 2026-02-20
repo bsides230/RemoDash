@@ -4,24 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XTTS v2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <style>
         :root {
-            --bg-color: #1e1e1e;
-            --text-color: #ffffff;
-            --accent-color: #6200ea;
-            --secondary-bg: #2d2d2d;
-            --border-color: #444;
+            /* Standard Dashboard Variables */
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
+            --border-color: #222222;
+
             --success-color: #2e7d32;
             --warn-color: #f9a825;
             --err-color: #c62828;
+
             --console-bg: #111;
             --console-text: #0f0;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: transparent;
-            color: var(--text-color);
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-core);
+            color: var(--text-body);
             margin: 0;
             padding: 20px;
             height: 100vh;
@@ -39,11 +48,23 @@
             border-bottom: 1px solid var(--border-color);
         }
 
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        h3, h4 {
+            color: var(--text-head);
+        }
+
         .main-player-container {
-            background: var(--secondary-bg);
+            background: var(--bg-panel);
             padding: 10px;
             border-radius: 8px;
             margin-top: 10px;
+            border: 1px solid var(--border-color);
         }
 
         audio {
@@ -62,36 +83,52 @@
             flex-direction: column;
         }
 
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        ::-webkit-scrollbar-thumb:hover { background-color: var(--brand-color); }
+
+
         /* Tabs */
         .tabs {
             display: flex;
             gap: 10px;
-            border-bottom: 2px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
             margin-bottom: 20px;
             flex-shrink: 0;
         }
         .tab-btn {
             background: none;
             border: none;
-            color: #aaa;
-            padding: 10px 20px;
+            color: var(--text-dim);
+            padding: 8px 16px;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
             transition: color 0.2s, border-bottom 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn:hover {
+            color: var(--text-head);
         }
         .tab-btn.active {
-            color: var(--text-color);
-            border-bottom: 2px solid var(--accent-color);
+            color: var(--brand-color);
+            border-bottom: 2px solid var(--brand-color);
             font-weight: bold;
         }
         .tab-content {
             display: none;
             flex: 1;
             overflow-y: auto;
+            padding-bottom: 20px;
         }
         .tab-content.active {
             display: block;
+            animation: fadeIn 0.2s;
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Forms */
         .form-group {
@@ -99,17 +136,24 @@
         }
         label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-head);
+            font-size: 0.9em;
         }
         input, select, textarea {
             width: 100%;
             padding: 10px;
-            background-color: var(--secondary-bg);
+            background-color: var(--bg-panel);
             border: 1px solid var(--border-color);
-            color: var(--text-color);
+            color: var(--text-body);
             border-radius: 4px;
             box-sizing: border-box;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--brand-color);
         }
         textarea {
             resize: vertical;
@@ -121,25 +165,30 @@
 
         button {
             padding: 10px 20px;
-            background-color: var(--accent-color);
-            color: white;
+            background-color: var(--brand-color);
+            color: #000; /* Often black text on bright brand color looks best, or white if dark brand */
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            transition: opacity 0.2s;
         }
         button:hover {
             opacity: 0.9;
         }
         button:disabled {
-            background-color: #555;
+            background-color: var(--border-color);
+            color: var(--text-dim);
             cursor: not-allowed;
         }
         button.danger {
             background-color: var(--err-color);
+            color: white;
         }
         button.success {
             background-color: var(--success-color);
+            color: white;
         }
 
         /* Lists */
@@ -155,20 +204,22 @@
         }
         .col-check { width: 30px; }
         .col-grow { flex: 1; }
-        .col-date { width: 150px; color: #aaa; font-size: 0.9em; }
+        .col-date { width: 150px; color: var(--text-dim); font-size: 0.85em; font-family: 'JetBrains Mono'; }
         .col-actions { display: flex; gap: 5px; }
 
         /* Status Badge */
         .status-badge {
             display: inline-block;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.8em;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75em;
             font-weight: bold;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono';
         }
-        .status-ok { background-color: var(--success-color); color: white; }
-        .status-warn { background-color: var(--warn-color); color: black; }
-        .status-err { background-color: var(--err-color); color: white; }
+        .status-ok { background-color: var(--brand-color-dim); color: var(--brand-color); border: 1px solid var(--brand-color); }
+        .status-warn { background-color: rgba(249, 168, 37, 0.1); color: var(--warn-color); border: 1px solid var(--warn-color); }
+        .status-err { background-color: rgba(198, 40, 40, 0.1); color: var(--err-color); border: 1px solid var(--err-color); }
 
         .hidden { display: none !important; }
 
@@ -176,20 +227,22 @@
         .modal-overlay {
             position: fixed; top:0; left:0; right:0; bottom:0;
             background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(2px);
             display: flex; justify-content: center; align-items: center;
             z-index: 1000;
         }
         .modal {
-            background: var(--bg-color);
+            background: var(--bg-core);
             padding: 20px;
             border-radius: 8px;
             width: 400px;
             border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
 
         /* Console & Progress */
         .console-container {
-            background: var(--console-bg);
+            background: #000;
             border: 1px solid var(--border-color);
             border-radius: 4px;
             padding: 10px;
@@ -199,8 +252,8 @@
             gap: 10px;
         }
         .console-log {
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9em;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
             color: var(--console-text);
             height: 150px;
             overflow-y: auto;
@@ -215,36 +268,37 @@
         }
         .progress-label {
             font-size: 0.85em;
-            color: #aaa;
+            color: var(--text-dim);
             display: flex;
             justify-content: space-between;
         }
         progress {
             width: 100%;
-            height: 10px;
-            border-radius: 5px;
+            height: 6px;
+            border-radius: 3px;
             overflow: hidden;
             appearance: none;
+            background: var(--bg-panel);
         }
         progress::-webkit-progress-bar {
-            background-color: #333;
+            background-color: var(--bg-panel);
         }
         progress::-webkit-progress-value {
-            background-color: var(--accent-color);
+            background-color: var(--brand-color);
         }
         .metrics-row {
             display: flex;
             gap: 15px;
             font-size: 0.85em;
-            color: #ddd;
-            font-family: monospace;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono';
         }
 
         /* Grid for Settings */
         .settings-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: 20px;
         }
         .slider-group {
             display: flex;
@@ -253,7 +307,13 @@
         .slider-val {
             float: right;
             font-weight: bold;
-            color: var(--accent-color);
+            color: var(--brand-color);
+            font-family: 'JetBrains Mono';
+        }
+        small {
+            font-size: 0.8em;
+            color: var(--text-dim);
+            margin-top: 4px;
         }
 
     </style>
@@ -266,14 +326,14 @@
                 <h2 style="margin:0;">XTTS v2</h2>
                 <div id="headerControls" style="display:flex; gap:5px; align-items:center;">
                     <span id="modelStatus" class="status-badge status-warn">Checking...</span>
-                    <button id="headerStartBtn" class="success hidden" style="padding:5px 15px; font-size:0.85em;" onclick="startModel()">Start</button>
-                    <button id="headerStopBtn" class="danger hidden" style="padding:5px 15px; font-size:0.85em;" onclick="stopModel()">Stop</button>
+                    <button id="headerStartBtn" class="success hidden" style="padding:4px 12px; font-size:0.75em;" onclick="startModel()">Start</button>
+                    <button id="headerStopBtn" class="danger hidden" style="padding:4px 12px; font-size:0.75em;" onclick="stopModel()">Stop</button>
                 </div>
             </div>
         </div>
         <div class="main-player-container">
              <audio id="mainAudio" controls></audio>
-             <div id="nowPlayingText" style="font-size: 0.8em; color: #aaa; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ready to play.</div>
+             <div id="nowPlayingText" style="font-size: 0.8em; color: var(--text-dim); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ready to play.</div>
         </div>
     </header>
 
@@ -296,7 +356,7 @@
             <div class="form-group">
                 <label>Text to Speak</label>
                 <textarea id="TextInput" placeholder="Type something here..." oninput="updateCharCounter()"></textarea>
-                <div id="charCounter" style="font-size:0.8em; text-align:right; margin-top:4px; color:#aaa;">
+                <div id="charCounter" style="font-size:0.8em; text-align:right; margin-top:4px; color:var(--text-dim); font-family: 'JetBrains Mono';">
                     0 chars
                 </div>
             </div>
@@ -304,7 +364,7 @@
             <div class="form-group" style="display:flex; gap:10px; align-items: center;">
                 <button id="generateBtn" onclick="generateSpeech()">Generate Audio</button>
                 <button id="playBtn" class="success hidden" onclick="playResult()">▶ Play</button>
-                <button id="resetBtn" class="hidden" onclick="resetGeneration()">Reset</button>
+                <button id="resetBtn" class="hidden" style="background:transparent; border:1px solid var(--border-color); color:var(--text-body);" onclick="resetGeneration()">Reset</button>
             </div>
 
             <div id="progressSection" class="console-container hidden">
@@ -327,7 +387,7 @@
         <div id="tab-history" class="tab-content">
             <div style="margin-bottom: 10px; display: flex; justify-content: space-between;">
                 <button class="danger" onclick="deleteSelectedHistory()">Delete Selected</button>
-                <button onclick="loadHistory()">Refresh</button>
+                <button style="background:transparent; border:1px solid var(--border-color); color:var(--text-body);" onclick="loadHistory()">Refresh</button>
             </div>
             <div id="historyList"></div>
         </div>
@@ -343,13 +403,13 @@
         <!-- SETTINGS TAB -->
         <div id="tab-settings" class="tab-content">
             <div class="form-group">
-                <p id="modelMsg" style="color:#aaa; font-size: 0.9em;"></p>
+                <p id="modelMsg" style="color:var(--text-dim); font-size: 0.9em;"></p>
             </div>
 
             <!-- Download Section (Hidden if loaded) -->
-            <div id="downloadSection" class="hidden form-group" style="padding: 15px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <div id="downloadSection" class="hidden form-group" style="padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-panel);">
                 <h4>Download Model</h4>
-                <p>The XTTS v2 model is licensed under the Coqui Public Model License (CPML).</p>
+                <p style="font-size:0.9em; color:var(--text-dim);">The XTTS v2 model is licensed under the Coqui Public Model License (CPML).</p>
                 <div style="margin-bottom: 10px;">
                     <input type="checkbox" id="licenseCheck" style="width:auto;">
                     <label for="licenseCheck" style="display:inline;">I agree to the CPML terms.</label>
@@ -359,56 +419,56 @@
 
             <!-- Device -->
             <div class="form-group">
-                <h3>Hardware</h3>
+                <h3 style="font-size:1em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border-color); padding-bottom:5px; margin-bottom:15px;">Hardware</h3>
                 <label>Processing Device</label>
                 <select id="deviceSelect">
                     <option value="cpu">CPU (Safe)</option>
                     <option value="vulkan">Vulkan (Experimental)</option>
                     <option value="cuda">CUDA (NVIDIA GPU)</option>
                 </select>
-                <div style="font-size:0.8em; color:#888; margin-top:5px;">
+                <div style="font-size:0.8em; color:var(--text-dim); margin-top:5px;">
                     Note: Vulkan requires PyTorch with Vulkan support.
                 </div>
             </div>
 
             <!-- Generation Params -->
-            <h3>Generation Parameters</h3>
+            <h3 style="font-size:1em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border-color); padding-bottom:5px; margin-bottom:15px; margin-top:30px;">Generation Parameters</h3>
             <div class="settings-grid">
 
                 <div class="slider-group">
                     <label>Temperature <span id="val_temp" class="slider-val">0.75</span></label>
                     <input type="range" id="inp_temp" min="0.1" max="1.5" step="0.05" value="0.75" oninput="updateVal('temp', this.value)">
-                    <small style="color:#888">Creativity vs Stability (Low = Stable)</small>
+                    <small>Creativity vs Stability (Low = Stable)</small>
                 </div>
 
                 <div class="slider-group">
                     <label>Speed <span id="val_speed" class="slider-val">1.0</span></label>
                     <input type="range" id="inp_speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateVal('speed', this.value)">
-                    <small style="color:#888">Speaking rate</small>
+                    <small>Speaking rate</small>
                 </div>
 
                 <div class="slider-group">
                     <label>Top P (Nucleus) <span id="val_topp" class="slider-val">0.8</span></label>
                     <input type="range" id="inp_topp" min="0.1" max="1.0" step="0.05" value="0.8" oninput="updateVal('topp', this.value)">
-                    <small style="color:#888">Probability mass cutoff</small>
+                    <small>Probability mass cutoff</small>
                 </div>
 
                 <div class="slider-group">
                     <label>Top K <span id="val_topk" class="slider-val">50</span></label>
                     <input type="number" id="inp_topk" min="1" max="100" value="50">
-                    <small style="color:#888">Top token count cutoff</small>
+                    <small>Top token count cutoff</small>
                 </div>
 
                 <div class="slider-group">
                     <label>Repetition Penalty <span id="val_rep" class="slider-val">2.0</span></label>
                     <input type="range" id="inp_rep" min="1.0" max="10.0" step="0.1" value="2.0" oninput="updateVal('rep', this.value)">
-                    <small style="color:#888">Discourages repeats</small>
+                    <small>Discourages repeats</small>
                 </div>
 
                 <div class="slider-group">
                     <label>Length Penalty <span id="val_len" class="slider-val">1.0</span></label>
                     <input type="range" id="inp_len" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateVal('len', this.value)">
-                    <small style="color:#888">Favors length (>1.0) or brevity (<1.0)</small>
+                    <small>Favors length (>1.0) or brevity (<1.0)</small>
                 </div>
             </div>
 
@@ -416,7 +476,7 @@
                 <label>Max Characters Per Chunk</label>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="number" id="chunkLimitInput" min="50" max="400" value="220" style="width:75px;">
-                    <span style="font-size:0.82em; color:#aaa;">
+                    <span style="font-size:0.82em; color:var(--text-dim);">
                         XTTS limit ≈ 250. Auto-split ensures safety.
                     </span>
                 </div>
@@ -439,7 +499,7 @@
                 <input type="file" id="newVoiceFile" accept="audio/*">
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button onclick="closeAddVoiceModal()" style="background:#555">Cancel</button>
+                <button onclick="closeAddVoiceModal()" style="background:transparent; border:1px solid var(--border-color); color:var(--text-body);">Cancel</button>
                 <button onclick="addVoice()">Create Voice</button>
             </div>
         </div>
@@ -472,6 +532,9 @@
             checkStatus();
             loadVoices();
             loadSettings();
+
+            // Initial Theme Sync if iframe parent sends it early or we can request it?
+            // Usually parent sends it on load.
         });
 
         // --- API Helpers ---
@@ -652,7 +715,7 @@
                 select.innerHTML = '';
 
                 if (voices.length === 0) {
-                    list.innerHTML = '<p style="color:#aaa; text-align:center;">No voices found.</p>';
+                    list.innerHTML = '<p style="color:var(--text-dim); text-align:center;">No voices found.</p>';
                     return;
                 }
 
@@ -826,7 +889,7 @@
                 const list = document.getElementById('historyList');
                 list.innerHTML = '';
                 if (history.length === 0) {
-                    list.innerHTML = '<p style="color:#aaa; text-align:center;">No history.</p>';
+                    list.innerHTML = '<p style="color:var(--text-dim); text-align:center;">No history.</p>';
                     return;
                 }
                 history.forEach(h => {
@@ -836,7 +899,7 @@
                         <div class="col-check"><input type="checkbox" class="hist-check" value="${h.filename}"></div>
                         <div class="col-grow">
                             <div style="font-weight:bold;">${h.text.substring(0,50)}...</div>
-                            <div style="font-size:0.8em; color:#aaa;">Voice: ${h.voice_id}</div>
+                            <div style="font-size:0.8em; color:var(--text-dim);">Voice: ${h.voice_id}</div>
                         </div>
                         <div class="col-date">${h.date}</div>
                         <div class="col-actions">
@@ -862,6 +925,48 @@
              await api('/download', 'POST', {agree:true});
              checkStatus();
         }
+
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
+        // --- Theme Listener ---
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'THEME_UPDATE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+
+                // Color override if provided
+                if(e.data.brandColor) {
+                    document.documentElement.style.setProperty('--brand-color', e.data.brandColor);
+                    const hex = e.data.brandColor.replace('#', '');
+                    const r = parseInt(hex.substring(0,2), 16);
+                    const g = parseInt(hex.substring(2,4), 16);
+                    const b = parseInt(hex.substring(4,6), 16);
+                    document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+                }
+
+                if(e.data.fontSize) {
+                     // We might need to adjust root font size if we used rem, but we used px mostly.
+                     // But we can set a variable.
+                     // document.documentElement.style.setProperty('--font-size-base', e.data.fontSize + 'px');
+                }
+
+                if (e.data.themeCssUrl) loadThemeCSS(e.data.themeCssUrl);
+                else clearThemeCSS();
+            }
+        });
 
     </script>
 </body>

@@ -1,0 +1,5 @@
+kokoro>=0.3.4
+soundfile
+torch
+misaki[en]
+numpy

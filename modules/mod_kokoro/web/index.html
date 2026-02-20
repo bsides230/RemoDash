@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kokoro TTS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            /* Standard Dashboard Variables */
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-color: #10B981;
+            --brand-color-dim: rgba(16, 185, 129, 0.1);
+            --border-color: #222222;
+            --error-color: #c62828;
+            --success-color: #2e7d32;
+            --warn-color: #f9a825;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            flex: 0 0 auto;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h2 {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-head);
+            font-size: 18px;
+            font-weight: 500;
+            margin: 0;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono';
+        }
+        .status-ok { background-color: var(--brand-color-dim); color: var(--brand-color); border: 1px solid var(--brand-color); }
+        .status-warn { background-color: rgba(249, 168, 37, 0.1); color: var(--warn-color); border: 1px solid var(--warn-color); }
+        .status-err { background-color: rgba(198, 40, 40, 0.1); color: var(--error-color); border: 1px solid var(--error-color); }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 0.85em;
+            font-weight: 500;
+            color: var(--text-head);
+        }
+
+        select, input[type="number"], input[type="text"] {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            padding: 8px;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        input[type="range"] {
+            accent-color: var(--brand-color);
+        }
+
+        textarea {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            padding: 10px;
+            border-radius: 4px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 150px;
+            font-size: 1em;
+            line-height: 1.5;
+        }
+        textarea:focus, select:focus, input:focus {
+            outline: none;
+            border-color: var(--brand-color);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: var(--brand-color);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            transition: opacity 0.2s;
+            flex: 1;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: var(--border-color); color: var(--text-dim); cursor: not-allowed; }
+        button.danger { background-color: var(--error-color); color: white; }
+
+        .console {
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            color: #0f0;
+            height: 100px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .hidden { display: none; }
+
+        /* Loading Overlay */
+        .overlay {
+            position: absolute; top:0; left:0; right:0; bottom:0;
+            background: rgba(0,0,0,0.8);
+            display: flex; justify-content: center; align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <h2>Kokoro TTS</h2>
+            <span id="statusBadge" class="status-badge status-warn">Connecting...</span>
+        </div>
+        <div style="font-size:0.8em; color:var(--text-dim);">v1.0</div>
+    </header>
+
+    <div class="content">
+
+        <div class="controls">
+            <div class="form-group">
+                <label>Voice</label>
+                <select id="voiceSelect">
+                    <option value="af_heart">Heart (Default)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Speed: <span id="speedVal">1.0</span>x</label>
+                <input type="range" id="speedInput" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').innerText = this.value">
+            </div>
+        </div>
+
+        <div class="form-group" style="flex:1;">
+            <label>Input Text</label>
+            <textarea id="textInput" placeholder="Type or paste text here to stream..."></textarea>
+        </div>
+
+        <div class="btn-group">
+            <button id="streamBtn" onclick="startStreaming()">Stream Audio</button>
+            <button id="stopBtn" class="danger hidden" onclick="stopStreaming()">Stop</button>
+        </div>
+
+        <div class="console" id="consoleLog">Ready.</div>
+    </div>
+
+    <div id="loadingOverlay" class="overlay hidden">
+        <h3 style="color:white;">Loading Model...</h3>
+        <p style="color:#aaa;">This may take a minute first time.</p>
+    </div>
+
+    <script>
+        const API_BASE = '/api/modules/mod_kokoro';
+        let audioContext = null;
+        let isStreaming = false;
+        let abortController = null;
+
+        // --- Init ---
+        window.addEventListener('load', () => {
+            checkStatus();
+            loadVoices();
+        });
+
+        async function checkStatus() {
+            try {
+                const res = await fetch(API_BASE + '/status');
+                const data = await res.json();
+                const badge = document.getElementById('statusBadge');
+
+                if (data.dependency_missing) {
+                    badge.className = 'status-badge status-err';
+                    badge.innerText = 'Missing Deps';
+                    log("Error: Missing Python dependencies (kokoro, soundfile). Check server logs.");
+                    return;
+                }
+
+                if (data.loaded) {
+                    badge.className = 'status-badge status-ok';
+                    badge.innerText = 'Ready';
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                } else if (data.loading) {
+                    badge.className = 'status-badge status-warn';
+                    badge.innerText = 'Loading...';
+                    document.getElementById('loadingOverlay').classList.remove('hidden');
+                    setTimeout(checkStatus, 2000);
+                } else {
+                    // Not loaded, try starting
+                    badge.className = 'status-badge status-warn';
+                    badge.innerText = 'Starting...';
+                    await fetch(API_BASE + '/start', { method: 'POST' });
+                    setTimeout(checkStatus, 2000);
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('statusBadge').className = 'status-badge status-err';
+                document.getElementById('statusBadge').innerText = 'Offline';
+            }
+        }
+
+        async function loadVoices() {
+            try {
+                const res = await fetch(API_BASE + '/voices');
+                if(!res.ok) return;
+                const voices = await res.json();
+                const sel = document.getElementById('voiceSelect');
+                sel.innerHTML = '';
+                voices.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.innerText = v.name;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {}
+        }
+
+        // --- Streaming Logic ---
+
+        async function startStreaming() {
+            const text = document.getElementById('textInput').value.trim();
+            if(!text) return alert("Enter text.");
+
+            if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 24000});
+            if(audioContext.state === 'suspended') await audioContext.resume();
+
+            isStreaming = true;
+            abortController = new AbortController();
+
+            updateUI(true);
+            log("Starting stream...");
+
+            try {
+                const res = await fetch(API_BASE + '/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        text: text,
+                        voice: document.getElementById('voiceSelect').value,
+                        speed: parseFloat(document.getElementById('speedInput').value)
+                    }),
+                    signal: abortController.signal
+                });
+
+                if(!res.ok) throw new Error(await res.text());
+
+                const reader = res.body.getReader();
+                let nextStartTime = audioContext.currentTime + 0.1; // Buffer slightly
+
+                // Buffer accumulator for float32 alignment
+                let remainder = null;
+
+                while(true) {
+                    const {done, value} = await reader.read();
+                    if(done) break;
+
+                    // Value is Uint8Array. Needs to be Float32Array.
+                    // Must be multiple of 4 bytes.
+                    let data = value;
+                    if(remainder) {
+                        const tmp = new Uint8Array(remainder.length + value.length);
+                        tmp.set(remainder);
+                        tmp.set(value, remainder.length);
+                        data = tmp;
+                        remainder = null;
+                    }
+
+                    const remLen = data.length % 4;
+                    if(remLen > 0) {
+                        remainder = data.slice(data.length - remLen);
+                        data = data.slice(0, data.length - remLen);
+                    }
+
+                    if(data.length === 0) continue;
+
+                    const float32 = new Float32Array(data.buffer, data.byteOffset, data.length / 4);
+                    scheduleChunk(float32, nextStartTime);
+
+                    // Duration = samples / sampleRate
+                    const duration = float32.length / 24000;
+                    nextStartTime += duration;
+                }
+
+                log("Stream finished.");
+            } catch(e) {
+                if(e.name === 'AbortError') log("Stream stopped.");
+                else {
+                    log("Error: " + e.message);
+                    console.error(e);
+                }
+            } finally {
+                isStreaming = false;
+                updateUI(false);
+            }
+        }
+
+        function scheduleChunk(float32Data, startTime) {
+            const buffer = audioContext.createBuffer(1, float32Data.length, 24000);
+            buffer.copyToChannel(float32Data, 0);
+
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+
+            // Ensure we don't schedule in past
+            const playTime = Math.max(audioContext.currentTime, startTime);
+            source.start(playTime);
+        }
+
+        function stopStreaming() {
+            if(abortController) abortController.abort();
+            if(audioContext) audioContext.close().then(() => audioContext = null); // Reset context to stop audio immediately
+        }
+
+        function updateUI(streaming) {
+            document.getElementById('streamBtn').classList.toggle('hidden', streaming);
+            document.getElementById('stopBtn').classList.toggle('hidden', !streaming);
+            document.getElementById('textInput').disabled = streaming;
+        }
+
+        function log(msg) {
+            const el = document.getElementById('consoleLog');
+            el.innerText += '\n' + msg;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        // --- Theme Listener ---
+        function loadThemeCSS(url) {
+            let link = document.getElementById('theme-css');
+            if (!link) {
+                link = document.createElement('link');
+                link.id = 'theme-css';
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            link.href = url;
+        }
+
+        function clearThemeCSS() {
+            const link = document.getElementById('theme-css');
+            if (link) link.remove();
+        }
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'THEME_UPDATE') {
+                document.body.setAttribute('data-theme', e.data.theme);
+                if(e.data.brandColor) {
+                    document.documentElement.style.setProperty('--brand-color', e.data.brandColor);
+                    const hex = e.data.brandColor.replace('#', '');
+                    const r = parseInt(hex.substring(0,2), 16);
+                    const g = parseInt(hex.substring(2,4), 16);
+                    const b = parseInt(hex.substring(4,6), 16);
+                    document.documentElement.style.setProperty('--brand-color-dim', `rgba(${r},${g},${b}, 0.1)`);
+                }
+                if (e.data.themeCssUrl) loadThemeCSS(e.data.themeCssUrl);
+                else clearThemeCSS();
+            }
+        });
+
+    </script>
+</body>
+</html>

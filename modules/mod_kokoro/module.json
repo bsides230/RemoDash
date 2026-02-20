@@ -1,0 +1,9 @@
+{
+  "id": "mod_kokoro",
+  "name": "Kokoro TTS",
+  "description": "Ultra-fast, high-quality streaming TTS using Kokoro.",
+  "icon": "speed",
+  "version": "1.0.0",
+  "author": "Jules",
+  "enabled": true
+}
