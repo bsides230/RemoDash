@@ -195,6 +195,31 @@ def load_model_task():
             model_state["loading"] = False
             return
 
+        # Patch torchaudio.load to use soundfile backend.
+        # Newer torchaudio (paired with PyTorch 2.x) defaults to torchcodec which
+        # requires FFmpeg DLLs. soundfile handles WAV/FLAC/OGG without FFmpeg.
+        try:
+            import soundfile as _sf
+            _orig_torchaudio_load = torchaudio.load
+
+            def _sf_audio_load(uri, frame_offset=0, num_frames=-1,
+                               normalize=True, channels_first=True, **kwargs):
+                try:
+                    data, sr = _sf.read(str(uri), dtype='float32', always_2d=True)
+                    tensor = torch.from_numpy(data.T if channels_first else data)
+                    return tensor, sr
+                except Exception:
+                    return _orig_torchaudio_load(uri, frame_offset=frame_offset,
+                                                 num_frames=num_frames,
+                                                 normalize=normalize,
+                                                 channels_first=channels_first,
+                                                 **kwargs)
+
+            torchaudio.load = _sf_audio_load
+            logger.info("torchaudio.load patched to use soundfile backend.")
+        except ImportError:
+            logger.warning("soundfile not installed; torchaudio will use its default backend.")
+
         # 2. Check/Download Model Files
         model_dir = ensure_model_files()
 
@@ -306,6 +331,17 @@ async def add_voice(name: str = Form(...), audio: UploadFile = File(...)):
     ref_path = voice_path / "reference.wav"
     with open(ref_path, "wb") as buffer:
         shutil.copyfileobj(audio.file, buffer)
+
+    # Normalise uploaded audio to a clean PCM WAV using soundfile.
+    # Converts stereo to mono and re-encodes so torchaudio can load it reliably.
+    try:
+        import soundfile as sf
+        _audio_data, _sr = sf.read(str(ref_path))
+        if _audio_data.ndim > 1:  # stereo → mono
+            _audio_data = _audio_data.mean(axis=1)
+        sf.write(str(ref_path), _audio_data, _sr, subtype='PCM_16')
+    except Exception as _prep_err:
+        logger.warning(f"Audio pre-processing skipped: {_prep_err}")
 
     # 3. Calculate Latents
     try:
