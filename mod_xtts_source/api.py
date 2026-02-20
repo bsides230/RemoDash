@@ -174,9 +174,9 @@ def load_model_task():
             model_state["dependency_missing"] = True
             model_state["missing_deps"] = check_dependencies()
             # If check_dependencies didn't find anything (meaning packages exist but import failed)
-            # we manually add a generic error indicator or the specific one
+            # we manually add the specific import error
             if not model_state["missing_deps"]:
-                 model_state["missing_deps"] = ["Import Error: Incompatible Versions?"]
+                 model_state["missing_deps"] = [f"Import Error: {str(e)}"]
 
             model_state["loaded"] = False
             model_state["loading"] = False
