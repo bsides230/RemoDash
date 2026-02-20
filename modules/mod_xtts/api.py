@@ -444,13 +444,17 @@ def generate_speech(req: GenerateRequest):
 
         # Generate
         if gpt_cond_latent is not None and speaker_embedding is not None:
-            # TTS wrapper's tts() method handles kwargs to underlying model
-            wav = tts_instance.tts(
+            # Use the lower-level inference() API to pass pre-computed conditioning
+            # latents directly. The high-level TTS.tts() wrapper requires speaker_wav
+            # or speaker_id and does not forward gpt_cond_latent/speaker_embedding to
+            # the XTTS model, causing "Neither speaker_wav nor speaker_id was specified".
+            out = tts_instance.synthesizer.tts_model.inference(
                 text=req.text,
                 language=req.language,
                 gpt_cond_latent=gpt_cond_latent,
-                speaker_embedding=speaker_embedding
+                speaker_embedding=speaker_embedding,
             )
+            wav = out["wav"]
         else:
             # Fallback (slower, recomputes latents)
             tts_instance.tts_to_file(
@@ -461,20 +465,18 @@ def generate_speech(req: GenerateRequest):
             )
             return {"filename": filename, "path": f"/api/modules/mod_xtts/output/{filename}"}
 
-        # Save wav if tts() was used
+        # Save wav using soundfile (avoids torchaudio torchcodec/FFmpeg dependency)
         if wav is not None:
-             import torchaudio
-             if isinstance(wav, list):
-                 wav = torch.tensor(wav)
-
-             if isinstance(wav, torch.Tensor):
-                 if wav.dim() == 1:
-                     wav = wav.unsqueeze(0)
-                 # Move to CPU for saving
-                 wav = wav.cpu()
-
-             # XTTS usually 24000 sample rate
-             torchaudio.save(str(output_path), wav, 24000)
+            import soundfile as sf
+            import numpy as np
+            if isinstance(wav, list):
+                wav = np.array(wav, dtype=np.float32)
+            elif hasattr(wav, 'cpu'):
+                wav = wav.cpu().numpy()
+            if wav.ndim > 1:
+                wav = wav.squeeze()
+            # XTTS outputs at 24000 Hz sample rate
+            sf.write(str(output_path), wav, 24000, subtype='PCM_16')
 
     except Exception as e:
         logger.error(f"Generation failed: {e}")
