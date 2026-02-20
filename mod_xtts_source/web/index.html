@@ -287,17 +287,26 @@
         </div>
 
         <div id="cmd-win" class="code-block-container">
-            <pre class="code-block">pip install coqui-tts torch torchaudio transformers accelerate requests</pre>
+            <pre class="code-block">git clone https://github.com/idiap/coqui-ai-TTS
+cd coqui-ai-TTS
+pip install -e .
+pip install transformers==5.0.0 accelerate==0.26.0 requests</pre>
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
         </div>
 
         <div id="cmd-mac" class="code-block-container hidden">
-            <pre class="code-block">pip install coqui-tts torch torchaudio transformers accelerate requests</pre>
+            <pre class="code-block">git clone https://github.com/idiap/coqui-ai-TTS
+cd coqui-ai-TTS
+pip install -e .
+pip install transformers==5.0.0 accelerate==0.26.0 requests</pre>
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
         </div>
 
         <div id="cmd-lin" class="code-block-container hidden">
-            <pre class="code-block">pip3 install coqui-tts torch torchaudio transformers accelerate requests</pre>
+            <pre class="code-block">git clone https://github.com/idiap/coqui-ai-TTS
+cd coqui-ai-TTS
+pip3 install -e .
+pip3 install transformers==5.0.0 accelerate==0.26.0 requests</pre>
             <button class="copy-btn" onclick="copyCode(this)">Copy</button>
         </div>
 
@@ -324,7 +333,10 @@
             </div>
             <div class="form-group">
                 <label>Text to Speak</label>
-                <textarea id="TextInput" placeholder="Type something here..."></textarea>
+                <textarea id="TextInput" placeholder="Type something here..." oninput="updateCharCounter()"></textarea>
+                <div id="charCounter" style="font-size:0.8em; text-align:right; margin-top:4px; color:#aaa;">
+                    0 chars
+                </div>
             </div>
             <div class="form-group">
                 <button id="generateBtn" onclick="generateSpeech()">Generate Audio</button>
@@ -373,6 +385,18 @@
                     <option value="vulkan">Vulkan (Experimental/Intel iGPU)</option>
                     <option value="cuda">CUDA (NVIDIA GPU)</option>
                 </select>
+            </div>
+
+            <div class="form-group">
+                <h3>Generation Settings</h3>
+                <label>Max Characters Per Chunk</label>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="number" id="chunkLimitInput" min="50" max="250" value="220"
+                           style="width:75px;">
+                    <span style="font-size:0.82em; color:#aaa;">
+                        XTTS hard limit ≈ 250 chars. Long text is auto-split and stitched.
+                    </span>
+                </div>
                 <button onclick="saveSettings()" style="margin-top: 10px;">Save Settings</button>
             </div>
         </div>
@@ -554,15 +578,36 @@
             try {
                 const s = await api('/settings');
                 document.getElementById('deviceSelect').value = s.device || 'cpu';
+                const cl = s.max_chunk_chars || 220;
+                document.getElementById('chunkLimitInput').value = cl;
+                window._chunkLimit = cl;
+                updateCharCounter();
             } catch (e) { console.error(e); }
         }
 
         async function saveSettings() {
             const dev = document.getElementById('deviceSelect').value;
+            const cl = parseInt(document.getElementById('chunkLimitInput').value) || 220;
+            window._chunkLimit = cl;
             try {
-                await api('/settings', 'POST', { device: dev });
+                await api('/settings', 'POST', { device: dev, max_chunk_chars: cl });
                 alert('Settings saved. If changing device, the model may reload next time.');
+                updateCharCounter();
             } catch (e) { alert(e.message); }
+        }
+
+        function updateCharCounter() {
+            const text = document.getElementById('TextInput').value;
+            const len = text.length;
+            const limit = window._chunkLimit || 220;
+            const chunks = len > 0 ? Math.ceil(len / limit) : 1;
+            const el = document.getElementById('charCounter');
+            if (len > limit * 2) el.style.color = '#ef5350';       // red
+            else if (len > limit) el.style.color = '#ffa726';       // orange
+            else el.style.color = '#aaa';                            // neutral
+            el.innerText = chunks > 1
+                ? `${len} chars — ~${chunks} chunks (auto-split)`
+                : `${len} chars`;
         }
 
         // --- Voices ---

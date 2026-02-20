@@ -12,6 +12,7 @@ import logging
 import platform
 import sys
 import importlib.util
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -86,10 +87,13 @@ def load_settings():
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, 'r') as f:
-                return json.load(f)
+                s = json.load(f)
+                if "max_chunk_chars" not in s:
+                    s["max_chunk_chars"] = 220
+                return s
         except:
             pass
-    return {"device": "cpu", "agreed_to_terms": False}
+    return {"device": "cpu", "agreed_to_terms": False, "max_chunk_chars": 220}
 
 def save_settings(settings):
     with open(SETTINGS_FILE, 'w') as f:
@@ -195,6 +199,31 @@ def load_model_task():
             model_state["loading"] = False
             return
 
+        # Patch torchaudio.load to use soundfile backend.
+        # Newer torchaudio (paired with PyTorch 2.x) defaults to torchcodec which
+        # requires FFmpeg DLLs. soundfile handles WAV/FLAC/OGG without FFmpeg.
+        try:
+            import soundfile as _sf
+            _orig_torchaudio_load = torchaudio.load
+
+            def _sf_audio_load(uri, frame_offset=0, num_frames=-1,
+                               normalize=True, channels_first=True, **kwargs):
+                try:
+                    data, sr = _sf.read(str(uri), dtype='float32', always_2d=True)
+                    tensor = torch.from_numpy(data.T if channels_first else data)
+                    return tensor, sr
+                except Exception:
+                    return _orig_torchaudio_load(uri, frame_offset=frame_offset,
+                                                 num_frames=num_frames,
+                                                 normalize=normalize,
+                                                 channels_first=channels_first,
+                                                 **kwargs)
+
+            torchaudio.load = _sf_audio_load
+            logger.info("torchaudio.load patched to use soundfile backend.")
+        except ImportError:
+            logger.warning("soundfile not installed; torchaudio will use its default backend.")
+
         # 2. Check/Download Model Files
         model_dir = ensure_model_files()
 
@@ -205,7 +234,7 @@ def load_model_task():
         model_path = model_dir / "model.pth"
 
         tts = TTS(
-            model_path=str(model_path),
+            model_path=str(model_dir),
             config_path=str(config_path),
             progress_bar=False,
             gpu=(device == "cuda")
@@ -240,6 +269,7 @@ class DeleteHistoryRequest(BaseModel):
 
 class SettingsUpdate(BaseModel):
     device: str
+    max_chunk_chars: int = 220
 
 # --- Routes ---
 
@@ -307,6 +337,17 @@ async def add_voice(name: str = Form(...), audio: UploadFile = File(...)):
     with open(ref_path, "wb") as buffer:
         shutil.copyfileobj(audio.file, buffer)
 
+    # Normalise uploaded audio to a clean PCM WAV using soundfile.
+    # Converts stereo to mono and re-encodes so torchaudio can load it reliably.
+    try:
+        import soundfile as sf
+        _audio_data, _sr = sf.read(str(ref_path))
+        if _audio_data.ndim > 1:  # stereo → mono
+            _audio_data = _audio_data.mean(axis=1)
+        sf.write(str(ref_path), _audio_data, _sr, subtype='PCM_16')
+    except Exception as _prep_err:
+        logger.warning(f"Audio pre-processing skipped: {_prep_err}")
+
     # 3. Calculate Latents
     try:
         # Access get_conditioning_latents via synthesizer.tts_model
@@ -361,6 +402,41 @@ def get_voice_reference(voice_id: str):
         return FileResponse(ref_path, media_type="audio/wav")
     raise HTTPException(status_code=404, detail="Reference audio not found")
 
+def split_text_into_chunks(text: str, max_chars: int = 220) -> List[str]:
+    """Split text at sentence boundaries to stay within XTTS character limit."""
+    # Split on sentence-ending punctuation, keeping the delimiter
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    chunks, current = [], ""
+    for sentence in sentences:
+        # If a single sentence is too long, break at commas then spaces
+        if len(sentence) > max_chars:
+            sub_parts = re.split(r'(?<=,)\s+', sentence)
+            for part in sub_parts:
+                if len(part) > max_chars:
+                    # Last resort: hard word-boundary split
+                    words = part.split()
+                    for word in words:
+                        if len(current) + len(word) + 1 > max_chars and current:
+                            chunks.append(current.strip())
+                            current = word + " "
+                        else:
+                            current += word + " "
+                else:
+                    if len(current) + len(part) + 1 > max_chars and current:
+                        chunks.append(current.strip())
+                        current = part + " "
+                    else:
+                        current += part + " "
+        else:
+            if len(current) + len(sentence) + 1 > max_chars and current:
+                chunks.append(current.strip())
+                current = sentence + " "
+            else:
+                current += sentence + " "
+    if current.strip():
+        chunks.append(current.strip())
+    return [c for c in chunks if c]
+
 @router.post("/generate")
 def generate_speech(req: GenerateRequest):
     logger.info(f"Generating speech for voice_id: {req.voice_id}")
@@ -392,6 +468,12 @@ def generate_speech(req: GenerateRequest):
     filename = f"{timestamp}_{safe_text}.wav"
     output_path = OUTPUT_DIR / filename
 
+    # Chunking
+    settings = load_settings()
+    max_chunk_chars = settings.get("max_chunk_chars", 220)
+    chunks = split_text_into_chunks(req.text, max_chunk_chars)
+    logger.info(f"Text split into {len(chunks)} chunk(s) for voice {req.voice_id}")
+
     try:
         # We need to handle tensor conversion if data was loaded from JSON
         import torch
@@ -406,39 +488,50 @@ def generate_speech(req: GenerateRequest):
             if gpt_cond_latent is not None: gpt_cond_latent = gpt_cond_latent.to(device)
             if speaker_embedding is not None: speaker_embedding = speaker_embedding.to(device)
 
-        # Generate
-        if gpt_cond_latent is not None and speaker_embedding is not None:
-            # TTS wrapper's tts() method handles kwargs to underlying model
-            wav = tts_instance.tts(
-                text=req.text,
-                language=req.language,
-                gpt_cond_latent=gpt_cond_latent,
-                speaker_embedding=speaker_embedding
-            )
+        import numpy as np
+        wav_segments = []
+
+        for chunk in chunks:
+            # Generate
+            if gpt_cond_latent is not None and speaker_embedding is not None:
+                # Use the lower-level inference() API to pass pre-computed conditioning
+                # latents directly.
+                out = tts_instance.synthesizer.tts_model.inference(
+                    text=chunk,
+                    language=req.language,
+                    gpt_cond_latent=gpt_cond_latent,
+                    speaker_embedding=speaker_embedding,
+                )
+                seg = out["wav"]
+            else:
+                # Fallback: using tts() directly to get wav in memory
+                # If latents are missing, tts() recomputes them from reference audio
+                wav_out = tts_instance.tts(
+                    text=chunk,
+                    speaker_wav=str(voice_path / "reference.wav"),
+                    language=req.language
+                )
+                seg = wav_out
+
+            # Normalize segment
+            if isinstance(seg, list):
+                seg = np.array(seg, dtype=np.float32)
+            elif hasattr(seg, 'cpu'):
+                seg = seg.cpu().numpy()
+            if seg.ndim > 1:
+                seg = seg.squeeze()
+
+            wav_segments.append(seg)
+
+        if wav_segments:
+            wav = np.concatenate(wav_segments)
         else:
-            # Fallback (slower, recomputes latents)
-            tts_instance.tts_to_file(
-                text=req.text,
-                speaker_wav=str(voice_path / "reference.wav"),
-                language=req.language,
-                file_path=str(output_path)
-            )
-            return {"filename": filename, "path": f"/api/modules/mod_xtts/output/{filename}"}
+             wav = np.array([], dtype=np.float32)
 
-        # Save wav if tts() was used
-        if wav is not None:
-             import torchaudio
-             if isinstance(wav, list):
-                 wav = torch.tensor(wav)
-
-             if isinstance(wav, torch.Tensor):
-                 if wav.dim() == 1:
-                     wav = wav.unsqueeze(0)
-                 # Move to CPU for saving
-                 wav = wav.cpu()
-
-             # XTTS usually 24000 sample rate
-             torchaudio.save(str(output_path), wav, 24000)
+        # Save wav using soundfile
+        import soundfile as sf
+        # XTTS outputs at 24000 Hz sample rate
+        sf.write(str(output_path), wav, 24000, subtype='PCM_16')
 
     except Exception as e:
         logger.error(f"Generation failed: {e}")
@@ -496,5 +589,6 @@ def get_settings():
 def update_settings(s: SettingsUpdate):
     settings = load_settings()
     settings["device"] = s.device
+    settings["max_chunk_chars"] = s.max_chunk_chars
     save_settings(settings)
     return settings
