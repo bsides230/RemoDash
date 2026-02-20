@@ -10,7 +10,6 @@ import threading
 import uuid
 import logging
 import platform
-import requests
 import sys
 import importlib.util
 from pathlib import Path
@@ -64,6 +63,10 @@ XTTS_FILES = {
 def check_dependencies():
     """Checks if critical python dependencies are importable."""
     missing = []
+
+    # Check for requests
+    if importlib.util.find_spec("requests") is None:
+        missing.append("requests")
 
     # Check for TTS (coqui-tts)
     if importlib.util.find_spec("TTS") is None:
@@ -124,6 +127,7 @@ def get_device():
     return "cpu"
 
 def download_file(url, dest_path):
+    import requests
     logger.info(f"Downloading {url} to {dest_path}...")
     try:
         with requests.get(url, stream=True) as r:
