@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 import traceback
+import gc
 
 # --- Configuration ---
 MODULE_DIR = Path(__file__).parent
@@ -144,15 +145,21 @@ def get_device():
             # Check for Vulkan availability if the installed torch supports it
             if hasattr(torch, 'is_vulkan_available') and torch.is_vulkan_available():
                  return "vulkan"
-            # Some older or specific torch builds might support it but not have the function?
-            # Unlikely. If not available, fallback.
-            logger.warning("Vulkan requested but torch.is_vulkan_available() is False or missing.")
+            logger.warning("Vulkan requested but torch.is_vulkan_available() is False or missing. Falling back to CPU.")
         except ImportError:
             pass
         # Fallback to CPU if Vulkan fails
         return "cpu"
 
     return "cpu"
+
+def check_files_exist():
+    target_dir = MODELS_DIR / "xtts_v2"
+    if not target_dir.exists(): return False
+    for filename in XTTS_FILES.keys():
+        if not (target_dir / filename).exists():
+            return False
+    return True
 
 def download_file(url, dest_path):
     import requests
@@ -294,7 +301,43 @@ def get_status():
             if not model_state["error"]:
                 model_state["dependency_missing"] = False
                 model_state["missing_deps"] = []
+
+    model_state["files_exist"] = check_files_exist()
     return model_state
+
+@router.post("/start")
+def start_model(background_tasks: BackgroundTasks):
+    if model_state["loaded"] or model_state["loading"]:
+        return {"status": "already_running", "message": "Model is already loaded or loading."}
+
+    if not check_files_exist():
+        raise HTTPException(status_code=400, detail="Model files missing. Please download first.")
+
+    background_tasks.add_task(load_model_task)
+    return {"status": "started", "message": "Model loading started."}
+
+@router.post("/stop")
+def stop_model():
+    global tts_instance, model_state
+    if not model_state["loaded"] and not model_state["loading"]:
+        return {"status": "stopped", "message": "Model is not running."}
+
+    logger.info("Stopping TTS Model...")
+    tts_instance = None
+    model_state["loaded"] = False
+    model_state["loading"] = False
+
+    # Cleanup
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except:
+        pass
+    gc.collect()
+
+    logger.info("TTS Model stopped and memory cleared.")
+    return {"status": "stopped", "message": "Model stopped."}
 
 @router.post("/download")
 def download_model(req: DownloadRequest, background_tasks: BackgroundTasks):

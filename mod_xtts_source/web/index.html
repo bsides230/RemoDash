@@ -262,9 +262,13 @@
 
     <header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin:0;">XTTS v2</h2>
-            <div>
-                <span id="modelStatus" class="status-badge status-warn">Checking...</span>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <h2 style="margin:0;">XTTS v2</h2>
+                <div id="headerControls" style="display:flex; gap:5px; align-items:center;">
+                    <span id="modelStatus" class="status-badge status-warn">Checking...</span>
+                    <button id="headerStartBtn" class="success hidden" style="padding:5px 15px; font-size:0.85em;" onclick="startModel()">Start</button>
+                    <button id="headerStopBtn" class="danger hidden" style="padding:5px 15px; font-size:0.85em;" onclick="stopModel()">Stop</button>
+                </div>
             </div>
         </div>
         <div class="main-player-container">
@@ -481,6 +485,14 @@ pip3 install transformers==5.0.0 accelerate==0.26.0 requests</pre>
                 const msg = document.getElementById('modelMsg');
                 const dlSec = document.getElementById('downloadSection');
 
+                const startBtn = document.getElementById('headerStartBtn');
+                const stopBtn = document.getElementById('headerStopBtn');
+                const genBtn = document.getElementById('generateBtn');
+
+                // Defaults
+                startBtn.classList.add('hidden');
+                stopBtn.classList.add('hidden');
+
                 // Dependency Handling
                 const missingSec = document.getElementById('missingDepsSection');
                 const mainContent = document.getElementById('mainContent');
@@ -513,29 +525,72 @@ pip3 install transformers==5.0.0 accelerate==0.26.0 requests</pre>
                 // Normal Status Handling
                 if (status.loaded) {
                     el.className = 'status-badge status-ok';
-                    el.innerText = 'Model Loaded';
+                    el.innerText = 'Running';
                     msg.innerText = 'Ready to generate.';
                     dlSec.classList.add('hidden');
+                    stopBtn.classList.remove('hidden');
+                    if(genBtn) {
+                         genBtn.disabled = false;
+                         genBtn.title = "";
+                    }
                 } else if (status.loading) {
                     el.className = 'status-badge status-warn';
                     el.innerHTML = '<span class="loader"></span> Loading...';
                     msg.innerText = 'Please wait...';
                     dlSec.classList.add('hidden');
                     setTimeout(checkStatus, 2000); // Poll
+                    if(genBtn) {
+                        genBtn.disabled = true;
+                        genBtn.title = "Model is loading";
+                    }
                 } else if (status.error) {
                     el.className = 'status-badge status-err';
                     el.innerText = 'Error';
                     msg.innerText = status.error;
                     dlSec.classList.remove('hidden');
+                    if(genBtn) genBtn.disabled = true;
                 } else {
-                    el.className = 'status-badge status-warn';
-                    el.innerText = 'Not Loaded';
-                    msg.innerText = 'Model files missing or not loaded.';
-                    dlSec.classList.remove('hidden');
+                    // Not loaded
+                    el.className = 'status-badge status-err';
+                    el.innerText = 'Stopped';
+                    if(genBtn) {
+                        genBtn.disabled = true;
+                        genBtn.title = "Model not running";
+                    }
+
+                    if (status.files_exist) {
+                        msg.innerText = 'Model files present. Click Start to load.';
+                        dlSec.classList.add('hidden');
+                        startBtn.classList.remove('hidden');
+                    } else {
+                        msg.innerText = 'Model files missing. Please download.';
+                        dlSec.classList.remove('hidden');
+                    }
                 }
             } catch (e) {
                 console.error(e);
             }
+        }
+
+        async function startModel() {
+            try {
+                document.getElementById('headerStartBtn').disabled = true;
+                const res = await api('/start', 'POST');
+                if(res.status === 'started') {
+                    checkStatus();
+                } else {
+                    alert(res.message);
+                }
+            } catch(e) { alert(e.message); }
+            finally { document.getElementById('headerStartBtn').disabled = false; }
+        }
+
+        async function stopModel() {
+            if(!confirm("Stop XTTS Model? This will free up memory.")) return;
+            try {
+                await api('/stop', 'POST');
+                checkStatus();
+            } catch(e) { alert(e.message); }
         }
 
         // --- Manual Install UI Helpers ---

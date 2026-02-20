@@ -262,9 +262,13 @@
 
     <header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin:0;">XTTS v2</h2>
-            <div>
-                <span id="modelStatus" class="status-badge status-warn">Checking...</span>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <h2 style="margin:0;">XTTS v2</h2>
+                <div id="headerControls" style="display:flex; gap:5px; align-items:center;">
+                    <span id="modelStatus" class="status-badge status-warn">Checking...</span>
+                    <button id="headerStartBtn" class="success hidden" style="padding:5px 15px; font-size:0.85em;" onclick="startModel()">Start</button>
+                    <button id="headerStopBtn" class="danger hidden" style="padding:5px 15px; font-size:0.85em;" onclick="stopModel()">Stop</button>
+                </div>
             </div>
         </div>
         <div class="main-player-container">
@@ -512,24 +516,69 @@
                 const msg = document.getElementById('modelMsg');
                 const dlSec = document.getElementById('downloadSection');
 
+                const startBtn = document.getElementById('headerStartBtn');
+                const stopBtn = document.getElementById('headerStopBtn');
+                const genBtn = document.getElementById('generateBtn');
+
+                // Defaults
+                startBtn.classList.add('hidden');
+                stopBtn.classList.add('hidden');
+
                 if (status.loaded) {
                     el.className = 'status-badge status-ok';
-                    el.innerText = 'Model Loaded';
+                    el.innerText = 'Running';
                     msg.innerText = 'Ready to generate.';
                     dlSec.classList.add('hidden');
+                    stopBtn.classList.remove('hidden');
+                    genBtn.disabled = false;
+                    genBtn.title = "";
                 } else if (status.loading) {
                     el.className = 'status-badge status-warn';
                     el.innerText = 'Loading...';
                     msg.innerText = 'Please wait...';
                     dlSec.classList.add('hidden');
                     setTimeout(checkStatus, 2000);
+                    genBtn.disabled = true;
+                    genBtn.title = "Model is loading";
                 } else {
-                    el.className = 'status-badge status-warn';
-                    el.innerText = 'Not Loaded';
-                    msg.innerText = 'Model files missing or not loaded.';
-                    dlSec.classList.remove('hidden');
+                    // Not loaded
+                    el.className = 'status-badge status-err';
+                    el.innerText = 'Stopped';
+                    genBtn.disabled = true;
+                    genBtn.title = "Model not running";
+
+                    if (status.files_exist) {
+                        msg.innerText = 'Model files present. Click Start to load.';
+                        dlSec.classList.add('hidden');
+                        startBtn.classList.remove('hidden');
+                    } else {
+                        msg.innerText = 'Model files missing. Please download.';
+                        dlSec.classList.remove('hidden');
+                        // No start button if files missing
+                    }
                 }
             } catch (e) { console.error(e); }
+        }
+
+        async function startModel() {
+            try {
+                document.getElementById('headerStartBtn').disabled = true;
+                const res = await api('/start', 'POST');
+                if(res.status === 'started') {
+                    checkStatus();
+                } else {
+                    alert(res.message);
+                }
+            } catch(e) { alert(e.message); }
+            finally { document.getElementById('headerStartBtn').disabled = false; }
+        }
+
+        async function stopModel() {
+            if(!confirm("Stop XTTS Model? This will free up memory.")) return;
+            try {
+                await api('/stop', 'POST');
+                checkStatus();
+            } catch(e) { alert(e.message); }
         }
 
         async function loadSettings() {
