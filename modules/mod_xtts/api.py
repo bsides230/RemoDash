@@ -205,8 +205,9 @@ def load_model_task():
         model_path = model_dir / "model.pth"
 
         tts = TTS(
-            model_path=str(model_path),
+            model_path=None,  # Explicitly None to avoid confusion
             config_path=str(config_path),
+            checkpoint_path=str(model_path),  # Use checkpoint_path for local file
             progress_bar=False,
             gpu=(device == "cuda")
         )
