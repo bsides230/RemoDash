@@ -16,28 +16,12 @@
         "brand": "#a0aec0"
     },
     {
-        "id": "noir",
-        "name": "Noir",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Monochrome E-Ink Theme",
-        "brand": "#cccccc"
-    },
-    {
         "id": "retro",
         "name": "Retro",
         "version": "1.0.0",
         "author": "LYRN",
         "description": "Retro Theme",
         "brand": "#ffcc00"
-    },
-    {
-        "id": "default",
-        "name": "Default",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Emerald Green",
-        "brand": "#10B981"
     },
     {
         "id": "pizza",
@@ -54,5 +38,29 @@
         "author": "LYRN",
         "description": "Blackout Theme",
         "brand": "#666666"
+    },
+    {
+        "id": "noir_dark",
+        "name": "Noir (Dark)",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "High contrast dark theme for e-ink displays",
+        "brand": "#ffffff"
+    },
+    {
+        "id": "noir_light",
+        "name": "Noir (Light)",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "High contrast light theme for e-ink displays",
+        "brand": "#000000"
+    },
+    {
+        "id": "default",
+        "name": "Default",
+        "version": "2.0.0",
+        "author": "LYRN",
+        "description": "The default RemoDash theme (Multicolor)",
+        "brand": "#1ea096"
     }
 ]

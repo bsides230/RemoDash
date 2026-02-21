@@ -927,13 +927,6 @@
             </div>
 
             <div class="settings-row">
-                <span>Dark Mode</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="setting-theme" checked onchange="toggleTheme(this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="settings-row">
                 <span>Theme Windows</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="setting-theme-windows" onchange="toggleWindowTheming(this.checked)">
@@ -981,7 +974,7 @@
         /* =========================================================================
            CONFIG & STATE
            ========================================================================= */
-        const APP_CONFIG = { name: 'RemoDash', settingsKey: 'lyrn-settings', defaultBrandColor: '#10B981' };
+        const APP_CONFIG = { name: 'RemoDash', settingsKey: 'lyrn-settings', defaultBrandColor: '#1ea096' };
         let CORE_MODULES = [];
         let MODULE_REGISTRY = [];
         let THEME_PRESETS = {};
@@ -990,11 +983,11 @@
             activeModules: [],
             dockPinned: true,
             dockPos: null,
-            theme: 'dark', // 'light' or 'dark' (base mode)
+            theme: 'dark', // Deprecated but kept for schema compatibility
             activeThemePreset: 'default', // ID of active preset
             fontSize: 12,
             uiScale: 1.0,
-            brandColor: '#10B981',
+            brandColor: '#1ea096',
             themeWindows: false,
             customColors: ['#333333', '#333333', '#333333', '#333333']
         };
@@ -1028,7 +1021,6 @@
             initFonts();
 
             document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
-            document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
             document.getElementById('setting-theme-windows').checked = appSettings.themeWindows || false;
 
             // Initialize Font Size Slider
@@ -1889,16 +1881,6 @@
             updateDockIndicators();
         }
 
-        function toggleTheme(isDark) {
-            const theme = isDark ? 'dark' : 'light';
-            document.body.setAttribute('data-theme', theme);
-            appSettings.theme = theme;
-            saveSettings();
-
-            // Broadcast
-            broadcastThemeToIframes();
-        }
-
         function updateFontSize(size, save = true) {
             document.documentElement.style.setProperty('--font-size-base', size + 'px');
             document.getElementById('font-size-display').innerText = size;
@@ -1995,7 +1977,7 @@
 
         /* COLOR PICKER */
         const BRAND_COLORS = [
-            '#10B981', // Emerald
+            '#1ea096', // New Default Teal
             '#7c5cff', // Purple
             '#3B82F6', // Blue
             '#F59E0B', // Orange

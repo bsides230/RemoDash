@@ -2,14 +2,14 @@
     --font-family-base: 'Inter', system-ui, sans-serif;
     --bg-core: #050505;
     --bg-panel: #0a0a0a;
-    --brand-color: #10B981; /* Default Emerald */
-    --brand-color-dim: rgba(16, 185, 129, 0.1);
-    --brand-color-glow: rgba(16, 185, 129, 0.4);
-    --brand-bg-gradient: rgba(16, 185, 129, 0.15); /* Stronger background */
+    --brand-color: #1ea096; /* New Default Teal */
+    --brand-color-dim: rgba(30, 160, 150, 0.1);
+    --brand-color-glow: rgba(30, 160, 150, 0.4);
+    --brand-bg-gradient: rgba(30, 160, 150, 0.15);
     --text-head: #ffffff;
     --text-body: #b0b0b0;
     --text-dim: #666666;
-    --border-color: #333333; /* Slightly lighter default */
+    --border-color: #333333;
 
     --dock-bg: rgba(20, 20, 20, 0.6);
     --dock-border: rgba(255, 255, 255, 0.1);
@@ -19,20 +19,4 @@
 
     --bg-input: #050505;
     --error-color: #ff4444;
-}
-
-body[data-theme="light"] {
-    --bg-core: #eef0f4;
-    --bg-panel: #ffffff;
-    /* --brand-color override moved to JS for consistency or kept dynamic */
-    --brand-color-dim: rgba(0,0,0, 0.05);
-    --brand-color-glow: rgba(0,0,0, 0.1);
-    --brand-bg-gradient: rgba(0,0,0, 0.05);
-    --text-head: #111111;
-    --text-body: #333333;
-    --text-dim: #555555;
-    --border-color: #d1d5db;
-    --dock-bg: rgba(255, 255, 255, 0.6);
-    --dock-border: rgba(0, 0, 0, 0.1);
-    --bg-input: #ffffff;
 }
