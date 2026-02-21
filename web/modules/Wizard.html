@@ -211,7 +211,7 @@
             formData.append('file', file);
 
             try {
-                const res = await fetch(`${CORE_URL}/api/modules/mod_wizard/install`, {
+                const res = await fetch(`${CORE_URL}/api/wizard/install`, {
                     method: 'POST',
                     headers: { 'X-Token': AUTH_TOKEN },
                     body: formData
@@ -240,7 +240,7 @@
             if (!confirm(`Are you sure you want to uninstall module '${modId}'?`)) return;
 
             try {
-                const res = await fetch(`${CORE_URL}/api/modules/mod_wizard/uninstall`, {
+                const res = await fetch(`${CORE_URL}/api/wizard/uninstall`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

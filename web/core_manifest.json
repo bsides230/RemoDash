@@ -1,38 +1,38 @@
 [
   {
-    "id": "mod_file_explorer",
+    "id": "core_files",
     "name": "File Explorer",
     "icon": "folder",
-    "file": "mod_file_explorer/index.html",
+    "file": "modules/FileExplorer.html",
     "core": true
   },
   {
-    "id": "mod_terminal",
+    "id": "core_terminal",
     "name": "Terminal",
     "icon": "terminal",
-    "file": "mod_terminal/index.html",
+    "file": "modules/Terminal.html",
     "core": true
   },
   {
-    "id": "mod_file_editor",
+    "id": "core_editor",
     "name": "Code Editor",
     "icon": "edit",
-    "file": "mod_file_editor/index.html",
+    "file": "modules/FileEditor.html",
     "core": true,
     "hidden": true
   },
   {
-    "id": "mod_server_status",
+    "id": "core_status",
     "name": "Server Status",
     "icon": "analytics",
-    "file": "mod_server_status/index.html",
+    "file": "modules/ServerStatus.html",
     "core": true
   },
   {
-    "id": "mod_wizard",
+    "id": "core_wizard",
     "name": "Module Manager",
     "icon": "extension",
-    "file": "mod_wizard/index.html",
+    "file": "modules/Wizard.html",
     "core": true
   }
 ]

@@ -293,7 +293,7 @@
             // Fetch content
             try {
                 setStatus('Loading ' + name + '...');
-                const res = await fetch(`${coreUrl}/api/modules/mod_file_explorer/content?path=${encodeURIComponent(path)}`, {
+                const res = await fetch(`${coreUrl}/api/files/content?path=${encodeURIComponent(path)}`, {
                     headers: { 'X-Token': authToken }
                 });
 
@@ -404,7 +404,7 @@
 
             setStatus('Saving...');
             try {
-                 const res = await fetch(`${coreUrl}/api/modules/mod_file_explorer/save`, {
+                 const res = await fetch(`${coreUrl}/api/files/save`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify({ path: targetPath, content: content })

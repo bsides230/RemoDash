@@ -570,10 +570,10 @@
             const t = tabs[index];
             window.parent.postMessage({
                 type: 'OPEN_CHILD_WINDOW',
-                parentId: 'mod_file_explorer',
+                parentId: 'core_files',
                 id: 'explorer_' + Date.now(),
                 title: 'Explorer',
-                url: `/modules/mod_file_explorer/index.html?path=${encodeURIComponent(t.path)}`,
+                url: `FileExplorer.html?path=${encodeURIComponent(t.path)}`,
                 canMinimize: true
             }, '*');
         }
@@ -605,7 +605,7 @@
                      return;
                 }
 
-                const res = await fetch(`${coreUrl}/api/modules/mod_file_explorer/list?path=${encodeURIComponent(tab.path)}&sort_by=${sortMode}&order=${sortOrder}`, {
+                const res = await fetch(`${coreUrl}/api/files/list?path=${encodeURIComponent(tab.path)}&sort_by=${sortMode}&order=${sortOrder}`, {
                     headers: { 'X-Token': authToken }
                 });
                 if(!res.ok) throw new Error(res.statusText);
@@ -741,7 +741,7 @@
                      type: 'OPEN_CHILD_WINDOW',
                      id: 'view_' + Date.now(),
                      title: item.name,
-                     url: `/modules/mod_media_viewer/index.html?src=${encodeURIComponent(item.path)}`,
+                     url: `MediaViewer.html?src=${encodeURIComponent(item.path)}`,
                      canMinimize: false
                  }, '*');
             } else {
@@ -815,7 +815,7 @@
                 const destPath = dest.endsWith(sep) ? dest + name : dest + sep + name;
 
                 if (clip.action === 'cut') {
-                    await fetch(`${coreUrl}/api/modules/mod_file_explorer/rename`, {
+                    await fetch(`${coreUrl}/api/files/rename`, {
                         method: 'POST',
                         headers: {'Content-Type':'application/json', 'X-Token':authToken},
                         body: JSON.stringify({ path: srcPath, new_path: destPath })
@@ -831,7 +831,7 @@
              if(tab.selected.size === 0) return;
              if(!confirm(`Delete ${tab.selected.size} items?`)) return;
              for(const path of tab.selected) {
-                 await fetch(`${coreUrl}/api/modules/mod_file_explorer/delete`, {
+                 await fetch(`${coreUrl}/api/files/delete`, {
                     method: 'POST',
                     headers: {'Content-Type':'application/json', 'X-Token':authToken},
                     body: JSON.stringify({ path: path })
@@ -856,7 +856,7 @@
              const sep = tab.path.includes('\\') ? '\\' : '/';
              const parent = tab.path.endsWith(sep) ? tab.path : tab.path + sep;
              const newPath = parent + name;
-             const endpoint = createType === 'file' ? '/api/modules/mod_file_explorer/save' : '/api/modules/mod_file_explorer/create_folder';
+             const endpoint = createType === 'file' ? '/api/files/save' : '/api/files/create_folder';
              const body = createType === 'file' ? { path: newPath, content: "" } : { path: newPath };
              try {
                 const res = await fetch(`${coreUrl}${endpoint}`, {
@@ -977,7 +977,7 @@
             const txt = document.getElementById('upload-percent');
             ui.style.display = 'flex'; bar.style.width = '0%'; txt.innerText = '0%';
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', `${coreUrl}/api/modules/mod_file_explorer/upload`, true);
+            xhr.open('POST', `${coreUrl}/api/files/upload`, true);
             if(authToken) xhr.setRequestHeader('X-Token', authToken);
             xhr.upload.onprogress = (e) => {
                 if(e.lengthComputable) {
@@ -1000,11 +1000,11 @@
             if(items.length === 1) {
                 const path = items[0];
                 const isDir = tab.items.find(i => i.path === path)?.type === 'dir';
-                if(!isDir) { window.open(`${coreUrl}/api/modules/mod_file_explorer/view?path=${encodeURIComponent(path)}&token=${authToken}`, '_blank'); return; }
+                if(!isDir) { window.open(`${coreUrl}/api/files/view?path=${encodeURIComponent(path)}&token=${authToken}`, '_blank'); return; }
             }
             const btn = event.target; const oldText = btn.innerText; btn.innerText = "Zipping..."; btn.disabled = true;
             try {
-                const res = await fetch(`${coreUrl}/api/modules/mod_file_explorer/zip`, {
+                const res = await fetch(`${coreUrl}/api/files/zip`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify({ paths: items })

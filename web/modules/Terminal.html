@@ -205,7 +205,7 @@
         async function connectTerminal(termObj, cwd, command) {
             let wsUrl = coreUrl.replace('http', 'ws');
             if(wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
-            wsUrl += `/api/modules/mod_terminal/${termObj.id}`; // SID for logging/consistency
+            wsUrl += `/api/terminal/${termObj.id}`; // SID for logging/consistency
 
             let key = await getSessionKey();
             let query = [];
@@ -323,10 +323,10 @@
             // Opens fresh terminal in new window
             window.parent.postMessage({
                 type: 'OPEN_CHILD_WINDOW',
-                parentId: 'mod_terminal',
+                parentId: 'core_terminal',
                 id: 'term_pop_' + tabId,
                 title: 'Terminal',
-                url: '/modules/mod_terminal/index.html',
+                url: 'Terminal.html',
                 canMinimize: true
             }, '*');
 
