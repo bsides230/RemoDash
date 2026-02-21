@@ -1,10 +1,7 @@
-from fastapi import APIRouter, HTTPException, Body
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import APIRouter, HTTPException, Body, BackgroundTasks
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
-import torch
-import numpy as np
-import soundfile as sf
 import io
 import os
 import logging
@@ -12,6 +9,9 @@ from pathlib import Path
 import threading
 import time
 import importlib.util
+import json
+import uuid
+from datetime import datetime
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,14 @@ logger = logging.getLogger("mod_kokoro")
 # Config
 MODULE_DIR = Path(__file__).parent
 MODELS_DIR = MODULE_DIR / "models"
+OUTPUT_DIR = MODULE_DIR / "output"
+HISTORY_FILE = MODULE_DIR / "history.json"
+
 os.environ["HF_HOME"] = str(MODELS_DIR) # Cache models here
+
+# Ensure directories exist
+for d in [MODELS_DIR, OUTPUT_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter()
 
@@ -56,13 +63,29 @@ class GenerateRequest(BaseModel):
     voice: str = "af_heart"
     speed: float = 1.0
 
+class DeleteHistoryRequest(BaseModel):
+    filenames: List[str]
+
 def check_dependencies():
     missing = []
     if not importlib.util.find_spec("kokoro"): missing.append("kokoro")
     if not importlib.util.find_spec("soundfile"): missing.append("soundfile")
     if not importlib.util.find_spec("torch"): missing.append("torch")
-    # misaki might be optional but good to check if we rely on it
+    if not importlib.util.find_spec("numpy"): missing.append("numpy")
     return missing
+
+def load_history():
+    if HISTORY_FILE.exists():
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return []
+
+def save_history(history):
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(history, f, indent=2)
 
 def load_model():
     global pipeline, model_status
@@ -82,10 +105,10 @@ def load_model():
         model_status["loading"] = True
         logger.info("Loading Kokoro Pipeline...")
 
-        # Import inside function to avoid startup errors if dependencies missing
+        # Local Imports
+        import torch
         from kokoro import KPipeline
 
-        # Determine device
         device = 'cpu'
         if torch.cuda.is_available():
             device = 'cuda'
@@ -99,13 +122,7 @@ def load_model():
                  model_status["loading"] = False
                  return
 
-            # Initialize pipeline (downloads model if needed)
-            # lang_code='a' for American English (en-us)
-            # KPipeline handles device placement usually, or we might need to move it?
-            # KPipeline source suggests it uses 'cuda' if available or we can pass device?
-            # Actually KPipeline usually puts on CPU by default unless specified or detected.
-            # We'll just init and see.
-            pipeline = KPipeline(lang_code='a')
+            pipeline = KPipeline(lang_code='a') # 'a' for American English
 
         model_status["loaded"] = True
         model_status["error"] = None
@@ -126,7 +143,6 @@ def shutdown_handler():
 
 @router.get("/status")
 def get_status():
-    # Perform a quick check if not loaded
     if not model_status["loaded"] and not model_status["loading"]:
         missing = check_dependencies()
         if missing:
@@ -147,10 +163,9 @@ def start_engine():
         return {"status": "loading"}
     return {"status": "ready"}
 
-@router.post("/generate")
+@router.post("/generate/stream")
 def generate_stream(req: GenerateRequest):
     if not model_status["loaded"]:
-        # Try auto-load if not running?
         if not model_status["loading"]:
              threading.Thread(target=load_model).start()
              raise HTTPException(status_code=503, detail="Model is loading, please wait.")
@@ -161,11 +176,8 @@ def generate_stream(req: GenerateRequest):
          raise HTTPException(status_code=500, detail="Pipeline is None despite loaded status.")
 
     def audio_generator():
-        # Lock to ensure single-threaded access to model
         with pipeline_lock:
             try:
-                # Generate returns generator of (graphemes, phonemes, audio)
-                # audio is 24khz float32 numpy
                 stream = pipeline(
                     req.text,
                     voice=req.voice,
@@ -177,17 +189,125 @@ def generate_stream(req: GenerateRequest):
                     if shutdown_event.is_set():
                         break
                     if audio is None: continue
-                    # audio is numpy array float32
-                    # Yield raw float32 bytes
+
+                    # Convert Tensor to Numpy if needed
+                    if hasattr(audio, 'cpu'):
+                        audio = audio.cpu().numpy()
+
                     yield audio.tobytes()
 
             except Exception as e:
                 logger.error(f"Generation error: {e}")
-                # We can't easily return JSON error in stream.
                 pass
 
-    # Return raw PCM stream. Client must know it's 24kHz Mono Float32.
     return StreamingResponse(
         audio_generator(),
         media_type="application/octet-stream"
     )
+
+def _generate_and_save_task(req: GenerateRequest, job_id: str):
+    logger.info(f"Starting generation task {job_id}")
+    try:
+        # Local Imports
+        import numpy as np
+        import soundfile as sf
+
+        # Wait for model if needed (simple check)
+        if not pipeline:
+            logger.error("Pipeline not ready")
+            return
+
+        all_audio = []
+
+        with pipeline_lock:
+            stream = pipeline(
+                req.text,
+                voice=req.voice,
+                speed=req.speed,
+                split_pattern=r'\n+'
+            )
+
+            for i, (gs, ps, audio) in enumerate(stream):
+                if shutdown_event.is_set(): break
+                if audio is None: continue
+
+                if hasattr(audio, 'cpu'):
+                    audio = audio.cpu().numpy()
+
+                all_audio.append(audio)
+
+        if not all_audio:
+            logger.warning("No audio generated")
+            return
+
+        final_wav = np.concatenate(all_audio)
+
+        # Save
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_text = "".join([c for c in req.text if c.isalnum() or c in (' ', '_')]).strip()[:25]
+        filename = f"{timestamp}_{safe_text}.wav"
+        output_path = OUTPUT_DIR / filename
+
+        sf.write(str(output_path), final_wav, 24000)
+        logger.info(f"Saved to {filename}")
+
+        # Update History
+        history = load_history()
+        history.insert(0, {
+            "filename": filename,
+            "text": req.text,
+            "voice": req.voice,
+            "date": timestamp,
+            "path": str(output_path),
+            "job_id": job_id
+        })
+        save_history(history)
+
+    except Exception as e:
+        logger.error(f"Task failed: {e}")
+
+@router.post("/generate")
+def generate_file(req: GenerateRequest, background_tasks: BackgroundTasks):
+    if not model_status["loaded"]:
+         if not model_status["loading"]:
+             threading.Thread(target=load_model).start()
+             return JSONResponse(status_code=503, content={"detail": "Model is loading, please wait."})
+         else:
+             return JSONResponse(status_code=503, content={"detail": "Model is still loading."})
+
+    job_id = str(uuid.uuid4())
+    background_tasks.add_task(_generate_and_save_task, req, job_id)
+    return {"job_id": job_id, "status": "started"}
+
+@router.get("/history")
+def get_history():
+    return load_history()
+
+@router.get("/output/{filename}")
+def get_output_file(filename: str):
+    file_path = OUTPUT_DIR / filename
+    if file_path.exists():
+        return FileResponse(file_path, media_type="audio/wav")
+    raise HTTPException(status_code=404, detail="File not found")
+
+@router.post("/history/delete")
+def delete_history_items(req: DeleteHistoryRequest):
+    history = load_history()
+    new_history = []
+    deleted_count = 0
+    to_delete = set(req.filenames)
+
+    for item in history:
+        if item["filename"] in to_delete:
+            p = OUTPUT_DIR / item["filename"]
+            if p.exists():
+                try:
+                    p.unlink()
+                except:
+                    pass
+            deleted_count += 1
+        else:
+            new_history.append(item)
+
+    save_history(new_history)
+    return {"deleted": deleted_count}

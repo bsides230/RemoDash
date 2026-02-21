@@ -16,20 +16,12 @@
         "brand": "#a0aec0"
     },
     {
-        "id": "coffee",
-        "name": "Coffee",
+        "id": "noir",
+        "name": "Noir",
         "version": "1.0.0",
         "author": "LYRN",
-        "description": "Coffee Theme",
-        "brand": "#d2b48c"
-    },
-    {
-        "id": "forest",
-        "name": "Forest",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Forest Theme",
-        "brand": "#4caf50"
+        "description": "Monochrome E-Ink Theme",
+        "brand": "#cccccc"
     },
     {
         "id": "retro",
@@ -44,8 +36,8 @@
         "name": "Default",
         "version": "1.0.0",
         "author": "LYRN",
-        "description": "Default Theme",
-        "brand": null
+        "description": "Emerald Green",
+        "brand": "#10B981"
     },
     {
         "id": "pizza",
@@ -56,59 +48,11 @@
         "brand": "#ff4444"
     },
     {
-        "id": "nebula",
-        "name": "Nebula",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Nebula Theme",
-        "brand": "#ff00aa"
-    },
-    {
-        "id": "lavender",
-        "name": "Lavender",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Lavender Theme",
-        "brand": "#c77dff"
-    },
-    {
-        "id": "midnight",
-        "name": "Midnight",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Midnight Theme",
-        "brand": "#7c5cff"
-    },
-    {
-        "id": "ocean",
-        "name": "Ocean Deep",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Ocean Deep Theme",
-        "brand": "#2aa198"
-    },
-    {
         "id": "blackout",
         "name": "Blackout",
         "version": "1.0.0",
         "author": "LYRN",
         "description": "Blackout Theme",
         "brand": "#666666"
-    },
-    {
-        "id": "cyberpunk",
-        "name": "Cyberpunk",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Cyberpunk Theme",
-        "brand": "#fce300"
-    },
-    {
-        "id": "dispensary",
-        "name": "Dispensary",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Dispensary Theme",
-        "brand": "#ffcc00"
     }
 ]

@@ -68,18 +68,39 @@
         .status-warn { background-color: rgba(249, 168, 37, 0.1); color: var(--warn-color); border: 1px solid var(--warn-color); }
         .status-err { background-color: rgba(198, 40, 40, 0.1); color: var(--error-color); border: 1px solid var(--error-color); }
 
-        .content {
-            flex: 1;
+        /* TABS */
+        .tabs {
             display: flex;
-            flex-direction: column;
-            gap: 20px;
-            overflow-y: auto;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono';
+            font-size: 0.9em;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--text-head); }
+        .tab-btn.active {
+            color: var(--brand-color);
+            border-bottom-color: var(--brand-color);
         }
 
+        .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .tab-content.active { display: flex; }
+
+        /* CONTROLS */
         .controls {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
+            margin-bottom: 15px;
         }
 
         .form-group {
@@ -118,6 +139,7 @@
             min-height: 150px;
             font-size: 1em;
             line-height: 1.5;
+            flex: 1;
         }
         textarea:focus, select:focus, input:focus {
             outline: none;
@@ -127,6 +149,7 @@
         .btn-group {
             display: flex;
             gap: 10px;
+            margin-top: 15px;
         }
 
         button {
@@ -140,12 +163,18 @@
             font-family: 'Inter', sans-serif;
             transition: opacity 0.2s;
             flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         button:hover { opacity: 0.9; }
         button:disabled { background-color: var(--border-color); color: var(--text-dim); cursor: not-allowed; }
         button.danger { background-color: var(--error-color); color: white; }
         button.warn { background-color: var(--warn-color); color: #000; }
         button.secondary { background-color: var(--border-color); color: var(--text-head); }
+        button.text-btn { background: transparent; color: var(--text-dim); padding: 4px; width: auto; flex: 0; }
+        button.text-btn:hover { color: var(--text-head); }
 
         .console {
             background: #000;
@@ -158,7 +187,41 @@
             height: 100px;
             overflow-y: auto;
             white-space: pre-wrap;
+            margin-top: 15px;
         }
+
+        /* HISTORY LIST */
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .history-item {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .h-info { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+        .h-text { color: var(--text-head); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
+        .h-meta { font-size: 0.8em; color: var(--text-dim); font-family: 'JetBrains Mono'; }
+        .h-actions { display: flex; gap: 8px; }
+
+        /* AUDIO PLAYER */
+        #audio-player-container {
+            margin-top: 15px;
+            background: var(--bg-panel);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            display: none;
+        }
+        audio { width: 100%; height: 32px; }
 
         /* Loading Overlay */
         .overlay {
@@ -182,8 +245,13 @@
         <div style="font-size:0.8em; color:var(--text-dim);">v1.0</div>
     </header>
 
-    <div class="content">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="setTab('generate')">Generate</button>
+        <button class="tab-btn" onclick="setTab('history')">History</button>
+    </div>
 
+    <!-- GENERATE TAB -->
+    <div id="tab-generate" class="tab-content active">
         <div class="controls">
             <div class="form-group">
                 <label>Voice</label>
@@ -199,17 +267,32 @@
 
         <div class="form-group" style="flex:1;">
             <label>Input Text</label>
-            <textarea id="textInput" placeholder="Type or paste text here to stream..."></textarea>
+            <textarea id="textInput" placeholder="Type or paste text here..."></textarea>
         </div>
 
         <div class="btn-group">
-            <button id="streamBtn" onclick="startStreaming()">Stream Audio</button>
+            <button id="genBtn" onclick="generateFile()">Generate & Save</button>
+            <button id="streamBtn" class="secondary" onclick="startStreaming()">Stream (Preview)</button>
             <button id="stopBtn" class="danger hidden" onclick="stopStreaming()">Stop</button>
+
             <button id="installBtn" class="warn hidden" onclick="showInstallModal()">Install Deps</button>
             <button id="scanBtn" class="secondary hidden" onclick="checkStatus()">Re-Scan</button>
         </div>
 
         <div class="console" id="consoleLog">Ready.</div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-content">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+            <button class="secondary" style="width:auto; flex:0;" onclick="loadHistory()">Refresh</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+
+        <div id="audio-player-container">
+            <div style="font-size:0.8em; margin-bottom:5px; color:var(--text-head);" id="player-title">Now Playing</div>
+            <audio id="audioPlayer" controls></audio>
+        </div>
     </div>
 
     <div id="loadingOverlay" class="overlay hidden">
@@ -223,12 +306,28 @@
         let isStreaming = false;
         let abortController = null;
         let missingDeps = [];
+        let pollingInterval = null;
 
         // --- Init ---
         window.addEventListener('load', async () => {
             checkStatus();
             loadVoices();
         });
+
+        function setTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            // Find button by text content roughly or index? cleaner to add data-tab
+            const btns = document.querySelectorAll('.tab-btn');
+            if(tab === 'generate') btns[0].classList.add('active');
+            if(tab === 'history') {
+                btns[1].classList.add('active');
+                loadHistory();
+            }
+
+            document.getElementById('tab-'+tab).classList.add('active');
+        }
 
         async function checkStatus() {
             try {
@@ -239,9 +338,10 @@
                 if (data.dependency_missing) {
                     badge.className = 'status-badge status-err';
                     badge.innerText = 'Missing Deps';
-                    log("Error: Missing Python dependencies (kokoro, soundfile). Check server logs.");
+                    log("Error: Missing Python dependencies. Check server logs.");
 
                     document.getElementById('loadingOverlay').classList.add('hidden');
+                    document.getElementById('genBtn').classList.add('hidden');
                     document.getElementById('streamBtn').classList.add('hidden');
                     document.getElementById('installBtn').classList.remove('hidden');
                     document.getElementById('scanBtn').classList.remove('hidden');
@@ -251,7 +351,10 @@
                 } else {
                     document.getElementById('installBtn').classList.add('hidden');
                     document.getElementById('scanBtn').classList.add('hidden');
-                    if(!isStreaming) document.getElementById('streamBtn').classList.remove('hidden');
+                    if(!isStreaming) {
+                        document.getElementById('genBtn').classList.remove('hidden');
+                        document.getElementById('streamBtn').classList.remove('hidden');
+                    }
                 }
 
                 if (data.loaded) {
@@ -293,6 +396,47 @@
             } catch(e) {}
         }
 
+        // --- Generation Logic ---
+
+        async function generateFile() {
+            const text = document.getElementById('textInput').value.trim();
+            if(!text) return alert("Enter text.");
+
+            document.getElementById('genBtn').disabled = true;
+            document.getElementById('genBtn').innerText = "Generating...";
+            log("Starting generation...");
+
+            try {
+                const res = await fetch(API_BASE + '/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        text: text,
+                        voice: document.getElementById('voiceSelect').value,
+                        speed: parseFloat(document.getElementById('speedInput').value)
+                    })
+                });
+
+                if(!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+
+                log("Job Started: " + data.job_id);
+                log("Wait a moment and check History...");
+
+                // Simple timeout to auto-refresh history or notify
+                setTimeout(() => {
+                    log("Check History tab for results.");
+                    document.getElementById('genBtn').disabled = false;
+                    document.getElementById('genBtn').innerText = "Generate & Save";
+                }, 2000);
+
+            } catch(e) {
+                log("Error: " + e.message);
+                document.getElementById('genBtn').disabled = false;
+                document.getElementById('genBtn').innerText = "Generate & Save";
+            }
+        }
+
         // --- Streaming Logic ---
 
         async function startStreaming() {
@@ -309,7 +453,7 @@
             log("Starting stream...");
 
             try {
-                const res = await fetch(API_BASE + '/generate', {
+                const res = await fetch(API_BASE + '/generate/stream', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -323,17 +467,13 @@
                 if(!res.ok) throw new Error(await res.text());
 
                 const reader = res.body.getReader();
-                let nextStartTime = audioContext.currentTime + 0.1; // Buffer slightly
-
-                // Buffer accumulator for float32 alignment
+                let nextStartTime = audioContext.currentTime + 0.1;
                 let remainder = null;
 
                 while(true) {
                     const {done, value} = await reader.read();
                     if(done) break;
 
-                    // Value is Uint8Array. Needs to be Float32Array.
-                    // Must be multiple of 4 bytes.
                     let data = value;
                     if(remainder) {
                         const tmp = new Uint8Array(remainder.length + value.length);
@@ -354,7 +494,6 @@
                     const float32 = new Float32Array(data.buffer, data.byteOffset, data.length / 4);
                     scheduleChunk(float32, nextStartTime);
 
-                    // Duration = samples / sampleRate
                     const duration = float32.length / 24000;
                     nextStartTime += duration;
                 }
@@ -380,20 +519,91 @@
             source.buffer = buffer;
             source.connect(audioContext.destination);
 
-            // Ensure we don't schedule in past
             const playTime = Math.max(audioContext.currentTime, startTime);
             source.start(playTime);
         }
 
         function stopStreaming() {
             if(abortController) abortController.abort();
-            if(audioContext) audioContext.close().then(() => audioContext = null); // Reset context to stop audio immediately
+            if(audioContext) audioContext.close().then(() => audioContext = null);
         }
 
         function updateUI(streaming) {
             document.getElementById('streamBtn').classList.toggle('hidden', streaming);
+            document.getElementById('genBtn').classList.toggle('hidden', streaming);
             document.getElementById('stopBtn').classList.toggle('hidden', !streaming);
             document.getElementById('textInput').disabled = streaming;
+        }
+
+        // --- History Logic ---
+
+        async function loadHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '<div style="padding:10px; color:var(--text-dim);">Loading...</div>';
+
+            try {
+                const res = await fetch(API_BASE + '/history');
+                const history = await res.json();
+
+                list.innerHTML = '';
+                if(history.length === 0) {
+                    list.innerHTML = '<div style="padding:10px; color:var(--text-dim);">No history found.</div>';
+                    return;
+                }
+
+                history.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = 'history-item';
+
+                    // Format date
+                    const dateStr = item.date.replace(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, '$1-$2-$3 $4:$5');
+
+                    el.innerHTML = `
+                        <div class="h-info">
+                            <div class="h-text" title="${item.text}">${item.text}</div>
+                            <div class="h-meta">${dateStr} • ${item.voice}</div>
+                        </div>
+                        <div class="h-actions">
+                            <button class="secondary" onclick="playAudio('${item.filename}', '${item.text.replace(/'/g, "\\'")}')">▶</button>
+                            <a href="${API_BASE}/output/${item.filename}" download="${item.filename}" class="btn-dl" style="display:none;"></a>
+                            <button class="secondary" onclick="downloadFile(this)">⬇</button>
+                            <button class="danger" onclick="deleteItem('${item.filename}')">🗑</button>
+                        </div>
+                    `;
+                    list.appendChild(el);
+                });
+
+            } catch(e) {
+                list.innerHTML = `<div style="padding:10px; color:var(--error-color);">Error: ${e.message}</div>`;
+            }
+        }
+
+        function playAudio(filename, text) {
+            const player = document.getElementById('audioPlayer');
+            const container = document.getElementById('audio-player-container');
+            const title = document.getElementById('player-title');
+
+            player.src = `${API_BASE}/output/${filename}`;
+            title.innerText = "Playing: " + text;
+            container.style.display = 'block';
+            player.play();
+        }
+
+        function downloadFile(btn) {
+            const link = btn.parentElement.querySelector('.btn-dl');
+            link.click();
+        }
+
+        async function deleteItem(filename) {
+            if(!confirm("Delete this audio?")) return;
+            try {
+                await fetch(API_BASE + '/history/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ filenames: [filename] })
+                });
+                loadHistory();
+            } catch(e) { alert(e.message); }
         }
 
         function log(msg) {

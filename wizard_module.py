@@ -98,8 +98,21 @@ def install_module():
             # Check for requirements.txt
             req_file = target_dir / "requirements.txt"
             if req_file.exists():
-                print("Installing dependencies...")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+                print("\n" + "="*40)
+                print("MODULE DEPENDENCIES REQUIRED")
+                print("="*40)
+                print("This module requires the following packages:")
+                print("-" * 40)
+                try:
+                    with open(req_file, "r") as rf:
+                        print(rf.read().strip())
+                except Exception:
+                    print("(Error reading requirements.txt)")
+                print("-" * 40)
+                print("Please install them manually using:")
+                print(f"pip install -r modules/{mod_id}/requirements.txt")
+                print("="*40 + "\n")
+                input("Press Enter to acknowledge...")
 
             # Register Module
             manager.register_module(
