@@ -1,8 +1,0 @@
-{
-    "id": "mod_vlc",
-    "name": "VLC Player",
-    "version": "1.0.0",
-    "author": "System",
-    "icon": "play_circle",
-    "enabled": true
-}
