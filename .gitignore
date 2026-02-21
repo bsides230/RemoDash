@@ -4,3 +4,4 @@ admin_token.txt
 /__pycache__
 settings.json
 data/git_credentials.json
+/themes
