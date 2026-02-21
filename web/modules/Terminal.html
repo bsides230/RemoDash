@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Terminal</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" /> -->
+    <link rel="stylesheet" href="../assets/xterm.css" />
     <style>
         :root {
             --bg-core: #050505;
@@ -67,8 +68,10 @@
     <div id="terminals-container"></div>
 
     <!-- Load xterm.js -->
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script> -->
+    <script src="../assets/xterm.js"></script>
+    <script src="../assets/xterm-addon-fit.js"></script>
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');

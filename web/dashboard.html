@@ -2441,7 +2441,7 @@
             }
 
             if (e.data.type === 'OPEN_TERMINAL_TAB') {
-                const termMod = MODULE_REGISTRY.find(m => m.id === 'mod_terminal');
+                const termMod = MODULE_REGISTRY.find(m => m.id === 'core_terminal');
                 if(!termMod) return;
 
                 const instanceId = 'win_' + termMod.id;

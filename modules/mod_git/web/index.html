@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Git Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-core: #050505;
+            --bg-panel: #0a0a0a;
+            --bg-sec: #111;
+            --text-head: #ffffff;
+            --text-body: #b0b0b0;
+            --text-dim: #666666;
+            --brand-color: #10B981;
+            --brand-dim: rgba(16, 185, 129, 0.1);
+            --border-color: #222222;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        body[data-theme="light"] {
+            --bg-core: #eef0f4;
+            --bg-panel: #ffffff;
+            --bg-sec: #f3f4f6;
+            --text-head: #111111;
+            --text-body: #333333;
+            --text-dim: #555555;
+            --border-color: #d1d5db;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-core);
+            color: var(--text-body);
+            font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            font-size: 13px;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-core); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+        /* Layout */
+        #app { display: flex; height: 100%; }
+
+        /* Sidebar */
+        #sidebar {
+            width: 250px; background: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 10px 15px; border-bottom: 1px solid var(--border-color);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-dim); background: var(--bg-sec);
+        }
+
+        #repo-list { flex: 1; overflow-y: auto; }
+        .repo-item {
+            padding: 10px 15px; border-bottom: 1px solid var(--border-color);
+            cursor: pointer; transition: background 0.1s;
+        }
+        .repo-item:hover { background: var(--bg-sec); }
+        .repo-item.active { background: var(--brand-dim); border-left: 3px solid var(--brand-color); }
+
+        .repo-name { font-weight: 600; color: var(--text-head); display: block; margin-bottom: 2px; }
+        .repo-path { font-size: 10px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+        .add-repo-btn {
+            background: none; border: none; color: var(--text-head); cursor: pointer;
+            font-size: 14px; padding: 0 5px;
+        }
+        .add-repo-btn:hover { color: var(--brand-color); }
+
+        /* Main Area */
+        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-core); position: relative; }
+
+        /* Toolbar */
+        #toolbar {
+            height: 40px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0;
+        }
+
+        .current-repo-info { font-weight: 600; color: var(--text-head); margin-right: auto; display: flex; align-items: center; gap: 10px; flex: 1; overflow: hidden; }
+        .branch-badge {
+            font-family: var(--font-mono); font-size: 11px;
+            background: var(--bg-sec); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color);
+            display: flex; align-items: center; gap: 4px;
+            white-space: nowrap;
+        }
+        #repo-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .tool-btn {
+            background: var(--bg-sec); border: 1px solid var(--border-color);
+            color: var(--text-body); padding: 4px 10px; border-radius: 4px;
+            cursor: pointer; font-size: 11px; font-family: var(--font-mono);
+            display: flex; align-items: center; gap: 6px;
+            transition: all 0.2s;
+        }
+        .tool-btn:hover { border-color: var(--brand-color); color: var(--text-head); }
+        .tool-btn:active { transform: translateY(1px); }
+
+        /* Workspace: Split Changes and Diff */
+        #workspace { flex: 1; display: flex; overflow: hidden; }
+
+        /* Changes Panel */
+        #changes-panel {
+            width: 250px; background: var(--bg-panel); border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; flex-shrink: 0;
+        }
+
+        .panel-header {
+            padding: 8px 10px; border-bottom: 1px solid var(--border-color);
+            font-size: 11px; font-weight: 600; color: var(--text-dim);
+            text-transform: uppercase; background: var(--bg-sec);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        #file-list { flex: 1; overflow-y: auto; }
+
+        .file-entry {
+            display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;
+            font-size: 12px;
+        }
+        .file-entry:hover { background: var(--bg-sec); }
+        .file-entry.selected { background: var(--brand-dim); }
+
+        .file-entry input[type="checkbox"] { cursor: pointer; }
+        .file-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-body); }
+        .file-status { width: 14px; text-align: center; font-weight: bold; font-family: var(--font-mono); font-size: 11px; }
+        .status-M { color: #60a5fa; } /* Modified */
+        .status-A { color: #34d399; } /* Added */
+        .status-D { color: #f87171; } /* Deleted */
+        .status-U { color: #fbbf24; } /* Untracked */
+
+        #commit-area {
+            padding: 10px; border-top: 1px solid var(--border-color);
+            background: var(--bg-sec); display: flex; flex-direction: column; gap: 8px;
+        }
+        #commit-msg {
+            width: 100%; height: 60px; resize: none;
+            background: var(--bg-core); border: 1px solid var(--border-color);
+            color: var(--text-head); padding: 8px; font-family: sans-serif; font-size: 12px;
+            border-radius: 4px;
+        }
+        #commit-btn {
+            width: 100%; background: var(--brand-color); color: #fff;
+            border: none; padding: 8px; border-radius: 4px; cursor: pointer;
+            font-weight: 600; font-size: 12px;
+        }
+        #commit-btn:hover { opacity: 0.9; }
+
+        /* Diff Panel */
+        #diff-panel { flex: 1; display: flex; flex-direction: column; background: var(--bg-core); overflow: hidden; }
+        #diff-content {
+            flex: 1; overflow: auto; padding: 15px;
+            font-family: var(--font-mono); font-size: 12px; line-height: 1.4; color: var(--text-body);
+            white-space: pre-wrap;
+        }
+
+        .diff-added { background: rgba(16, 185, 129, 0.1); color: #34d399; display: block; }
+        .diff-removed { background: rgba(239, 68, 68, 0.1); color: #f87171; display: block; }
+        .diff-header { color: var(--text-dim); font-weight: bold; display: block; margin-bottom: 5px; }
+        .diff-chunk { color: #60a5fa; display: block; margin-top: 5px; }
+
+        #empty-state {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: var(--text-dim); font-family: var(--font-mono); gap: 10px;
+        }
+
+        #mobile-menu-btn {
+            display: none; width: 32px; height: 32px; align-items: center; justify-content: center;
+            background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 4px;
+            color: var(--text-head); cursor: pointer;
+            position: absolute; top: 10px; left: 10px; z-index: 50;
+        }
+
+        /* Mobile Sidebar */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: fixed; top: 0; left: 0; height: 100%; z-index: 100;
+                transform: translateX(-100%); transition: transform 0.3s;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            }
+            #sidebar.open { transform: translateX(0); }
+
+            #sidebar-overlay {
+                display: none; position: fixed; top:0; left:0; width:100%; height:100%;
+                background: rgba(0,0,0,0.5); z-index: 99;
+            }
+            #sidebar-overlay.visible { display: block; }
+
+            #mobile-menu-btn { display: flex !important; }
+            #toolbar { padding-left: 50px; }
+
+            #workspace { flex-direction: column; }
+            #changes-panel { width: 100%; height: 200px; border-right: none; border-bottom: 1px solid var(--border-color); }
+        }
+
+        /* Dropdown */
+        .action-dropdown { position: relative; display: inline-block; }
+        .dropdown-content {
+            display: none; position: absolute; right: 0; top: 100%; margin-top: 5px;
+            background-color: var(--bg-panel); min-width: 160px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5); z-index: 10;
+            border: 1px solid var(--border-color); border-radius: 4px;
+        }
+        .dropdown-content.show { display: block; } /* Click to show */
+        .dropdown-content button {
+            color: var(--text-body); padding: 10px 16px;
+            text-decoration: none; display: block; width: 100%; text-align: left;
+            background: none; border: none; cursor: pointer; font-family: var(--font-mono); font-size: 11px;
+        }
+        .dropdown-content button:hover { background-color: var(--bg-sec); color: var(--text-head); }
+        /* .action-dropdown:hover .dropdown-content { display: block; } REMOVED */
+
+    </style>
+</head>
+<body>
+    <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <div id="app">
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <span>Repositories</span>
+                <div style="display:flex; gap:5px;">
+                    <button class="add-repo-btn" onclick="showSettings()" title="Settings">⚙</button>
+                    <button class="add-repo-btn" onclick="loadRepos()" title="Refresh List">↻</button>
+                    <button class="add-repo-btn" onclick="showCloneModal()" title="Clone from URL">⬇</button>
+                    <button class="add-repo-btn" onclick="promptAddRepo()" title="Add Local Path">+</button>
+                </div>
+            </div>
+            <div id="repo-list"></div>
+        </div>
+
+        <div id="main">
+            <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+            <div id="empty-state">
+                <div style="font-size: 40px; opacity: 0.3;">🐙</div>
+                <div>Select a repository to manage</div>
+            </div>
+
+            <div id="repo-interface" style="display:none; flex:1; flex-direction:column; overflow:hidden;">
+
+                <div id="toolbar">
+                    <div class="current-repo-info">
+                        <span id="repo-title">Repo Name</span>
+                        <div class="branch-badge" title="Current Branch">
+                            <span>⎇</span> <span id="current-branch">main</span>
+                        </div>
+                    </div>
+
+                    <button class="tool-btn" onclick="loadRepoDetails()">↻</button>
+
+                    <div class="action-dropdown">
+                         <button class="tool-btn" id="btn-actions-dropdown" onclick="toggleDropdown(event)">Actions ▼</button>
+                         <div class="dropdown-content" id="dropdown-menu">
+                             <button onclick="doPull()">↓ Pull</button>
+                             <button onclick="doPush()">↑ Push</button>
+                             <div style="height:1px; background:var(--border-color); margin:5px 0"></div>
+                             <button onclick="doStash()">📦 Stash</button>
+                             <button onclick="doStashPop()">📦 Pop Stash</button>
+                             <div style="height:1px; background:var(--border-color); margin:5px 0"></div>
+                             <button onclick="doDiscard()" style="color:var(--danger)">✕ Discard Changes</button>
+                             <button onclick="removeRepo()" style="color:var(--danger)">🗑 Remove from List</button>
+                         </div>
+                    </div>
+                </div>
+
+                <div id="workspace">
+                    <div id="changes-panel">
+                        <div class="panel-header">
+                            Changes <span id="change-count" style="background:var(--brand-color); color:#fff; padding:1px 5px; border-radius:10px; font-size:9px;">0</span>
+                        </div>
+                        <div id="file-list">
+                            <!-- JS populated -->
+                        </div>
+                        <div id="commit-area">
+                            <textarea id="commit-msg" placeholder="Summary (required)"></textarea>
+                            <button id="commit-btn" onclick="doCommit()">Commit to <span id="commit-branch-label">main</span></button>
+                        </div>
+                    </div>
+
+                    <div id="diff-panel">
+                        <div class="panel-header" id="diff-filename">Select a file to view diff</div>
+                        <div id="diff-content"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-delete" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Remove Repository</h3>
+            <p style="color:var(--text-body); font-size:12px; margin-bottom:15px;">
+                Are you sure you want to remove <strong id="del-repo-name" style="color:var(--text-head)"></strong>?
+            </p>
+
+            <label style="cursor:pointer; display:flex; align-items:center; gap:8px; color:var(--text-body); font-size:12px; margin-bottom:20px; padding:10px; background:rgba(239, 68, 68, 0.1); border-radius:4px; border:1px solid rgba(239, 68, 68, 0.2);">
+                <input type="checkbox" id="chk-delete-files">
+                <span>Also delete files from disk (Cannot be undone)</span>
+            </label>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-delete').style.display='none'">Cancel</button>
+                <button class="tool-btn" style="color:var(--danger); border-color:var(--danger);" onclick="confirmRemoveRepo()">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-clone" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:20px; border-radius:8px; width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Clone Repository</h3>
+
+            <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Repo URL</label>
+            <input type="text" id="inp-clone-url" placeholder="https://github.com/user/repo.git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 5px 0; font-family:var(--font-mono); outline:none;">
+
+            <div style="font-size:10px; color:var(--text-dim); margin-bottom:15px;">
+                Authentication will use <a href="#" onclick="document.getElementById('modal-clone').style.display='none';showSettings();" style="color:var(--brand-color); text-decoration:none;">Global Credentials</a> if configured.
+            </div>
+
+            <label id="lbl-clone-dest" style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Local Destination Path (Must be empty/new)</label>
+            <input type="text" id="inp-clone-path" placeholder="/path/to/destination" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 15px 0; font-family:var(--font-mono); outline:none;">
+            <div id="clone-hint" style="font-size:10px; color:var(--text-dim); margin-top:-10px; margin-bottom:15px; display:none;">Will be cloned to: <span id="clone-root-preview"></span></div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-clone').style.display='none'">Cancel</button>
+                <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="doClone()">Clone</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:0; border-radius:8px; width:600px; height: 80vh; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <div style="padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:var(--bg-sec);">
+                <h3 style="margin:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Global Git Settings</h3>
+                <button onclick="document.getElementById('modal-settings').style.display='none'" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:16px;">✕</button>
+            </div>
+
+            <div style="flex:1; overflow-y:auto; padding:20px;">
+
+                <!-- Section: Configuration -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Repo Configuration</h4>
+                <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Clone Mode</label>
+                <div style="margin:5px 0 15px 0; display:flex; gap:10px; color:var(--text-body);">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="git_mode" value="auto" onchange="toggleSettingsUI()"> Auto (Central Folder)
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="radio" name="git_mode" value="manual" onchange="toggleSettingsUI()"> Manual (Ask Path)
+                    </label>
+                </div>
+
+                <div id="setting-root-path-group" style="margin-bottom:20px;">
+                    <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Root Git Folder</label>
+                    <input type="text" id="inp-setting-root" placeholder="~/documents/github/repos" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin:5px 0 5px 0; font-family:var(--font-mono); outline:none;">
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+
+                <!-- Section: Identity -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Git Identity (Global)</h4>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">User Name</label>
+                        <input type="text" id="inp-git-name" placeholder="John Doe" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">User Email</label>
+                        <input type="text" id="inp-git-email" placeholder="john@example.com" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+
+                <!-- Section: HTTPS Credentials -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">HTTPS Credentials (Saved Locally)</h4>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Username</label>
+                        <input type="text" id="inp-cred-user" placeholder="git" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                    <div style="flex:1">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Token / Password</label>
+                        <input type="password" id="inp-cred-token" placeholder="ghp_..." style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); margin-top:5px; font-family:var(--font-mono); outline:none;">
+                    </div>
+                </div>
+
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:20px 0;">
+
+                <!-- Section: SSH Keys -->
+                <h4 style="margin:0 0 10px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">SSH Keys</h4>
+                <div id="ssh-section-content">
+                    <div id="ssh-loading" style="display:none; color:var(--text-dim); padding:10px;">Checking SSH...</div>
+
+                    <div id="ssh-no-key" style="display:none; padding:10px; background:var(--bg-core); border:1px solid var(--border-color); border-radius:4px; text-align:center;">
+                        <p style="color:var(--text-body); margin:0 0 10px 0; font-size:12px;">No SSH key found.</p>
+                        <button class="tool-btn" style="background:var(--brand-color); color:#fff; border:none; margin:0 auto; padding:6px 12px;" onclick="generateSSHKey()">Generate SSH Key</button>
+                    </div>
+
+                    <div id="ssh-key-info" style="display:none;">
+                        <label style="font-size:10px; color:var(--text-dim); text-transform:uppercase;">Public Key</label>
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <input type="text" id="ssh-pub-key" readonly style="flex:1; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-body); font-family:var(--font-mono); outline:none; font-size:11px;">
+                            <button class="tool-btn" onclick="copySSHKey()">Copy</button>
+                        </div>
+                        <div style="margin-top:5px; font-size:10px; color:var(--text-dim);">Fingerprint: <span id="ssh-fingerprint" style="color:var(--brand-color);"></span></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style="padding:15px; border-top:1px solid var(--border-color); background:var(--bg-sec); display:flex; justify-content:flex-end; gap:10px;">
+                <button class="tool-btn" onclick="document.getElementById('modal-settings').style.display='none'">Cancel</button>
+                <button class="tool-btn" style="color:var(--brand-color); border-color:var(--brand-color);" onclick="saveSettings()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let coreUrl = localStorage.getItem('lyrn_core_url');
+        let authToken = localStorage.getItem('lyrn_admin_token');
+        let currentRepoPath = null;
+        let activeFile = null;
+
+        // State tracking
+        let currentFiles = []; // { file: str, type: str, staged: bool }
+        let currentSettings = { git_root_mode: 'manual', git_root_path: '' };
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'CORE_URL_CHANGE') coreUrl = e.data.url;
+            if (e.data.type === 'TOKEN_UPDATE') {
+                authToken = e.data.token;
+                if(coreUrl && authToken) { loadRepos(); loadSettings(); }
+            }
+            if (e.data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', e.data.theme);
+            if (e.data.type === 'COLOR_CHANGE') {
+                document.documentElement.style.setProperty('--brand-color', e.data.color);
+            }
+            if (e.data.type === 'REFRESH_LIST') {
+                loadRepos();
+            }
+        });
+
+        // Dropdown Logic
+        function toggleDropdown(e) {
+            e.stopPropagation();
+            const el = document.getElementById('dropdown-menu');
+            el.classList.toggle('show');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+             const dropdown = document.getElementById('dropdown-menu');
+             if(dropdown && dropdown.classList.contains('show')) {
+                 if(!e.target.closest('.action-dropdown')) {
+                     dropdown.classList.remove('show');
+                 }
+             }
+        });
+
+        async function fetchAPI(endpoint, method='GET', body=null) {
+            if(!coreUrl || !authToken) return { success: false, error: "Not connected" };
+
+            // Cache busting for GET
+            if(method === 'GET') {
+                const sep = endpoint.includes('?') ? '&' : '?';
+                endpoint += sep + 't=' + Date.now();
+            }
+
+            const opts = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Token': authToken
+                }
+            };
+            if(body) opts.body = JSON.stringify(body);
+            try {
+                const res = await fetch(coreUrl + endpoint, opts);
+                if(!res.ok) {
+                    let err = res.statusText;
+                    try { const j = await res.json(); if(j.detail) err = j.detail; } catch(_) {}
+                    throw new Error(err);
+                }
+                return await res.json();
+            } catch(e) {
+                console.error(e);
+                return { success: false, error: e.message };
+            }
+        }
+
+        async function loadRepos() {
+            if(!authToken) return;
+            const list = document.getElementById('repo-list');
+            list.innerHTML = '<div style="padding:10px; color:var(--text-dim);">Loading...</div>';
+
+            const repos = await fetchAPI('/api/modules/mod_git/repos');
+
+            list.innerHTML = '';
+            if(!repos || !Array.isArray(repos)) {
+                list.innerHTML = '<div style="padding:10px; color:var(--danger);">Failed to load.</div>';
+                return;
+            }
+
+            repos.forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'repo-item';
+                if(r.path === currentRepoPath) item.classList.add('active');
+
+                item.innerHTML = `
+                    <span class="repo-name">${r.name}</span>
+                    <span class="repo-path">${r.path}</span>
+                `;
+                item.onclick = () => {
+                    selectRepo(r.path, r.name);
+                    toggleSidebar(); // Close on select on mobile
+                };
+                list.appendChild(item);
+            });
+        }
+
+        function selectRepo(path, name) {
+            currentRepoPath = path;
+            document.getElementById('repo-title').innerText = name;
+
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('repo-interface').style.display = 'flex';
+
+            loadRepos(); // Refresh active class
+            loadRepoDetails();
+
+            // Clear Diff
+            document.getElementById('diff-content').innerHTML = '';
+            document.getElementById('diff-filename').innerText = "No file selected";
+        }
+
+        async function loadRepoDetails() {
+            if(!currentRepoPath) return;
+            const data = await fetchAPI('/api/modules/mod_git/status?path=' + encodeURIComponent(currentRepoPath));
+
+            if(!data || data.error) {
+                // Silently fail or show error?
+                // console.error("Status load failed", data?.error);
+                return;
+            }
+
+            document.getElementById('current-branch').innerText = data.branch || 'HEAD';
+            document.getElementById('commit-branch-label').innerText = data.branch || 'HEAD';
+
+            currentFiles = data.files || [];
+            renderFileList();
+        }
+
+        function renderFileList() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = '';
+
+            document.getElementById('change-count').innerText = currentFiles.length;
+
+            if(currentFiles.length === 0) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-dim); font-size:12px;">No changes</div>';
+                return;
+            }
+
+            currentFiles.forEach((f, idx) => {
+                const div = document.createElement('div');
+                div.className = 'file-entry';
+                if(activeFile === f.file) div.classList.add('selected');
+
+                let statusChar = 'M';
+                let statusClass = 'status-M';
+                if(f.type === 'untracked') { statusChar = 'U'; statusClass='status-U'; }
+                else if(f.type === 'deleted') { statusChar = 'D'; statusClass='status-D'; }
+
+                div.innerHTML = `
+                    <input type="checkbox" class="file-chk" data-file="${f.file}" checked>
+                    <span class="file-status ${statusClass}">${statusChar}</span>
+                    <span class="file-name" title="${f.file}">${f.file}</span>
+                `;
+
+                div.onclick = (e) => {
+                    if(e.target.type === 'checkbox') return;
+                    activeFile = f.file;
+                    loadDiff(f.file);
+                    renderFileList();
+                };
+
+                list.appendChild(div);
+            });
+        }
+
+        async function loadDiff(file) {
+            document.getElementById('diff-filename').innerText = file;
+            const contentDiv = document.getElementById('diff-content');
+            contentDiv.innerHTML = 'Loading diff...';
+
+            const res = await fetchAPI(`/api/modules/mod_git/diff?path=${encodeURIComponent(currentRepoPath)}&file=${encodeURIComponent(file)}`);
+            if(res && res.diff) {
+                // Colorize Diff
+                const lines = res.diff.split('\n');
+                let html = '';
+                lines.forEach(line => {
+                    if(line.startsWith('+') && !line.startsWith('+++')) {
+                        html += `<span class="diff-added">${escapeHtml(line)}</span>`;
+                    } else if(line.startsWith('-') && !line.startsWith('---')) {
+                        html += `<span class="diff-removed">${escapeHtml(line)}</span>`;
+                    } else if(line.startsWith('@@')) {
+                        html += `<span class="diff-chunk">${escapeHtml(line)}</span>`;
+                    } else if(line.startsWith('diff') || line.startsWith('index')) {
+                        html += `<span class="diff-header">${escapeHtml(line)}</span>`;
+                    } else {
+                        html += `<span>${escapeHtml(line)}</span>`;
+                    }
+                });
+                contentDiv.innerHTML = html || '(Empty Diff)';
+            } else {
+                contentDiv.innerHTML = '(No Diff Available)';
+            }
+        }
+
+        async function doCommit() {
+            const msg = document.getElementById('commit-msg').value;
+            if(!msg) { alert("Please enter a commit message."); return; }
+
+            const checkboxes = document.querySelectorAll('.file-chk:checked');
+            if(checkboxes.length === 0) { alert("No files selected."); return; }
+
+            const filesToCommit = Array.from(checkboxes).map(cb => cb.dataset.file);
+
+            const btn = document.getElementById('commit-btn');
+            btn.innerText = "Committing...";
+            btn.disabled = true;
+
+            const res = await fetchAPI('/api/modules/mod_git/commit', 'POST', {
+                path: currentRepoPath,
+                message: msg,
+                files: filesToCommit
+            });
+
+            if(res && res.success) {
+                document.getElementById('commit-msg').value = '';
+                loadRepoDetails();
+                document.getElementById('diff-content').innerHTML = '';
+            } else {
+                alert("Commit Failed: " + (res.error || "Unknown Error"));
+            }
+
+            btn.innerText = "Commit to " + document.getElementById('current-branch').innerText;
+            btn.disabled = false;
+        }
+
+        async function doPush() {
+            if(!confirm("Push to origin?")) return;
+            const res = await fetchAPI('/api/modules/mod_git/push', 'POST', { path: currentRepoPath });
+            if(res && res.success) alert("Push Successful");
+            else alert("Push Failed: " + (res.error || "Unknown Error"));
+            loadRepoDetails();
+        }
+
+        async function doPull() {
+             const res = await fetchAPI('/api/modules/mod_git/pull', 'POST', { path: currentRepoPath });
+             if(res && res.success) {
+                 alert("Pull Successful");
+                 loadRepoDetails();
+             } else alert("Pull Failed: " + (res.error || "Unknown Error"));
+        }
+
+        async function doStash() {
+             const msg = prompt("Stash Message (Optional):");
+             if(msg === null) return;
+             const res = await fetchAPI('/api/modules/mod_git/stash', 'POST', { path: currentRepoPath, message: msg });
+             if(res && res.success) {
+                 alert("Stashed.");
+                 loadRepoDetails();
+             } else alert("Stash Failed: " + (res.error || "Unknown Error"));
+        }
+
+        async function doStashPop() {
+             const res = await fetchAPI('/api/modules/mod_git/stash/pop', 'POST', { path: currentRepoPath });
+             if(res && res.success) {
+                 alert("Popped Stash.");
+                 loadRepoDetails();
+             } else alert("Pop Failed: " + (res.error || "Unknown Error"));
+        }
+
+        async function doDiscard() {
+             // Get selected files only
+             const checkboxes = document.querySelectorAll('.file-chk:checked');
+             let files = null;
+
+             if(checkboxes.length > 0) {
+                 files = Array.from(checkboxes).map(cb => cb.dataset.file);
+                 if(!confirm(`Discard changes for ${files.length} selected files?`)) return;
+             } else {
+                 if(!confirm("Discard ALL changes in repository? This cannot be undone.")) return;
+             }
+
+             const res = await fetchAPI('/api/modules/mod_git/discard', 'POST', { path: currentRepoPath, files: files });
+             if(res && res.success) {
+                 loadRepoDetails();
+             } else alert("Discard Failed: " + (res.error || "Unknown Error"));
+        }
+
+        async function promptAddRepo() {
+            const path = prompt("Enter absolute path to local repository:");
+            if(path) {
+                await fetchAPI('/api/modules/mod_git/repos', 'POST', { path });
+                loadRepos();
+            }
+        }
+
+        // --- Settings ---
+        async function loadSettings() {
+            if(!authToken) return;
+            try {
+                const res = await fetchAPI('/api/config');
+                if(res && res.settings) {
+                    currentSettings = res.settings;
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function showSettings() {
+            // Populate Config
+            const mode = currentSettings.git_root_mode || 'manual';
+            const radio = document.querySelector(`input[name="git_mode"][value="${mode}"]`);
+            if(radio) radio.checked = true;
+            document.getElementById('inp-setting-root').value = currentSettings.git_root_path || '';
+            toggleSettingsUI();
+
+            // Populate Credentials & Identity
+            try {
+                const creds = await fetchAPI('/api/modules/mod_git/credentials');
+                if (creds) {
+                    document.getElementById('inp-git-name').value = creds.git_name || '';
+                    document.getElementById('inp-git-email').value = creds.git_email || '';
+                    document.getElementById('inp-cred-user').value = creds.username || '';
+                    document.getElementById('inp-cred-token').value = creds.token || ''; // Masked
+                }
+            } catch(e) { console.error(e); }
+
+            // Initialize SSH
+            checkSSHStatus();
+
+            document.getElementById('modal-settings').style.display = 'flex';
+        }
+
+        function toggleSettingsUI() {
+            const mode = document.querySelector('input[name="git_mode"]:checked').value;
+            const grp = document.getElementById('setting-root-path-group');
+            grp.style.display = (mode === 'auto') ? 'block' : 'none';
+        }
+
+        async function saveSettings() {
+            const btn = event.target;
+            btn.innerText = "Saving...";
+            btn.disabled = true;
+
+            try {
+                // 1. Save Config
+                const mode = document.querySelector('input[name="git_mode"]:checked').value;
+                const root = document.getElementById('inp-setting-root').value.trim();
+
+                const payloadConfig = {
+                    settings: {
+                        ...currentSettings,
+                        git_root_mode: mode,
+                        git_root_path: root
+                    }
+                };
+                await fetchAPI('/api/config', 'POST', payloadConfig);
+
+                // 2. Save Credentials/Identity
+                const credsPayload = {
+                    git_name: document.getElementById('inp-git-name').value.trim() || null,
+                    git_email: document.getElementById('inp-git-email').value.trim() || null,
+                    username: document.getElementById('inp-cred-user').value.trim() || null,
+                    token: document.getElementById('inp-cred-token').value.trim() || null
+                };
+
+                if (credsPayload.token === "********") {
+                    credsPayload.token = null;
+                }
+
+                await fetchAPI('/api/modules/mod_git/credentials', 'POST', credsPayload);
+
+                alert("Settings Saved");
+                document.getElementById('modal-settings').style.display = 'none';
+                loadSettings();
+            } catch(e) {
+                alert("Error saving settings: " + e.message);
+            } finally {
+                btn.innerText = "Save Changes";
+                btn.disabled = false;
+            }
+        }
+
+        // --- Clone ---
+
+        function showCloneModal() {
+            // Check mode
+            const mode = currentSettings.git_root_mode || 'manual';
+            const lbl = document.getElementById('lbl-clone-dest');
+            const inp = document.getElementById('inp-clone-path');
+            const hint = document.getElementById('clone-hint');
+
+            document.getElementById('inp-clone-url').value = '';
+            document.getElementById('inp-clone-user').value = '';
+            document.getElementById('inp-clone-token').value = '';
+            inp.value = '';
+
+            if (mode === 'auto') {
+                lbl.innerText = "Repository Name (Optional - Auto from URL)";
+                inp.placeholder = "my-repo";
+                hint.style.display = 'block';
+                document.getElementById('clone-root-preview').innerText = currentSettings.git_root_path + "/<name>";
+            } else {
+                lbl.innerText = "Local Destination Path (Must be empty/new)";
+                inp.placeholder = "/path/to/destination";
+                hint.style.display = 'none';
+            }
+
+            document.getElementById('modal-clone').style.display = 'flex';
+        }
+
+        async function doClone() {
+            const url = document.getElementById('inp-clone-url').value.trim();
+            const val = document.getElementById('inp-clone-path').value.trim(); // Name or Path depending on mode
+            const mode = currentSettings.git_root_mode || 'manual';
+
+            if(!url) { alert("URL is required."); return; }
+            if(mode === 'manual' && !val) { alert("Path is required."); return; }
+
+            const btn = event.target;
+            const oldText = btn.innerText;
+            btn.innerText = "Cloning...";
+            btn.disabled = true;
+
+            const payload = { url };
+
+            if (mode === 'auto') payload.name = val; // can be empty
+            else payload.path = val;
+
+            try {
+                const res = await fetchAPI('/api/modules/mod_git/clone', 'POST', payload);
+                if(res.success) {
+                    alert("Clone Successful!");
+                    document.getElementById('modal-clone').style.display = 'none';
+                    loadRepos();
+                } else {
+                    alert("Clone Failed: " + (res.error || "Unknown error"));
+                }
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
+            }
+        }
+
+        function removeRepo() {
+            document.getElementById('del-repo-name').innerText = currentRepoPath;
+            document.getElementById('chk-delete-files').checked = false;
+            document.getElementById('modal-delete').style.display = 'flex';
+        }
+
+        async function confirmRemoveRepo() {
+            const delFiles = document.getElementById('chk-delete-files').checked;
+            const btn = event.target;
+            btn.innerText = "Removing...";
+            btn.disabled = true;
+
+            try {
+                await fetchAPI('/api/modules/mod_git/repos/remove', 'POST', {
+                    path: currentRepoPath,
+                    delete_files: delFiles
+                });
+
+                document.getElementById('modal-delete').style.display = 'none';
+                currentRepoPath = null;
+                document.getElementById('repo-interface').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'flex';
+                loadRepos();
+            } catch (e) {
+                alert("Error removing repo: " + e.message);
+            } finally {
+                btn.innerText = "Remove";
+                btn.disabled = false;
+            }
+        }
+
+        async function checkSSHStatus() {
+            document.getElementById('ssh-loading').style.display = 'block';
+            document.getElementById('ssh-no-key').style.display = 'none';
+            document.getElementById('ssh-key-info').style.display = 'none';
+
+            try {
+                const res = await fetchAPI('/api/modules/mod_git/ssh_key');
+                document.getElementById('ssh-loading').style.display = 'none';
+
+                if (res && res.exists) {
+                    document.getElementById('ssh-key-info').style.display = 'block';
+                    document.getElementById('ssh-pub-key').value = res.public_key;
+                    document.getElementById('ssh-fingerprint').innerText = res.fingerprint;
+                } else {
+                    document.getElementById('ssh-no-key').style.display = 'block';
+                }
+            } catch(e) {
+                console.error("Error checking SSH", e);
+                document.getElementById('ssh-loading').innerText = "Error checking SSH";
+            }
+        }
+
+        async function generateSSHKey() {
+            const btn = event.target;
+            btn.innerText = "Generating...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetchAPI('/api/modules/mod_git/ssh_key/generate', 'POST');
+                if (res && res.success) {
+                    checkSSHStatus(); // Reload
+                } else {
+                    alert("Generation Failed: " + (res.error || "Unknown"));
+                }
+            } catch(e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = "Generate SSH Key";
+                btn.disabled = false;
+            }
+        }
+
+        function copySSHKey() {
+            const el = document.getElementById('ssh-pub-key');
+            el.select();
+            document.execCommand('copy');
+            alert("Public Key copied to clipboard.");
+        }
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('sidebar-overlay');
+            if(sb.classList.contains('open')) {
+                sb.classList.remove('open');
+                ov.classList.remove('visible');
+            } else {
+                sb.classList.add('open');
+                ov.classList.add('visible');
+            }
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Init
+        if(coreUrl && authToken) {
+            loadRepos();
+            loadSettings();
+        }
+    </script>
+</body>
+</html>
