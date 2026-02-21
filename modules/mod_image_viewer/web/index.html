@@ -82,7 +82,7 @@
 
             const img = document.getElementById('viewer-img');
 
-            let fullUrl = `${coreUrl}/api/files/view?path=${encodeURIComponent(path)}`;
+            let fullUrl = `${coreUrl}/api/modules/mod_file_explorer/view?path=${encodeURIComponent(path)}`;
 
             // Try Session Key
             let key = await getSessionKey();

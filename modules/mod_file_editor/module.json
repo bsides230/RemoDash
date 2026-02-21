@@ -1,0 +1,7 @@
+{
+    "id": "mod_file_editor",
+    "name": "File Editor",
+    "icon": "edit_note",
+    "version": "1.0",
+    "enabled": true
+}

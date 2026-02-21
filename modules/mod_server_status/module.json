@@ -1,0 +1,7 @@
+{
+    "id": "mod_server_status",
+    "name": "Server Status",
+    "icon": "dns",
+    "version": "1.0",
+    "enabled": true
+}

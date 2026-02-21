@@ -14,7 +14,7 @@ import uvicorn
 from settings_manager import SettingsManager
 from module_manager import ModuleManager
 from theme_manager import ThemeManager
-from core.api import auth, system, filesystem, terminal, wizard, themes
+from core.api import auth, system, themes, modules
 from core.api.auth import verify_token, init_auth
 
 settings_manager = SettingsManager()
@@ -66,10 +66,8 @@ app.add_middleware(
 # --- Mount Core APIs ---
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(system.router, prefix="/api", tags=["System"]) # /api/sysinfo, /api/health (via system)
-app.include_router(filesystem.router, prefix="/api/files", tags=["Files"])
-app.include_router(terminal.router, prefix="/api/terminal", tags=["Terminal"])
-app.include_router(wizard.router, prefix="/api/wizard", tags=["Wizard"])
 app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
+app.include_router(modules.router, prefix="/api/modules", tags=["Modules"])
 
 # --- Legacy / Root Endpoints ---
 
