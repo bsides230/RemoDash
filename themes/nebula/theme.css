@@ -1,9 +1,0 @@
-:root {
-    --bg-core: #0b001a;
-    --bg-panel: #15002b;
-    --border-color: #00ccff;
-    --text-head: #ffffff;
-    --text-body: #cccccc;
-    --text-dim: #888888;
-    --bg-pattern: radial-gradient(circle at 50% 50%, rgba(255, 0, 170, 0.05), transparent 60%), radial-gradient(circle at 80% 20%, rgba(0, 204, 255, 0.05), transparent 50%);
-}
