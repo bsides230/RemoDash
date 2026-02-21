@@ -1,43 +1,11 @@
 [
     {
-        "id": "sunset",
-        "name": "Sunset",
+        "id": "blackout",
+        "name": "Blackout",
         "version": "1.0.0",
         "author": "LYRN",
-        "description": "Sunset Theme",
-        "brand": "#ff6600"
-    },
-    {
-        "id": "slate",
-        "name": "Slate",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Slate Theme",
-        "brand": "#a0aec0"
-    },
-    {
-        "id": "noir",
-        "name": "Noir",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Monochrome E-Ink Theme",
-        "brand": "#cccccc"
-    },
-    {
-        "id": "retro",
-        "name": "Retro",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Retro Theme",
-        "brand": "#ffcc00"
-    },
-    {
-        "id": "default",
-        "name": "Default",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Emerald Green",
-        "brand": "#10B981"
+        "description": "Blackout Theme",
+        "brand": "#666666"
     },
     {
         "id": "pizza",
@@ -48,11 +16,27 @@
         "brand": "#ff4444"
     },
     {
-        "id": "blackout",
-        "name": "Blackout",
+        "id": "retro",
+        "name": "Retro",
         "version": "1.0.0",
         "author": "LYRN",
-        "description": "Blackout Theme",
-        "brand": "#666666"
+        "description": "Retro Theme",
+        "brand": "#ffcc00"
+    },
+    {
+        "id": "slate",
+        "name": "Slate",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Slate Theme",
+        "brand": "#a0aec0"
+    },
+    {
+        "id": "sunset",
+        "name": "Sunset",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Sunset Theme",
+        "brand": "#ff6600"
     }
 ]

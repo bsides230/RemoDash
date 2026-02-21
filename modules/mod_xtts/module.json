@@ -1,9 +1,0 @@
-{
-  "id": "mod_xtts",
-  "name": "XTTS v2",
-  "description": "High-quality text-to-speech module using Coqui XTTS v2.",
-  "icon": "record_voice_over",
-  "version": "1.0.1",
-  "author": "Jules",
-  "enabled": true
-}
