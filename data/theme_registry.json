@@ -1,27 +1,11 @@
 [
     {
-        "id": "blackout",
-        "name": "Blackout",
+        "id": "sunset",
+        "name": "Sunset",
         "version": "1.0.0",
         "author": "LYRN",
-        "description": "Blackout Theme",
-        "brand": "#666666"
-    },
-    {
-        "id": "pizza",
-        "name": "Pizza Place",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Pizza Place Theme",
-        "brand": "#ff4444"
-    },
-    {
-        "id": "retro",
-        "name": "Retro",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Retro Theme",
-        "brand": "#ffcc00"
+        "description": "Sunset Theme",
+        "brand": "#ff6600"
     },
     {
         "id": "slate",
@@ -32,11 +16,43 @@
         "brand": "#a0aec0"
     },
     {
-        "id": "sunset",
-        "name": "Sunset",
+        "id": "noir",
+        "name": "Noir",
         "version": "1.0.0",
         "author": "LYRN",
-        "description": "Sunset Theme",
-        "brand": "#ff6600"
+        "description": "Monochrome E-Ink Theme",
+        "brand": "#cccccc"
+    },
+    {
+        "id": "retro",
+        "name": "Retro",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Retro Theme",
+        "brand": "#ffcc00"
+    },
+    {
+        "id": "default",
+        "name": "Default",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Emerald Green",
+        "brand": "#10B981"
+    },
+    {
+        "id": "pizza",
+        "name": "Pizza Place",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Pizza Place Theme",
+        "brand": "#ff4444"
+    },
+    {
+        "id": "blackout",
+        "name": "Blackout",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Blackout Theme",
+        "brand": "#666666"
     }
 ]
