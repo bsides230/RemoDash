@@ -144,6 +144,8 @@
         button:hover { opacity: 0.9; }
         button:disabled { background-color: var(--border-color); color: var(--text-dim); cursor: not-allowed; }
         button.danger { background-color: var(--error-color); color: white; }
+        button.warn { background-color: var(--warn-color); color: #000; }
+        button.secondary { background-color: var(--border-color); color: var(--text-head); }
 
         .console {
             background: #000;
@@ -158,8 +160,6 @@
             white-space: pre-wrap;
         }
 
-        .hidden { display: none; }
-
         /* Loading Overlay */
         .overlay {
             position: absolute; top:0; left:0; right:0; bottom:0;
@@ -168,6 +168,8 @@
             flex-direction: column;
             z-index: 100;
         }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -203,6 +205,8 @@
         <div class="btn-group">
             <button id="streamBtn" onclick="startStreaming()">Stream Audio</button>
             <button id="stopBtn" class="danger hidden" onclick="stopStreaming()">Stop</button>
+            <button id="installBtn" class="warn hidden" onclick="showInstallModal()">Install Deps</button>
+            <button id="scanBtn" class="secondary hidden" onclick="checkStatus()">Re-Scan</button>
         </div>
 
         <div class="console" id="consoleLog">Ready.</div>
@@ -218,18 +222,12 @@
         let audioContext = null;
         let isStreaming = false;
         let abortController = null;
+        let missingDeps = [];
 
         // --- Init ---
         window.addEventListener('load', async () => {
             checkStatus();
             loadVoices();
-
-            // Check Dependencies
-            const sdk = new ModuleSDK('mod_kokoro');
-            const reqs = await sdk.checkRequirements();
-            if (reqs && reqs.missing && reqs.missing.length > 0) {
-                sdk.showInstallModal(reqs.missing);
-            }
         });
 
         async function checkStatus() {
@@ -242,7 +240,18 @@
                     badge.className = 'status-badge status-err';
                     badge.innerText = 'Missing Deps';
                     log("Error: Missing Python dependencies (kokoro, soundfile). Check server logs.");
+
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                    document.getElementById('streamBtn').classList.add('hidden');
+                    document.getElementById('installBtn').classList.remove('hidden');
+                    document.getElementById('scanBtn').classList.remove('hidden');
+
+                    missingDeps = data.missing_deps || ['kokoro', 'soundfile'];
                     return;
+                } else {
+                    document.getElementById('installBtn').classList.add('hidden');
+                    document.getElementById('scanBtn').classList.add('hidden');
+                    if(!isStreaming) document.getElementById('streamBtn').classList.remove('hidden');
                 }
 
                 if (data.loaded) {
@@ -391,6 +400,11 @@
             const el = document.getElementById('consoleLog');
             el.innerText += '\n' + msg;
             el.scrollTop = el.scrollHeight;
+        }
+
+        function showInstallModal() {
+            const sdk = new ModuleSDK('mod_kokoro');
+            sdk.showInstallModal(missingDeps);
         }
 
         // --- Theme Listener ---
