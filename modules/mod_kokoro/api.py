@@ -27,6 +27,7 @@ router = APIRouter()
 # Global State
 pipeline = None
 pipeline_lock = threading.Lock()
+shutdown_event = threading.Event()
 model_status = {
     "loaded": False,
     "loading": False,
@@ -67,6 +68,9 @@ def load_model():
     global pipeline, model_status
     if model_status["loaded"] or model_status["loading"]: return
 
+    if shutdown_event.is_set():
+        return
+
     missing = check_dependencies()
     if missing:
         model_status["dependency_missing"] = True
@@ -91,6 +95,10 @@ def load_model():
             logger.info("MPS detected, using Apple Silicon GPU.")
 
         with pipeline_lock:
+            if shutdown_event.is_set():
+                 model_status["loading"] = False
+                 return
+
             # Initialize pipeline (downloads model if needed)
             # lang_code='a' for American English (en-us)
             # KPipeline handles device placement usually, or we might need to move it?
@@ -110,6 +118,11 @@ def load_model():
         model_status["loaded"] = False
     finally:
         model_status["loading"] = False
+
+@router.on_event("shutdown")
+def shutdown_handler():
+    logger.info("Shutdown event received in mod_kokoro.")
+    shutdown_event.set()
 
 @router.get("/status")
 def get_status():
@@ -161,6 +174,8 @@ def generate_stream(req: GenerateRequest):
                 )
 
                 for i, (gs, ps, audio) in enumerate(stream):
+                    if shutdown_event.is_set():
+                        break
                     if audio is None: continue
                     # audio is numpy array float32
                     # Yield raw float32 bytes

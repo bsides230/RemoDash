@@ -50,6 +50,7 @@ model_state = {
 }
 
 tts_instance = None
+shutdown_event = threading.Event()
 
 # Generation State
 gen_state = {
@@ -191,6 +192,10 @@ def load_model_task():
     global tts_instance, model_state
     if model_state["loading"] or model_state["loaded"]: return
 
+    if shutdown_event.is_set():
+        logger.info("Shutdown signal received. Skipping model load.")
+        return
+
     model_state["loading"] = True
     model_state["error"] = None
 
@@ -235,6 +240,11 @@ def load_model_task():
             logger.warning("soundfile not installed; torchaudio will use its default backend.")
 
         model_dir = ensure_model_files()
+
+        if shutdown_event.is_set():
+             model_state["loading"] = False
+             return
+
         device = get_device()
         logger.info(f"Loading TTS model from {model_dir} on {device}...")
 
@@ -289,6 +299,12 @@ class SettingsUpdate(BaseModel):
     speed: float = 1.0
 
 # --- Routes ---
+
+@router.on_event("shutdown")
+def shutdown_handler():
+    logger.info("Shutdown event received in mod_xtts.")
+    shutdown_event.set()
+    stop_model()
 
 @router.get("/status")
 def get_status():
@@ -549,6 +565,10 @@ def _run_generation_task(req: GenerateRequest):
         wav_segments = []
 
         for i, chunk in enumerate(chunks):
+            if shutdown_event.is_set():
+                log_gen("Shutdown signal received. Aborting generation.")
+                break
+
             start_chunk = time.time()
             current_chunk_idx = i + 1
 
