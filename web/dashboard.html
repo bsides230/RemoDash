@@ -332,6 +332,25 @@
         }
         .dock-btn.wiggle:hover { transform: scale(1.05); }
 
+        /* TOOLTIP */
+        #dock-tooltip {
+            position: fixed;
+            background: var(--bg-panel);
+            color: var(--text-head);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            pointer-events: none;
+            z-index: 20002;
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        #dock-tooltip.show { opacity: 1; }
+
         .active-dot {
             position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
             width: 3px; height: 3px; border-radius: 50%;
@@ -956,6 +975,8 @@
         </div>
     </div>
 
+    <div id="dock-tooltip"></div>
+
     <script>
         /* =========================================================================
            CONFIG & STATE
@@ -1165,6 +1186,35 @@
         /* =========================================
            DOCK LOGIC
            ========================================= */
+        let tooltipTimer = null;
+        function showTooltip(text, target) {
+            const el = document.getElementById('dock-tooltip');
+            if(!el) return;
+            el.innerText = text;
+
+            const elRect = el.getBoundingClientRect();
+            const rect = target.getBoundingClientRect();
+
+            // Position above the button
+            let top = rect.top - elRect.height - 8;
+            let left = rect.left + (rect.width / 2) - (elRect.width / 2);
+
+            // Adjust if out of bounds (simple)
+            if(left < 10) left = 10;
+            if(top < 10) top = rect.bottom + 8; // below if no space above
+
+            el.style.top = top + 'px';
+            el.style.left = left + 'px';
+            el.classList.add('show');
+        }
+        function hideTooltip() {
+            const el = document.getElementById('dock-tooltip');
+            if(el) {
+                el.classList.remove('show');
+                el.style.top = '-9999px'; // Move away
+            }
+        }
+
         function renderDock() {
             const container = document.getElementById('dock-content');
             const modContainer = document.getElementById('module-list-container');
@@ -1189,16 +1239,28 @@
                 btn.className = 'dock-btn';
                 if(isEditMode) btn.classList.add('wiggle');
 
-                // Color Logic
-                const color = getColorForModule(mod.id);
-                btn.style.color = color;
-
                 btn.id = 'btn_' + mod.id;
                 btn.innerHTML = `<span class="material-symbols-outlined">${mod.icon}</span><div class="active-dot"></div>`;
+
+                btn.onmouseenter = () => {
+                    if(isEditMode) return;
+                    clearTimeout(tooltipTimer);
+                    tooltipTimer = setTimeout(() => showTooltip(mod.name, btn), 2000);
+                };
+                btn.onmouseleave = () => {
+                    clearTimeout(tooltipTimer);
+                    hideTooltip();
+                };
+                btn.onmousedown = () => {
+                    clearTimeout(tooltipTimer);
+                    hideTooltip();
+                };
 
                 btn.onclick = (e) => {
                     e.stopPropagation();
                     e.preventDefault();
+                    clearTimeout(tooltipTimer);
+                    hideTooltip();
                     if(isEditMode) {
                         openEditPopup(e, mod);
                     } else {
