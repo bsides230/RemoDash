@@ -1,43 +1,19 @@
 [
     {
-        "id": "sunset",
-        "name": "Sunset",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Sunset Theme",
-        "brand": "#ff6600"
-    },
-    {
-        "id": "slate",
-        "name": "Slate",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Slate Theme",
-        "brand": "#a0aec0"
-    },
-    {
-        "id": "retro",
-        "name": "Retro",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Retro Theme",
-        "brand": "#ffcc00"
-    },
-    {
-        "id": "pizza",
-        "name": "Pizza Place",
-        "version": "1.0.0",
-        "author": "LYRN",
-        "description": "Pizza Place Theme",
-        "brand": "#ff4444"
-    },
-    {
         "id": "blackout",
         "name": "Blackout",
         "version": "1.0.0",
         "author": "LYRN",
         "description": "Blackout Theme",
         "brand": "#666666"
+    },
+    {
+        "id": "default",
+        "name": "Default",
+        "version": "2.0.0",
+        "author": "LYRN",
+        "description": "The default RemoDash theme (Multicolor)",
+        "brand": "#1ea096"
     },
     {
         "id": "noir_dark",
@@ -56,11 +32,35 @@
         "brand": "#000000"
     },
     {
-        "id": "default",
-        "name": "Default",
-        "version": "2.0.0",
+        "id": "pizza",
+        "name": "Pizza Place",
+        "version": "1.0.0",
         "author": "LYRN",
-        "description": "The default RemoDash theme (Multicolor)",
-        "brand": "#1ea096"
+        "description": "Pizza Place Theme",
+        "brand": "#ff4444"
+    },
+    {
+        "id": "retro",
+        "name": "Retro",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Retro Theme",
+        "brand": "#ffcc00"
+    },
+    {
+        "id": "slate",
+        "name": "Slate",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Slate Theme",
+        "brand": "#a0aec0"
+    },
+    {
+        "id": "sunset",
+        "name": "Sunset",
+        "version": "1.0.0",
+        "author": "LYRN",
+        "description": "Sunset Theme",
+        "brand": "#ff6600"
     }
 ]
