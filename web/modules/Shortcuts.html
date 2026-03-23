@@ -399,6 +399,7 @@
 
         function confirmRun(id) {
             const s = shortcuts.find(x => x.id === id);
+            if(!s) return;
             if(confirm(`Run shortcut "${s.name}"?`)) {
                 runShortcut(id);
             }

@@ -1090,8 +1090,14 @@ async def get_cron():
     try:
         cron = CronTab(user=True)
         return {"lines": cron.render()}
+    except FileNotFoundError:
+        raise HTTPException(status_code=501, detail="crontab not available on this system")
     except Exception as e:
-         raise HTTPException(status_code=500, detail=str(e))
+        detail = str(e)
+        dl = detail.lower()
+        if "crontab" in dl or "can't read" in dl or "not found" in dl or "no such file" in dl:
+            raise HTTPException(status_code=501, detail="crontab not available on this system")
+        raise HTTPException(status_code=500, detail=detail)
 
 @app.post("/api/cron", dependencies=[Depends(verify_token)])
 async def save_cron(req: CronRequest):
