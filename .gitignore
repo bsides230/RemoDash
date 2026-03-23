@@ -3,4 +3,5 @@ global_flags/no_auth
 admin_token.txt
 /__pycache__
 settings.json
+settings.json.bk
 data/git_credentials.json

@@ -310,7 +310,7 @@
         function updateStatusUI(data) {
             const box = document.getElementById('status-box');
 
-            if (data.state && data.state.includes("Error")) {
+            if (data.state && String(data.state).includes("Error")) {
                 box.innerText = "VLC Not Running / Not Connected";
                 box.className = "status-display status-stopped";
                 return;

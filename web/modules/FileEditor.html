@@ -314,19 +314,17 @@
             setStatus(file.path);
         }
 
-        function closeFile(index, e) {
+        async function closeFile(index, e) {
             if(e) e.stopPropagation();
             if(files[index].unsaved) {
-                if(!confirm(`Save changes to ${files[index].name}?`)) {
-                    // if cancel, maybe return? but if user wants to close without saving...
-                    // Standard: Confirm "Save? Yes/No/Cancel"
-                    // Simple: "Discard changes?"
-                    if(!confirm("Discard unsaved changes?")) return;
+                if(confirm(`Save changes to ${files[index].name} before closing?`)) {
+                    // User wants to save first
+                    const prev = activeFileIndex;
+                    activeFileIndex = index;
+                    await saveCurrentFile();
+                    activeFileIndex = prev;
                 } else {
-                    // User said yes to save
-                    // We must await save?
-                    // Simpler logic: Just "Discard?"
-                    // Let's implement active save first.
+                    if(!confirm("Discard unsaved changes?")) return;
                 }
             }
 

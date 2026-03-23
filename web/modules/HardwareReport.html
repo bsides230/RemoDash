@@ -167,8 +167,9 @@
                 if (data.missing.length > 0) {
                     let html = `<div class="warning-box">Missing Tools: ${data.missing.join(', ')}</div>`;
                     html += `<p>These tools are required to generate a full report.</p>`;
-                    html += `<button class="btn" onclick="installDeps('${data.install_cmd}')">Install via Terminal</button>`;
+                    html += `<button class="btn" id="btn-install-deps">Install via Terminal</button>`;
                     container.innerHTML = html;
+                    document.getElementById('btn-install-deps').onclick = () => installDeps(data.install_cmd);
                     document.getElementById('sec-generate').style.display = 'none';
                 } else {
                     container.innerHTML = `<span style="color:var(--brand-color)">All dependencies are installed.</span>`;
@@ -199,7 +200,7 @@
                     headers: { 'X-Token': authToken }
                 });
                 const data = await res.json();
-                out.value = data.content;
+                out.value = data.content || data.error || "No report content returned.";
             } catch (e) {
                 out.value = "Error: " + e.message;
             }

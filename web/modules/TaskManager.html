@@ -172,8 +172,8 @@
                         <td>${p.pid}</td>
                         <td title="${p.name}">${p.name}</td>
                         <td>${p.username || '-'}</td>
-                        <td class="numeric">${p.cpu_percent.toFixed(1)}%</td>
-                        <td class="numeric">${p.memory_percent.toFixed(1)}%</td>
+                        <td class="numeric">${(p.cpu_percent ?? 0).toFixed(1)}%</td>
+                        <td class="numeric">${(p.memory_percent ?? 0).toFixed(1)}%</td>
                         <td style="text-align:right">
                             <button class="action-btn" onclick="killTask(${p.pid})">KILL</button>
                         </td>

@@ -588,6 +588,8 @@
                 let statusClass = 'status-M';
                 if(f.type === 'untracked') { statusChar = 'U'; statusClass='status-U'; }
                 else if(f.type === 'deleted') { statusChar = 'D'; statusClass='status-D'; }
+                else if(f.type === 'added') { statusChar = 'A'; statusClass='status-A'; }
+                else if(f.type === 'renamed') { statusChar = 'R'; statusClass='status-M'; }
 
                 div.innerHTML = `
                     <input type="checkbox" class="file-chk" data-file="${f.file}" checked>
@@ -822,8 +824,6 @@
             const hint = document.getElementById('clone-hint');
 
             document.getElementById('inp-clone-url').value = '';
-            document.getElementById('inp-clone-user').value = '';
-            document.getElementById('inp-clone-token').value = '';
             inp.value = '';
 
             if (mode === 'auto') {
