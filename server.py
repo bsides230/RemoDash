@@ -1555,18 +1555,31 @@ async def get_git_status(path: str):
             return {"error": "Path not found", "branch": "Missing", "files": [], "history": []}
 
         diffs = []
-        # Staged
+        seen_files = set()
+
+        def diff_type(item):
+            ct = item.change_type
+            if ct == 'D': return "deleted"
+            elif ct == 'A': return "added"
+            elif ct == 'R': return "renamed"
+            return "modified"
+
+        # Working tree changes (unstaged)
         try:
             for item in r.index.diff(None):
-                diffs.append({"file": item.a_path, "type": "modified", "staged": False})
+                path = item.a_path or item.b_path
+                diffs.append({"file": path, "type": diff_type(item), "staged": False})
+                seen_files.add(path)
         except: pass
 
-        # Diff against HEAD (only if HEAD exists)
+        # Diff against HEAD (staged changes, only if HEAD exists)
         try:
-            # Check if HEAD is valid
             _ = r.head.commit
             for item in r.index.diff("HEAD"):
-                diffs.append({"file": item.a_path, "type": "modified", "staged": True})
+                path = item.a_path or item.b_path
+                if path not in seen_files:
+                    diffs.append({"file": path, "type": diff_type(item), "staged": True})
+                    seen_files.add(path)
         except ValueError:
             # Empty repo (no commits)
             pass
@@ -1632,16 +1645,32 @@ async def get_git_diff(path: str, file: str):
     if not git: raise HTTPException(status_code=501)
     try:
         r = git.Repo(path)
-        try:
-            diff = r.git.diff('HEAD', file)
-        except:
+
+        # Check if file is untracked first - show its content as diff
+        if file in r.untracked_files:
             try:
-                diff = r.git.diff(file)
-                if not diff and (file in r.untracked_files):
-                    with open(os.path.join(path, file), 'r', encoding='utf-8', errors='replace') as f:
-                        diff = f.read()
+                file_path = os.path.join(path, file)
+                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                lines = content.split('\n')
+                diff_lines = [f"diff --git a/{file} b/{file}", "new file", f"--- /dev/null", f"+++ b/{file}"]
+                for line in lines:
+                    diff_lines.append(f"+{line}")
+                diff = '\n'.join(diff_lines)
             except:
                 diff = ""
+        else:
+            try:
+                diff = r.git.diff('HEAD', '--', file)
+                if not diff:
+                    # Try unstaged diff
+                    diff = r.git.diff('--', file)
+            except:
+                try:
+                    diff = r.git.diff('--', file)
+                except:
+                    diff = ""
+
         return {"diff": diff}
     except Exception as e:
         return {"diff": f"Error: {str(e)}"}
