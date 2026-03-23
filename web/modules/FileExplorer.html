@@ -676,6 +676,12 @@
         function navigate(path) {
             const tab = tabs[activeTabIndex];
             tab.path = path;
+            // Track history for back button
+            if(navHistoryIndex < navHistory.length - 1) {
+                navHistory = navHistory.slice(0, navHistoryIndex + 1);
+            }
+            navHistory.push(path);
+            navHistoryIndex = navHistory.length - 1;
             loadFilesForTab(activeTabIndex);
         }
 
@@ -692,8 +698,19 @@
             navigate(newPath);
         }
 
+        let navHistory = [];
+        let navHistoryIndex = -1;
+
         function refreshTab() { loadFilesForTab(activeTabIndex); }
-        function navBack() { /* TODO */ }
+
+        function navBack() {
+            if(navHistory.length > 1 && navHistoryIndex > 0) {
+                navHistoryIndex--;
+                const tab = tabs[activeTabIndex];
+                tab.path = navHistory[navHistoryIndex];
+                loadFilesForTab(activeTabIndex);
+            }
+        }
 
         function handleItemDblClick(item) {
             if(item.type === 'dir') navigate(item.path);
@@ -774,26 +791,38 @@
 
         async function pasteSelection() {
             const clipRaw = localStorage.getItem('lyrn_clipboard');
-            if(!clipRaw) return;
+            if(!clipRaw) { alert("Nothing in clipboard."); return; }
             const clip = JSON.parse(clipRaw);
             const dest = tabs[activeTabIndex].path;
-            if(!confirm(`Paste ${clip.items.length} items to ${dest}?`)) return;
+            if(!confirm(`${clip.action === 'cut' ? 'Move' : 'Copy'} ${clip.items.length} items to ${dest}?`)) return;
 
+            let errors = [];
             for (const srcPath of clip.items) {
                 const parts = srcPath.split(/[/\\]/);
                 const name = parts[parts.length-1];
                 const sep = dest.includes('\\') ? '\\' : '/';
                 const destPath = dest.endsWith(sep) ? dest + name : dest + sep + name;
 
-                if (clip.action === 'cut') {
-                    await fetch(`${coreUrl}/api/files/rename`, {
-                        method: 'POST',
-                        headers: {'Content-Type':'application/json', 'X-Token':authToken},
-                        body: JSON.stringify({ path: srcPath, new_path: destPath })
-                    });
-                }
+                try {
+                    if (clip.action === 'cut') {
+                        const res = await fetch(`${coreUrl}/api/files/rename`, {
+                            method: 'POST',
+                            headers: {'Content-Type':'application/json', 'X-Token':authToken},
+                            body: JSON.stringify({ path: srcPath, new_path: destPath })
+                        });
+                        if(!res.ok) errors.push(`Move ${name}: ${(await res.json()).detail || res.statusText}`);
+                    } else {
+                        const res = await fetch(`${coreUrl}/api/files/copy`, {
+                            method: 'POST',
+                            headers: {'Content-Type':'application/json', 'X-Token':authToken},
+                            body: JSON.stringify({ path: srcPath, new_path: destPath })
+                        });
+                        if(!res.ok) errors.push(`Copy ${name}: ${(await res.json()).detail || res.statusText}`);
+                    }
+                } catch(e) { errors.push(`${name}: ${e.message}`); }
             }
             if(clip.action === 'cut') localStorage.removeItem('lyrn_clipboard');
+            if(errors.length > 0) alert("Some operations failed:\n" + errors.join("\n"));
             reload();
         }
 
@@ -970,8 +999,25 @@
             const items = Array.from(tab.selected);
             if(items.length === 1) {
                 const path = items[0];
-                const isDir = tab.items.find(i => i.path === path)?.type === 'dir';
-                if(!isDir) { window.open(`${coreUrl}/api/files/view?path=${encodeURIComponent(path)}&token=${authToken}`, '_blank'); return; }
+                const item = tab.items.find(i => i.path === path);
+                const isDir = item?.type === 'dir';
+                if(!isDir) {
+                    // Use fetch + blob to force proper filename download
+                    try {
+                        const res = await fetch(`${coreUrl}/api/files/view?path=${encodeURIComponent(path)}`, {
+                            headers: { 'X-Token': authToken }
+                        });
+                        if(!res.ok) throw new Error(res.statusText);
+                        const blob = await res.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = item?.name || path.split(/[/\\]/).pop() || 'download';
+                        document.body.appendChild(a); a.click(); a.remove();
+                        window.URL.revokeObjectURL(url);
+                    } catch(e) { alert("Download failed: " + e.message); }
+                    return;
+                }
             }
             const btn = event.target; const oldText = btn.innerText; btn.innerText = "Zipping..."; btn.disabled = true;
             try {

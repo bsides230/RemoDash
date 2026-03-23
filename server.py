@@ -2213,7 +2213,7 @@ async def view_file(path: str):
     if not p.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(p)
+    return FileResponse(p, filename=p.name)
 
 @app.post("/api/files/save", dependencies=[Depends(verify_token)])
 async def save_file_content(data: FileOpRequest):
@@ -2264,6 +2264,32 @@ async def rename_item(data: FileOpRequest):
         check_path_access(str(dst))
 
         src.rename(dst)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/copy", dependencies=[Depends(verify_token)])
+async def copy_item(data: FileOpRequest):
+    """Copies a file or directory to new_path."""
+    if not data.new_path:
+        raise HTTPException(status_code=400, detail="new_path required")
+    src = check_path_access(data.path)
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    try:
+        dst = Path(data.new_path)
+        if not dst.is_absolute():
+            dst = src.parent / data.new_path
+
+        check_path_access(str(dst))
+
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            # Ensure parent directory exists
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
