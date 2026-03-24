@@ -111,6 +111,16 @@
         }
         .tool-btn:hover { border-color: var(--brand-color); color: var(--text-head); }
         .tool-btn:active { transform: translateY(1px); }
+        .branch-select {
+            background: var(--bg-sec);
+            border: 1px solid var(--border-color);
+            color: var(--text-body);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            max-width: 240px;
+        }
 
         /* Workspace: Split Changes and Diff */
         #workspace { flex: 1; display: flex; overflow: hidden; }
@@ -264,6 +274,9 @@
                     </div>
 
                     <button class="tool-btn" onclick="loadRepoDetails()">↻</button>
+                    <select id="branch-select" class="branch-select" onchange="checkoutSelectedBranch()" title="Switch local branch"></select>
+                    <button class="tool-btn" onclick="showBranchManager()">Branches</button>
+                    <button class="tool-btn" onclick="doFetch()">Fetch</button>
 
                     <div class="action-dropdown">
                          <button class="tool-btn" id="btn-actions-dropdown" onclick="toggleDropdown(event)">Actions ▼</button>
@@ -432,12 +445,44 @@
         </div>
     </div>
 
+    <div id="modal-branches" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:220; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-panel); border:1px solid var(--border-color); padding:0; border-radius:8px; width:680px; height: 80vh; display:flex; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <div style="padding:15px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:var(--bg-sec);">
+                <h3 style="margin:0; color:var(--text-head); font-family:var(--font-mono); font-size:14px;">Branch Manager</h3>
+                <button onclick="document.getElementById('modal-branches').style.display='none'" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:16px;">✕</button>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding:20px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                    <div>
+                        <h4 style="margin:0 0 8px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Create Branch</h4>
+                        <input id="inp-new-branch" type="text" placeholder="feature/my-branch" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); font-family:var(--font-mono); outline:none; margin-bottom:8px;">
+                        <input id="inp-new-branch-start" type="text" placeholder="start point (default: HEAD)" style="width:100%; padding:8px; background:var(--bg-core); border:1px solid var(--border-color); color:var(--text-head); font-family:var(--font-mono); outline:none; margin-bottom:8px;">
+                        <button class="tool-btn" style="width:100%; justify-content:center;" onclick="createBranch()">Create Branch</button>
+                    </div>
+                    <div>
+                        <h4 style="margin:0 0 8px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Remote Checkout</h4>
+                        <select id="remote-branch-select" class="branch-select" style="width:100%; max-width:none; margin-bottom:8px;"></select>
+                        <button class="tool-btn" style="width:100%; justify-content:center;" onclick="checkoutRemoteBranch()">Checkout Remote Branch</button>
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid var(--border-color); margin:16px 0;">
+                <h4 style="margin:0 0 8px 0; color:var(--brand-color); font-size:12px; text-transform:uppercase;">Local Branches</h4>
+                <div id="local-branch-list" style="border:1px solid var(--border-color); border-radius:4px; overflow:hidden;"></div>
+            </div>
+            <div style="padding:15px; border-top:1px solid var(--border-color); background:var(--bg-sec); display:flex; justify-content:space-between; gap:10px;">
+                <button class="tool-btn" onclick="refreshBranchData()">Refresh</button>
+                <button class="tool-btn" onclick="document.getElementById('modal-branches').style.display='none'">Close</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         let coreUrl = localStorage.getItem('lyrn_core_url');
         let authToken = localStorage.getItem('lyrn_admin_token');
         let currentRepoPath = null;
         let activeFile = null;
+        let branchState = { current: '', local: [], remote: [] };
 
         // State tracking
         let currentFiles = []; // { file: str, type: str, staged: bool }
@@ -563,9 +608,58 @@
 
             document.getElementById('current-branch').innerText = data.branch || 'HEAD';
             document.getElementById('commit-branch-label').innerText = data.branch || 'HEAD';
+            branchState = data.branches || { current: data.branch || 'HEAD', local: [], remote: [] };
+            renderBranchControls();
 
             currentFiles = data.files || [];
             renderFileList();
+        }
+
+        function renderBranchControls() {
+            const sel = document.getElementById('branch-select');
+            if(!sel) return;
+            const local = branchState.local || [];
+            sel.innerHTML = '';
+            if(local.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '(No branches)';
+                sel.appendChild(opt);
+                return;
+            }
+            local.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.name;
+                opt.textContent = b.tracking ? `${b.name} → ${b.tracking}` : b.name;
+                if(b.is_current) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        async function checkoutSelectedBranch() {
+            const sel = document.getElementById('branch-select');
+            if(!sel || !sel.value || !currentRepoPath) return;
+            if(sel.value === (branchState.current || '')) return;
+            const res = await fetchAPI('/api/git/branches/checkout', 'POST', {
+                path: currentRepoPath,
+                branch: sel.value
+            });
+            if(res && res.success) {
+                await loadRepoDetails();
+            } else {
+                alert("Branch checkout failed: " + (res.error || "Unknown Error"));
+            }
+        }
+
+        async function doFetch() {
+            if(!currentRepoPath) return;
+            const res = await fetchAPI('/api/git/fetch', 'POST', { path: currentRepoPath });
+            if(res && res.success) {
+                alert("Fetch successful.");
+                await loadRepoDetails();
+            } else {
+                alert("Fetch failed: " + (res.error || "Unknown Error"));
+            }
         }
 
         function renderFileList() {
@@ -682,6 +776,127 @@
                  alert("Pull Successful");
                  loadRepoDetails();
              } else alert("Pull Failed: " + (res.error || "Unknown Error"));
+        }
+
+        async function showBranchManager() {
+            if(!currentRepoPath) return;
+            document.getElementById('modal-branches').style.display = 'flex';
+            await refreshBranchData();
+        }
+
+        async function refreshBranchData() {
+            if(!currentRepoPath) return;
+            const data = await fetchAPI('/api/git/branches?path=' + encodeURIComponent(currentRepoPath));
+            if(!data || data.error) {
+                alert("Failed to load branches: " + (data?.error || "Unknown Error"));
+                return;
+            }
+            branchState = data;
+            renderBranchControls();
+            renderBranchManager();
+        }
+
+        function renderBranchManager() {
+            const localEl = document.getElementById('local-branch-list');
+            const remoteSel = document.getElementById('remote-branch-select');
+            localEl.innerHTML = '';
+            remoteSel.innerHTML = '';
+
+            if((branchState.remote || []).length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '(No remote branches found)';
+                remoteSel.appendChild(opt);
+            } else {
+                branchState.remote.forEach(rb => {
+                    const opt = document.createElement('option');
+                    opt.value = rb;
+                    opt.textContent = rb;
+                    remoteSel.appendChild(opt);
+                });
+            }
+
+            if((branchState.local || []).length === 0) {
+                localEl.innerHTML = '<div style="padding:10px; color:var(--text-dim);">No local branches.</div>';
+                return;
+            }
+
+            branchState.local.forEach(b => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border-color);';
+                const encodedBranch = encodeURIComponent(b.name);
+                row.innerHTML = `
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="font-family:var(--font-mono); color:${b.is_current ? 'var(--brand-color)' : 'var(--text-head)'};">${b.name}${b.is_current ? ' (current)' : ''}</span>
+                        <span style="font-size:10px; color:var(--text-dim);">${b.tracking || 'no tracking remote'}</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="tool-btn" onclick="switchBranchFromModal(decodeURIComponent('${encodedBranch}'))">Switch</button>
+                        ${b.is_current ? '' : `<button class="tool-btn" style="color:var(--danger); border-color:var(--danger);" onclick="deleteBranch(decodeURIComponent('${encodedBranch}'))">Delete</button>`}
+                    </div>
+                `;
+                localEl.appendChild(row);
+            });
+        }
+
+        async function switchBranchFromModal(branchName) {
+            const res = await fetchAPI('/api/git/branches/checkout', 'POST', { path: currentRepoPath, branch: branchName });
+            if(res && res.success) {
+                await loadRepoDetails();
+                await refreshBranchData();
+            } else {
+                alert("Switch failed: " + (res.error || "Unknown Error"));
+            }
+        }
+
+        async function createBranch() {
+            const branch = document.getElementById('inp-new-branch').value.trim();
+            const start = document.getElementById('inp-new-branch-start').value.trim();
+            if(!branch) { alert("Branch name is required."); return; }
+            const res = await fetchAPI('/api/git/branches/create', 'POST', {
+                path: currentRepoPath,
+                branch,
+                start_point: start || null
+            });
+            if(res && res.success) {
+                await fetchAPI('/api/git/branches/checkout', 'POST', { path: currentRepoPath, branch });
+                document.getElementById('inp-new-branch').value = '';
+                document.getElementById('inp-new-branch-start').value = '';
+                await loadRepoDetails();
+                await refreshBranchData();
+            } else {
+                alert("Create branch failed: " + (res.error || "Unknown Error"));
+            }
+        }
+
+        async function checkoutRemoteBranch() {
+            const remoteBranch = document.getElementById('remote-branch-select').value;
+            if(!remoteBranch) return;
+            const res = await fetchAPI('/api/git/branches/checkout', 'POST', {
+                path: currentRepoPath,
+                branch: remoteBranch,
+                track_remote: true
+            });
+            if(res && res.success) {
+                await loadRepoDetails();
+                await refreshBranchData();
+            } else {
+                alert("Remote checkout failed: " + (res.error || "Unknown Error"));
+            }
+        }
+
+        async function deleteBranch(branchName) {
+            if(!confirm(`Delete local branch '${branchName}'?`)) return;
+            const res = await fetchAPI('/api/git/branches/delete', 'POST', {
+                path: currentRepoPath,
+                branch: branchName
+            });
+            if(res && res.success) {
+                await refreshBranchData();
+                await loadRepoDetails();
+            } else {
+                alert("Delete failed: " + (res.error || "Unknown Error"));
+            }
         }
 
         async function doStash() {

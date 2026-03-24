@@ -148,3 +148,42 @@
 - **Delete Files:** Added option to delete repository files from disk when removing a repository.
   - Added "Also delete files from disk" checkbox to the removal confirmation modal in `GitManager.html`.
   - Updated backend to support file deletion via `shutil.rmtree`.
+
+## Updates - 2026-03-24
+
+### Git Manager Deep-Dive + Branch Control Expansion
+- Expanded the Git Manager UI (`web/modules/GitManager.html`) with full branch controls in the main toolbar and a dedicated Branch Manager modal.
+  - Added local branch selector for quick checkout.
+  - Added a Fetch button to update remote refs.
+  - Added branch creation workflow (`branch name` + optional `start point`).
+  - Added local branch switch/delete actions.
+  - Added remote branch checkout flow (track remote branch locally).
+- Extended runtime state wiring so branch metadata is loaded with repository status and rendered in both toolbar controls and modal views.
+
+### New Git API Controls (Backend)
+- Added branch and remote sync API endpoints in `server.py`:
+  - `GET /api/git/branches`
+  - `POST /api/git/fetch`
+  - `POST /api/git/branches/checkout`
+  - `POST /api/git/branches/create`
+  - `POST /api/git/branches/delete`
+- Added server-side branch state collector and included branch metadata in `/api/git/status` responses so frontend updates are simple and lightweight.
+- Added request models for the new branch operations and validation checks for missing branch names / active branch deletion safety.
+
+### Runtime & Button Coverage Testing
+- Added `tests/test_git_manager_runtime.py` with end-to-end runtime tests that exercise the backend actions behind Git Manager controls:
+  - repo add/list/remove
+  - status/diff/commit
+  - stash/stash-pop/discard
+  - fetch/push/pull
+  - branch list/create/checkout/delete
+  - remote branch checkout/tracking
+  - clone endpoint flow
+  - credentials save/load masking
+  - SSH key status endpoint
+- Added `pytest` to `requirements.txt` to keep testing dependency explicit and reproducible.
+
+### Logging
+- Verified that this update preserves existing lightweight logging approach in server runtime (no heavy logging framework added).
+- Kept branch/fetch features consistent with current simple-action pattern so existing console and server event logging behavior remains stable.
+- Test coverage now provides repeatable runtime verification for Git operations that previously depended on manual button checks.

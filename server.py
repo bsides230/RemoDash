@@ -672,6 +672,23 @@ class GitCloneRequest(BaseModel):
     username: Optional[str] = None
     token: Optional[str] = None
 
+class GitBranchCheckoutRequest(BaseModel):
+    path: str
+    branch: str
+    create: Optional[bool] = False
+    start_point: Optional[str] = None
+    track_remote: Optional[bool] = False
+
+class GitBranchCreateRequest(BaseModel):
+    path: str
+    branch: str
+    start_point: Optional[str] = None
+
+class GitBranchDeleteRequest(BaseModel):
+    path: str
+    branch: str
+    force: Optional[bool] = False
+
 class TaskKillRequest(BaseModel):
     pid: int
 
@@ -1547,6 +1564,146 @@ async def git_clone(req: GitCloneRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _collect_branch_state(repo):
+    current_branch = "Detached"
+    try:
+        if not repo.head.is_detached:
+            current_branch = repo.active_branch.name
+    except:
+        pass
+
+    local_branches = []
+    for b in repo.branches:
+        tracking = None
+        try:
+            tr = b.tracking_branch()
+            if tr:
+                tracking = tr.name
+        except:
+            pass
+        local_branches.append({
+            "name": b.name,
+            "tracking": tracking,
+            "is_current": b.name == current_branch
+        })
+
+    remote_branches = []
+    try:
+        for rb in repo.remote().refs:
+            if rb.remote_head == "HEAD":
+                continue
+            remote_branches.append(rb.name)
+    except:
+        pass
+
+    return {
+        "current": current_branch,
+        "local": sorted(local_branches, key=lambda x: x["name"].lower()),
+        "remote": sorted(remote_branches, key=str.lower)
+    }
+
+@app.get("/api/git/branches", dependencies=[Depends(verify_token)])
+async def git_list_branches(path: str):
+    check_path_access(path)
+    if not git:
+        raise HTTPException(status_code=501, detail="GitPython not installed")
+    try:
+        r = git.Repo(path)
+        return _collect_branch_state(r)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/fetch", dependencies=[Depends(verify_token)])
+async def git_fetch(req: GitRepoRequest):
+    check_path_access(req.path)
+    if not git:
+        raise HTTPException(status_code=501, detail="GitPython not installed")
+    try:
+        r = git.Repo(req.path)
+        origin = r.remote(name='origin')
+        env = {"GIT_SSH_COMMAND": "ssh -o StrictHostKeyChecking=no"}
+        creds = git_cred_manager.load()
+        if creds.get("username") and creds.get("token"):
+            askpass_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "git_askpass.py")
+            if os.path.exists(askpass_script):
+                env["GIT_ASKPASS"] = askpass_script
+                env["GIT_USERNAME"] = creds["username"]
+                env["GIT_PASSWORD"] = creds["token"]
+                env["GIT_TERMINAL_PROMPT"] = "0"
+        with r.git.custom_environment(**env):
+            r.git.fetch("--all", "--prune")
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/branches/checkout", dependencies=[Depends(verify_token)])
+async def git_checkout_branch(req: GitBranchCheckoutRequest):
+    check_path_access(req.path)
+    if not git:
+        raise HTTPException(status_code=501, detail="GitPython not installed")
+    try:
+        r = git.Repo(req.path)
+        branch = req.branch.strip()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch name is required")
+
+        if req.create:
+            start_point = (req.start_point or "HEAD").strip()
+            r.git.checkout("-B", branch, start_point)
+        else:
+            if req.track_remote and "/" in branch:
+                local_name = branch.split("/", 1)[1]
+                r.git.checkout("-B", local_name, "--track", branch)
+            else:
+                r.git.checkout(branch)
+
+        return {"success": True, "branch": r.active_branch.name if not r.head.is_detached else "Detached"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/branches/create", dependencies=[Depends(verify_token)])
+async def git_create_branch(req: GitBranchCreateRequest):
+    check_path_access(req.path)
+    if not git:
+        raise HTTPException(status_code=501, detail="GitPython not installed")
+    try:
+        r = git.Repo(req.path)
+        branch = req.branch.strip()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch name is required")
+        start_point = (req.start_point or "HEAD").strip()
+        r.git.branch(branch, start_point)
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/git/branches/delete", dependencies=[Depends(verify_token)])
+async def git_delete_branch(req: GitBranchDeleteRequest):
+    check_path_access(req.path)
+    if not git:
+        raise HTTPException(status_code=501, detail="GitPython not installed")
+    try:
+        r = git.Repo(req.path)
+        branch = req.branch.strip()
+        if not branch:
+            raise HTTPException(status_code=400, detail="Branch name is required")
+        if not r.head.is_detached and branch == r.active_branch.name:
+            raise HTTPException(status_code=400, detail="Cannot delete checked-out branch")
+
+        if req.force:
+            r.git.branch("-D", branch)
+        else:
+            r.git.branch("-d", branch)
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/git/status", dependencies=[Depends(verify_token)])
 async def get_git_status(path: str):
     check_path_access(path) # Validate Access
@@ -1621,12 +1778,13 @@ async def get_git_status(path: str):
 
         return {
             "branch": branch_name,
+            "branches": _collect_branch_state(r),
             "files": diffs,
             "history": history
         }
     except Exception as e:
         # Return structured error instead of 500
-        return {"error": str(e), "branch": "Error", "files": [], "history": []}
+        return {"error": str(e), "branch": "Error", "branches": {"current": "Error", "local": [], "remote": []}, "files": [], "history": []}
 
 @app.post("/api/git/commit", dependencies=[Depends(verify_token)])
 async def git_commit(req: GitRepoRequest):
