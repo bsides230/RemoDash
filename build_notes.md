@@ -250,3 +250,17 @@
   - Adding, deleting, and reordering items within playlists.
   - Core control actions (play, pause, next, prev, toggle repeat, toggle shuffle).
   - Explicit warning logs for invalid control actions and error logs for uncaught exceptions in endpoint execution.
+
+## Updates - 2026-03-27 (Remo Player Phase 02)
+
+### Fullscreen Local Viewer Integration
+- Implemented a host-local fullscreen media viewer (`web/viewer.html`) with a minimalist interface containing an invisible close hotspot and an auto-hiding control bar.
+- The viewer polls `/api/remo-player/state` every second for synchronization with the server-side playback engine.
+- Implemented `viewer_linux.py` and `viewer_windows.py` as abstraction layers to handle launching OS-specific browser instances in kiosk or fullscreen app modes.
+- Added a new API endpoint `/api/remo-player/viewer/launch` to dynamically determine the host OS and trigger the local viewer launch securely.
+- Preserved existing event-driven architecture, avoiding bloat while keeping the presentation and state decoupled.
+
+### Logging
+- Extended the lightweight `DiskJournalLogger` to capture events related to the local viewer launch.
+- `RemoPlayer` actions successfully launching the local viewer via `/api/remo-player/viewer/launch` are logged via `await logger.emit(...)`.
+- The logging standard continues to be strictly upheld, ensuring full traceability without heavy dependency introduction.

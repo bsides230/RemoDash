@@ -728,6 +728,9 @@ class RemoSetActivePlaylistRequest(BaseModel):
 class RemoControlRequest(BaseModel):
     action: str
 
+class RemoViewerLaunchRequest(BaseModel):
+    url: Optional[str] = None
+
 class HardwareReportSaveRequest(BaseModel):
     report_content: str
     filename: Optional[str] = None
@@ -1272,6 +1275,42 @@ async def remo_control(req: RemoControlRequest):
         raise
     except Exception as e:
         await logger.emit("Error", f"Control action failed: {str(e)}", "RemoPlayer")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/viewer/launch")
+async def remo_launch_viewer(req: RemoViewerLaunchRequest, request: Request, token_val: str = Depends(verify_token)):
+    try:
+        url = req.url
+        if not url:
+            # Construct default local url based on the current request
+            host = request.client.host if request.client else "localhost"
+            # If coming from a local proxy or network, we prefer 127.0.0.1 for local viewing
+            local_host = "127.0.0.1"
+            # Keep the same port
+            port = request.url.port or 8000
+            url = f"http://{local_host}:{port}/viewer"
+            if token_val and token_val not in ["NO_AUTH", "SESSION_KEY_VALID"]:
+                 url += f"?token={token_val}"
+
+        # Dynamically import and run the correct launcher
+        sys_os = platform.system()
+        launched = False
+
+        if sys_os == "Windows":
+            import viewer_windows
+            launched = viewer_windows.launch_viewer(url)
+        else:
+            import viewer_linux
+            launched = viewer_linux.launch_viewer(url)
+
+        if not launched:
+             raise Exception("No suitable browser found for kiosk mode.")
+
+        await logger.emit("Info", f"Launched fullscreen viewer at {url}", "RemoPlayer")
+        return {"success": True, "url": url}
+
+    except Exception as e:
+        await logger.emit("Error", f"Failed to launch viewer: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Shortcuts Endpoints ---
@@ -2734,6 +2773,10 @@ async def list_fonts():
         for f in fonts_dir.glob(ext):
             fonts.append(f.name)
     return sorted(fonts)
+
+@app.get("/viewer")
+async def read_viewer():
+    return FileResponse('web/viewer.html')
 
 @app.get("/")
 async def read_root():

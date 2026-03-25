@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Remo Player</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: Inter, Arial, sans-serif;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #mediaContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    video, img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    /* Invisible Close Hotspot (Top Right) */
+    #closeHotspot {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 64px;
+      height: 64px;
+      z-index: 1000;
+      cursor: pointer;
+      opacity: 0;
+      /* background: rgba(255,0,0,0.2); Uncomment for debugging */
+    }
+
+    /* Hidden Control Bar (Bottom) */
+    #controlBar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 26, 36, 0.85);
+      border: 1px solid #2a3242;
+      border-radius: 12px;
+      padding: 12px 24px;
+      display: flex;
+      gap: 16px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    #controlBar.active {
+      opacity: 1;
+    }
+
+    .control-btn {
+      background: none;
+      border: none;
+      color: #e7eaf0;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="mediaContainer">
+    <video id="videoPlayer" controls></video>
+    <img id="imagePlayer" />
+    <audio id="audioPlayer"></audio>
+  </div>
+
+  <div id="closeHotspot" title="Close Viewer"></div>
+
+  <div id="controlBar">
+    <button class="control-btn" id="btnPrev">Prev</button>
+    <button class="control-btn" id="btnPlayPause">Play/Pause</button>
+    <button class="control-btn" id="btnNext">Next</button>
+  </div>
+
+  <script>
+    const core = () => window.location.origin;
+    const token = new URLSearchParams(window.location.search).get('token') || localStorage.getItem('remodash_token') || '';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    let state = null;
+    let pollInterval = null;
+
+    // --- State Polling ---
+    async function fetchState() {
+      try {
+        const res = await fetch(`${core()}/api/remo-player/state`, { headers });
+        if (res.ok) {
+          state = await res.json();
+          renderState();
+        }
+      } catch (err) {
+        console.error("Failed to fetch state:", err);
+      }
+    }
+
+    function renderState() {
+      if (!state || !state.playback) return;
+      const pb = state.playback;
+
+      const btnPlayPause = document.getElementById('btnPlayPause');
+      btnPlayPause.textContent = pb.is_playing ? 'Pause' : 'Play';
+
+      // Additional rendering logic (media element updates) will go here in Phase 03.
+      // For now, Phase 02 just focuses on controls and state receipt.
+    }
+
+    function startPolling() {
+      fetchState();
+      pollInterval = setInterval(fetchState, 1000); // 1s polling for state sync
+    }
+
+    // --- Control Commands ---
+    async function sendCommand(action) {
+      try {
+        await fetch(`${core()}/api/remo-player/control`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ action })
+        });
+        fetchState(); // Immediately fetch state after command
+      } catch (err) {
+        console.error("Command failed:", err);
+      }
+    }
+
+    document.getElementById('btnPlayPause').addEventListener('click', () => {
+      if (state && state.playback && state.playback.is_playing) {
+        sendCommand('pause');
+      } else {
+        sendCommand('play');
+      }
+    });
+
+    document.getElementById('btnNext').addEventListener('click', () => sendCommand('next'));
+    document.getElementById('btnPrev').addEventListener('click', () => sendCommand('prev'));
+
+    // --- Autohide Controls Logic ---
+    let hideTimeout;
+    const controlBar = document.getElementById('controlBar');
+
+    function resetHideTimer() {
+      controlBar.classList.add('active');
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        controlBar.classList.remove('active');
+      }, 3000); // hide after 3 seconds of inactivity
+    }
+
+    // Listeners for activity
+    window.addEventListener('mousemove', resetHideTimer);
+    window.addEventListener('touchstart', resetHideTimer);
+    window.addEventListener('keydown', resetHideTimer);
+
+    // Initial show
+    resetHideTimer();
+
+    // Start Polling
+    startPolling();
+
+    // --- Close Hotspot Logic ---
+    document.getElementById('closeHotspot').addEventListener('click', () => {
+      // Typically the viewer will close the window
+      window.close();
+    });
+
+  </script>
+</body>
+</html>
