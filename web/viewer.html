@@ -37,6 +37,26 @@
       display: none;
     }
 
+    #nowPlaying {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(20, 26, 36, 0.85);
+      border: 1px solid #2a3242;
+      border-radius: 8px;
+      padding: 8px 16px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+      font-size: 14px;
+    }
+
+    #nowPlaying.active {
+      opacity: 1;
+    }
+
     /* Invisible Close Hotspot (Top Right) */
     #closeHotspot {
       position: absolute;
@@ -91,11 +111,12 @@
 <body>
 
   <div id="mediaContainer">
-    <video id="videoPlayer" controls></video>
+    <video id="videoPlayer"></video>
     <img id="imagePlayer" />
     <audio id="audioPlayer"></audio>
   </div>
 
+  <div id="nowPlaying"></div>
   <div id="closeHotspot" title="Close Viewer"></div>
 
   <div id="controlBar">
@@ -116,6 +137,34 @@
     let state = null;
     let pollInterval = null;
 
+    let currentItemId = null;
+    let currentItemType = null;
+    let imageEndTime = null;
+    let imageRemainingMs = 0;
+
+    const videoPlayer = document.getElementById('videoPlayer');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const imagePlayer = document.getElementById('imagePlayer');
+    const nowPlaying = document.getElementById('nowPlaying');
+
+    let isWaitingForNext = false;
+
+    // Autoplay next on ended
+    videoPlayer.addEventListener('ended', () => {
+        if (isWaitingForNext) return;
+        isWaitingForNext = true;
+        sendCommand('next').finally(() => {
+            setTimeout(() => { isWaitingForNext = false; }, 1000);
+        });
+    });
+    audioPlayer.addEventListener('ended', () => {
+        if (isWaitingForNext) return;
+        isWaitingForNext = true;
+        sendCommand('next').finally(() => {
+            setTimeout(() => { isWaitingForNext = false; }, 1000);
+        });
+    });
+
     // --- State Polling ---
     async function fetchState() {
       try {
@@ -129,6 +178,74 @@
       }
     }
 
+    function getMediaUrl(source) {
+      if (source.startsWith('http://') || source.startsWith('https://')) return source;
+      let url = `${core()}/api/files/view?path=${encodeURIComponent(source)}`;
+      if (token && token !== "NO_AUTH" && token !== "SESSION_KEY_VALID") {
+         url += `&token=${encodeURIComponent(token)}`;
+      }
+      return url;
+    }
+
+    function hideAllMedia() {
+      videoPlayer.style.display = 'none';
+      audioPlayer.style.display = 'none';
+      imagePlayer.style.display = 'none';
+
+      videoPlayer.pause();
+      audioPlayer.pause();
+    }
+
+    function updateNowPlaying(title) {
+      if (title) {
+        nowPlaying.textContent = title;
+        // Also trigger show UI temporarily
+        resetHideTimer();
+      } else {
+        nowPlaying.textContent = "";
+      }
+    }
+
+    function loadItem(item, pb) {
+      hideAllMedia();
+      currentItemType = item.type;
+
+      const url = getMediaUrl(item.source);
+      updateNowPlaying(item.title || item.source);
+
+      if (item.type === 'video') {
+        videoPlayer.src = url;
+        videoPlayer.style.display = 'block';
+        videoPlayer.load();
+      } else if (item.type === 'audio') {
+        audioPlayer.src = url;
+        audioPlayer.load();
+      } else if (item.type === 'image') {
+        imagePlayer.src = url;
+        imagePlayer.style.display = 'block';
+
+        const duration = item.duration_sec || pb.image_default_duration_sec || 8;
+        imageRemainingMs = duration * 1000;
+        imageEndTime = null;
+      }
+    }
+
+    function applyPlaybackState(item, pb) {
+      if (item.type === 'video') {
+        if (pb.is_playing && videoPlayer.paused && !videoPlayer.ended) {
+          videoPlayer.play().catch(e => console.warn("Autoplay blocked?", e));
+        } else if (!pb.is_playing && !videoPlayer.paused) {
+          videoPlayer.pause();
+        }
+      } else if (item.type === 'audio') {
+        if (pb.is_playing && audioPlayer.paused && !audioPlayer.ended) {
+          audioPlayer.play().catch(e => console.warn("Autoplay blocked?", e));
+        } else if (!pb.is_playing && !audioPlayer.paused) {
+          audioPlayer.pause();
+        }
+      }
+    }
+
     function renderState() {
       if (!state || !state.playback) return;
       const pb = state.playback;
@@ -136,9 +253,55 @@
       const btnPlayPause = document.getElementById('btnPlayPause');
       btnPlayPause.textContent = pb.is_playing ? 'Pause' : 'Play';
 
-      // Additional rendering logic (media element updates) will go here in Phase 03.
-      // For now, Phase 02 just focuses on controls and state receipt.
+      const playlistId = state.active_playlist_id;
+      const playlist = state.playlists ? state.playlists[playlistId] : null;
+      let currentItem = null;
+
+      if (playlist && pb.current_item_id) {
+        currentItem = playlist.items.find(i => i.id === pb.current_item_id);
+      }
+
+      if (!currentItem) {
+        hideAllMedia();
+        if (currentItemId !== null) {
+          currentItemId = null;
+          currentItemType = null;
+          updateNowPlaying("");
+        }
+        return;
+      }
+
+      if (currentItemId !== currentItem.id) {
+        currentItemId = currentItem.id;
+        loadItem(currentItem, pb);
+      }
+
+      applyPlaybackState(currentItem, pb);
     }
+
+    function checkTimers() {
+      if (state && state.playback && state.playback.is_playing) {
+         if (currentItemId && currentItemType === 'image' && !isWaitingForNext) {
+            if (!imageEndTime) {
+               imageEndTime = Date.now() + imageRemainingMs;
+            } else if (Date.now() >= imageEndTime) {
+               imageEndTime = null;
+               imageRemainingMs = 0;
+               isWaitingForNext = true;
+               sendCommand('next').finally(() => {
+                 setTimeout(() => { isWaitingForNext = false; }, 1000);
+               });
+            }
+         }
+      } else {
+         if (imageEndTime) {
+            imageRemainingMs = Math.max(0, imageEndTime - Date.now());
+            imageEndTime = null;
+         }
+      }
+      requestAnimationFrame(checkTimers);
+    }
+    requestAnimationFrame(checkTimers);
 
     function startPolling() {
       fetchState();
@@ -176,9 +339,13 @@
 
     function resetHideTimer() {
       controlBar.classList.add('active');
+      if (nowPlaying && nowPlaying.textContent) {
+        nowPlaying.classList.add('active');
+      }
       clearTimeout(hideTimeout);
       hideTimeout = setTimeout(() => {
         controlBar.classList.remove('active');
+        if (nowPlaying) nowPlaying.classList.remove('active');
       }, 3000); // hide after 3 seconds of inactivity
     }
 

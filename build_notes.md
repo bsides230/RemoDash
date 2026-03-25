@@ -264,3 +264,17 @@
 - Extended the lightweight `DiskJournalLogger` to capture events related to the local viewer launch.
 - `RemoPlayer` actions successfully launching the local viewer via `/api/remo-player/viewer/launch` are logged via `await logger.emit(...)`.
 - The logging standard continues to be strictly upheld, ensuring full traceability without heavy dependency introduction.
+
+## Updates - Today (Remo Player Phase 03)
+
+### Mixed-Media Playback Engine
+- Enhanced `web/viewer.html` to fully support playing mixed media (video, audio, and images) sequentially within the same playlist.
+- The viewer now dynamically switches between `<video>`, `<audio>`, and `<img>` elements based on the currently active item's type, pausing and hiding unused elements.
+- Image items are now displayed for a configurable duration. The viewer checks `duration_sec` on the item, falling back to `image_default_duration_sec` in the playback state, and automatically advances to the next item when the time expires.
+- Added `ended` event listeners to video and audio elements to seamlessly trigger the next media item.
+- Play and pause actions are correctly synchronized with the `state.playback.is_playing` flag for video and audio elements.
+- Added a floating "Now Playing" UI overlay to reliably update and display metadata (title or source) for the current active item.
+
+### Logging
+- Maintained the existing lightweight logging strategy. All state transitions (play, pause, next, prev) triggered by the viewer automatically advancing media are processed by the existing endpoints (`/api/remo-player/control`) and logged using `await logger.emit(...)`.
+- Ensured no new heavyweight logging dependencies were introduced during the client-side playback implementation.
