@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Remo Player</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: Inter, Arial, sans-serif;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #mediaContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    video, img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    #nowPlaying {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(20, 26, 36, 0.85);
+      border: 1px solid #2a3242;
+      border-radius: 8px;
+      padding: 8px 16px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+      font-size: 14px;
+    }
+
+    #nowPlaying.active {
+      opacity: 1;
+    }
+
+    /* Invisible Close Hotspot (Top Right) */
+    #closeHotspot {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 64px;
+      height: 64px;
+      z-index: 1000;
+      cursor: pointer;
+      opacity: 0;
+      /* background: rgba(255,0,0,0.2); Uncomment for debugging */
+    }
+
+    /* Hidden Control Bar (Bottom) */
+    #controlBar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 26, 36, 0.85);
+      border: 1px solid #2a3242;
+      border-radius: 12px;
+      padding: 12px 24px;
+      display: flex;
+      gap: 16px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    #controlBar.active {
+      opacity: 1;
+    }
+
+    .control-btn {
+      background: none;
+      border: none;
+      color: #e7eaf0;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="mediaContainer">
+    <video id="videoPlayer"></video>
+    <img id="imagePlayer" />
+    <audio id="audioPlayer"></audio>
+  </div>
+
+  <div id="nowPlaying"></div>
+  <div id="closeHotspot" title="Close Viewer"></div>
+
+  <div id="controlBar">
+    <button class="control-btn" id="btnPrev">Prev</button>
+    <button class="control-btn" id="btnPlayPause">Play/Pause</button>
+    <button class="control-btn" id="btnNext">Next</button>
+  </div>
+
+  <script>
+    const core = () => window.location.origin;
+    const token = new URLSearchParams(window.location.search).get('token') || localStorage.getItem('remodash_token') || '';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    let state = null;
+    let pollInterval = null;
+
+    let currentItemId = null;
+    let currentItemType = null;
+    let imageEndTime = null;
+    let imageRemainingMs = 0;
+
+    const videoPlayer = document.getElementById('videoPlayer');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const imagePlayer = document.getElementById('imagePlayer');
+    const nowPlaying = document.getElementById('nowPlaying');
+
+    let isWaitingForNext = false;
+
+    // Autoplay next on ended
+    videoPlayer.addEventListener('ended', () => {
+        if (isWaitingForNext) return;
+        isWaitingForNext = true;
+        sendCommand('next').finally(() => {
+            setTimeout(() => { isWaitingForNext = false; }, 1000);
+        });
+    });
+    audioPlayer.addEventListener('ended', () => {
+        if (isWaitingForNext) return;
+        isWaitingForNext = true;
+        sendCommand('next').finally(() => {
+            setTimeout(() => { isWaitingForNext = false; }, 1000);
+        });
+    });
+
+    // --- State Polling ---
+    async function fetchState() {
+      try {
+        const res = await fetch(`${core()}/api/remo-player/state`, { headers });
+        if (res.ok) {
+          state = await res.json();
+          renderState();
+        }
+      } catch (err) {
+        console.error("Failed to fetch state:", err);
+      }
+    }
+
+    function getMediaUrl(source) {
+      if (source.startsWith('http://') || source.startsWith('https://')) return source;
+      let url = `${core()}/api/files/view?path=${encodeURIComponent(source)}`;
+      if (token && token !== "NO_AUTH" && token !== "SESSION_KEY_VALID") {
+         url += `&token=${encodeURIComponent(token)}`;
+      }
+      return url;
+    }
+
+    function hideAllMedia() {
+      videoPlayer.style.display = 'none';
+      audioPlayer.style.display = 'none';
+      imagePlayer.style.display = 'none';
+
+      videoPlayer.pause();
+      audioPlayer.pause();
+    }
+
+    function updateNowPlaying(title) {
+      if (title) {
+        nowPlaying.textContent = title;
+        // Also trigger show UI temporarily
+        resetHideTimer();
+      } else {
+        nowPlaying.textContent = "";
+      }
+    }
+
+    function loadItem(item, pb) {
+      hideAllMedia();
+      currentItemType = item.type;
+
+      const url = getMediaUrl(item.source);
+      updateNowPlaying(item.title || item.source);
+
+      if (item.type === 'video') {
+        videoPlayer.src = url;
+        videoPlayer.style.display = 'block';
+        videoPlayer.load();
+      } else if (item.type === 'audio') {
+        audioPlayer.src = url;
+        audioPlayer.load();
+      } else if (item.type === 'image') {
+        imagePlayer.src = url;
+        imagePlayer.style.display = 'block';
+
+        const duration = item.duration_sec || pb.image_default_duration_sec || 8;
+        imageRemainingMs = duration * 1000;
+        imageEndTime = null;
+      }
+    }
+
+    function applyPlaybackState(item, pb) {
+      if (item.type === 'video') {
+        if (pb.is_playing && videoPlayer.paused && !videoPlayer.ended) {
+          videoPlayer.play().catch(e => console.warn("Autoplay blocked?", e));
+        } else if (!pb.is_playing && !videoPlayer.paused) {
+          videoPlayer.pause();
+        }
+      } else if (item.type === 'audio') {
+        if (pb.is_playing && audioPlayer.paused && !audioPlayer.ended) {
+          audioPlayer.play().catch(e => console.warn("Autoplay blocked?", e));
+        } else if (!pb.is_playing && !audioPlayer.paused) {
+          audioPlayer.pause();
+        }
+      }
+    }
+
+    function renderState() {
+      if (!state || !state.playback) return;
+      const pb = state.playback;
+
+      const btnPlayPause = document.getElementById('btnPlayPause');
+      btnPlayPause.textContent = pb.is_playing ? 'Pause' : 'Play';
+
+      const playlistId = state.active_playlist_id;
+      const playlist = state.playlists ? state.playlists[playlistId] : null;
+      let currentItem = null;
+
+      if (playlist && pb.current_item_id) {
+        currentItem = playlist.items.find(i => i.id === pb.current_item_id);
+      }
+
+      if (!currentItem) {
+        hideAllMedia();
+        if (currentItemId !== null) {
+          currentItemId = null;
+          currentItemType = null;
+          updateNowPlaying("");
+        }
+        return;
+      }
+
+      if (currentItemId !== currentItem.id) {
+        currentItemId = currentItem.id;
+        loadItem(currentItem, pb);
+      }
+
+      applyPlaybackState(currentItem, pb);
+    }
+
+    function checkTimers() {
+      if (state && state.playback && state.playback.is_playing) {
+         if (currentItemId && currentItemType === 'image' && !isWaitingForNext) {
+            if (!imageEndTime) {
+               imageEndTime = Date.now() + imageRemainingMs;
+            } else if (Date.now() >= imageEndTime) {
+               imageEndTime = null;
+               imageRemainingMs = 0;
+               isWaitingForNext = true;
+               sendCommand('next').finally(() => {
+                 setTimeout(() => { isWaitingForNext = false; }, 1000);
+               });
+            }
+         }
+      } else {
+         if (imageEndTime) {
+            imageRemainingMs = Math.max(0, imageEndTime - Date.now());
+            imageEndTime = null;
+         }
+      }
+      requestAnimationFrame(checkTimers);
+    }
+    requestAnimationFrame(checkTimers);
+
+    function startPolling() {
+      fetchState();
+      pollInterval = setInterval(fetchState, 1000); // 1s polling for state sync
+    }
+
+    // --- Control Commands ---
+    async function sendCommand(action) {
+      try {
+        await fetch(`${core()}/api/remo-player/control`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ action })
+        });
+        fetchState(); // Immediately fetch state after command
+      } catch (err) {
+        console.error("Command failed:", err);
+      }
+    }
+
+    document.getElementById('btnPlayPause').addEventListener('click', () => {
+      if (state && state.playback && state.playback.is_playing) {
+        sendCommand('pause');
+      } else {
+        sendCommand('play');
+      }
+    });
+
+    document.getElementById('btnNext').addEventListener('click', () => sendCommand('next'));
+    document.getElementById('btnPrev').addEventListener('click', () => sendCommand('prev'));
+
+    // --- Autohide Controls Logic ---
+    let hideTimeout;
+    const controlBar = document.getElementById('controlBar');
+
+    function resetHideTimer() {
+      controlBar.classList.add('active');
+      if (nowPlaying && nowPlaying.textContent) {
+        nowPlaying.classList.add('active');
+      }
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => {
+        controlBar.classList.remove('active');
+        if (nowPlaying) nowPlaying.classList.remove('active');
+      }, 3000); // hide after 3 seconds of inactivity
+    }
+
+    // Listeners for activity
+    window.addEventListener('mousemove', resetHideTimer);
+    window.addEventListener('touchstart', resetHideTimer);
+    window.addEventListener('keydown', resetHideTimer);
+
+    // Initial show
+    resetHideTimer();
+
+    // Start Polling
+    startPolling();
+
+    // --- Close Hotspot Logic ---
+    document.getElementById('closeHotspot').addEventListener('click', () => {
+      // Typically the viewer will close the window
+      window.close();
+    });
+
+  </script>
+</body>
+</html>

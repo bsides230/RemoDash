@@ -240,3 +240,61 @@
 - Refactor intentionally preserved the existing lightweight logging approach.
 - No new heavyweight logging dependencies were introduced.
 - Phase prompt files explicitly require logging updates in each phase to keep observability consistent as viewer/playback features expand.
+
+## Updates - 2026-03-26 (Remo Player Phase 01)
+
+### Remo Media Player Endpoint Logging
+- Implemented `await logger.emit(...)` for all `RemoPlayer` actions in `server.py` to preserve the lightweight observability standard.
+- Actions logged include:
+  - Playlist creation and setting active playlists.
+  - Adding, deleting, and reordering items within playlists.
+  - Core control actions (play, pause, next, prev, toggle repeat, toggle shuffle).
+  - Explicit warning logs for invalid control actions and error logs for uncaught exceptions in endpoint execution.
+
+## Updates - 2026-03-27 (Remo Player Phase 02)
+
+### Fullscreen Local Viewer Integration
+- Implemented a host-local fullscreen media viewer (`web/viewer.html`) with a minimalist interface containing an invisible close hotspot and an auto-hiding control bar.
+- The viewer polls `/api/remo-player/state` every second for synchronization with the server-side playback engine.
+- Implemented `viewer_linux.py` and `viewer_windows.py` as abstraction layers to handle launching OS-specific browser instances in kiosk or fullscreen app modes.
+- Added a new API endpoint `/api/remo-player/viewer/launch` to dynamically determine the host OS and trigger the local viewer launch securely.
+- Preserved existing event-driven architecture, avoiding bloat while keeping the presentation and state decoupled.
+
+### Logging
+- Extended the lightweight `DiskJournalLogger` to capture events related to the local viewer launch.
+- `RemoPlayer` actions successfully launching the local viewer via `/api/remo-player/viewer/launch` are logged via `await logger.emit(...)`.
+- The logging standard continues to be strictly upheld, ensuring full traceability without heavy dependency introduction.
+
+## Updates - Today (Remo Player Phase 04)
+
+### Shuffle & Repeat Boundary Logic
+- Finalized shuffle preparation logic to ensure a stable, deterministic prepared order rather than item-by-item random picks.
+- Implemented next-loop prebuild trigger that activates during the final 20% of the active order when repeat and shuffle are active.
+- Added boundary exclusion rule: The first 20% of the next prepared shuffle order will not overlap with the last 20% of the previous order (by `media_key`) when possible.
+- Added comprehensive unit tests in `tests/test_remo_player_shuffle_repeat.py` covering boundary avoidance, edge case fallback, and repeat sequence transitions.
+
+### Logging
+- Maintained the existing lightweight logging strategy. No new logging framework dependencies have been added. The precomputed playback sequence and next-loop sequence generation continue to use the established backend routines while the state API natively handles transitions.
+- Existing playback controls (`play`, `next`, `prev`) continue to emit standard `RemoPlayer` logs via `await logger.emit(...)` without modification.
+
+## Updates - Today (Remo Player Phase 03)
+
+### Mixed-Media Playback Engine
+- Enhanced `web/viewer.html` to fully support playing mixed media (video, audio, and images) sequentially within the same playlist.
+- The viewer now dynamically switches between `<video>`, `<audio>`, and `<img>` elements based on the currently active item's type, pausing and hiding unused elements.
+- Image items are now displayed for a configurable duration. The viewer checks `duration_sec` on the item, falling back to `image_default_duration_sec` in the playback state, and automatically advances to the next item when the time expires.
+- Added `ended` event listeners to video and audio elements to seamlessly trigger the next media item.
+- Play and pause actions are correctly synchronized with the `state.playback.is_playing` flag for video and audio elements.
+- Added a floating "Now Playing" UI overlay to reliably update and display metadata (title or source) for the current active item.
+
+### Logging
+- Maintained the existing lightweight logging strategy. All state transitions (play, pause, next, prev) triggered by the viewer automatically advancing media are processed by the existing endpoints (`/api/remo-player/control`) and logged using `await logger.emit(...)`.
+- Ensured no new heavyweight logging dependencies were introduced during the client-side playback implementation.
+
+## Updates - Today (Remo Player Phase 05)
+
+### Production Hardening & UX
+- **Mobile Interaction Resilience**: Replaced pointer events with robust Drag and Drop API in `web/modules/RemoMediaPlayer.html` for reliable touch reordering on mobile devices.
+- **Unit & Integration Tests**: Added test coverage (`tests/test_remo_player_state.py` and `tests/test_remo_player_api.py`) for API operations and playback state transitions.
+- **Logging & Observability**: Expanded `server.py` logging with detailed event tracking for viewer launches and media playback state changes (using the core lightweight `DiskJournalLogger`).
+- **Schema Migration Strategy**: Added `docs/schema_migration.md` providing rollback-safe guidelines for any future `remo_media_player.json` schema updates.

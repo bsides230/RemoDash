@@ -728,6 +728,9 @@ class RemoSetActivePlaylistRequest(BaseModel):
 class RemoControlRequest(BaseModel):
     action: str
 
+class RemoViewerLaunchRequest(BaseModel):
+    url: Optional[str] = None
+
 class HardwareReportSaveRequest(BaseModel):
     report_content: str
     filename: Optional[str] = None
@@ -1199,39 +1202,51 @@ async def remo_player_state():
 @app.post("/api/remo-player/playlists", dependencies=[Depends(verify_token)])
 async def remo_create_playlist(req: RemoPlaylistCreateRequest):
     try:
-        return remo_media_manager.create_playlist(req.name)
+        result = remo_media_manager.create_playlist(req.name)
+        await logger.emit("Info", f"Created playlist: {req.name}", "RemoPlayer")
+        return result
     except Exception as e:
+        await logger.emit("Error", f"Failed to create playlist: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/active", dependencies=[Depends(verify_token)])
 async def remo_set_active_playlist(req: RemoSetActivePlaylistRequest):
     try:
         remo_media_manager.set_active_playlist(req.playlist_id)
+        await logger.emit("Info", f"Set active playlist: {req.playlist_id}", "RemoPlayer")
         return {"success": True}
     except Exception as e:
+        await logger.emit("Error", f"Failed to set active playlist: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/{playlist_id}/items", dependencies=[Depends(verify_token)])
 async def remo_add_playlist_item(playlist_id: str, req: RemoPlaylistItemRequest):
     try:
-        return remo_media_manager.add_item(playlist_id, req.dict())
+        result = remo_media_manager.add_item(playlist_id, req.dict())
+        await logger.emit("Info", f"Added item to playlist {playlist_id}: {req.title or req.source}", "RemoPlayer")
+        return result
     except Exception as e:
+        await logger.emit("Error", f"Failed to add item to playlist: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/{playlist_id}/reorder", dependencies=[Depends(verify_token)])
 async def remo_reorder_playlist_item(playlist_id: str, req: RemoPlaylistReorderRequest):
     try:
         remo_media_manager.reorder_item(playlist_id, req.item_id, req.to_index)
+        await logger.emit("Info", f"Reordered item {req.item_id} in playlist {playlist_id} to index {req.to_index}", "RemoPlayer")
         return {"success": True}
     except Exception as e:
+        await logger.emit("Error", f"Failed to reorder item: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/{playlist_id}/items/delete", dependencies=[Depends(verify_token)])
 async def remo_delete_playlist_item(playlist_id: str, req: RemoPlaylistItemDeleteRequest):
     try:
         remo_media_manager.remove_item(playlist_id, req.item_id)
+        await logger.emit("Info", f"Deleted item {req.item_id} from playlist {playlist_id}", "RemoPlayer")
         return {"success": True}
     except Exception as e:
+        await logger.emit("Error", f"Failed to delete item: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/control", dependencies=[Depends(verify_token)])
@@ -1251,11 +1266,55 @@ async def remo_control(req: RemoControlRequest):
         elif action == 'toggle_shuffle':
             remo_media_manager.toggle_shuffle()
         else:
+            await logger.emit("Warning", f"Invalid control action: {action}", "RemoPlayer")
             raise HTTPException(status_code=400, detail='Invalid action')
+
+        pb = remo_media_manager.state["playback"]
+        status_msg = f"Action: {action}. Playing: {pb.get('is_playing')}, Current Item: {pb.get('current_item_id')}"
+        await logger.emit("Info", f"Playback state changed - {status_msg}", "RemoPlayer")
+
         return remo_media_manager.get_state()
     except HTTPException:
         raise
     except Exception as e:
+        await logger.emit("Error", f"Control action failed: {str(e)}", "RemoPlayer")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/viewer/launch")
+async def remo_launch_viewer(req: RemoViewerLaunchRequest, request: Request, token_val: str = Depends(verify_token)):
+    await logger.emit("Info", "Viewer launch requested", "RemoPlayerViewer")
+    try:
+        url = req.url
+        if not url:
+            # Construct default local url based on the current request
+            host = request.client.host if request.client else "localhost"
+            # If coming from a local proxy or network, we prefer 127.0.0.1 for local viewing
+            local_host = "127.0.0.1"
+            # Keep the same port
+            port = request.url.port or 8000
+            url = f"http://{local_host}:{port}/viewer"
+            if token_val and token_val not in ["NO_AUTH", "SESSION_KEY_VALID"]:
+                 url += f"?token={token_val}"
+
+        # Dynamically import and run the correct launcher
+        sys_os = platform.system()
+        launched = False
+
+        if sys_os == "Windows":
+            import viewer_windows
+            launched = viewer_windows.launch_viewer(url)
+        else:
+            import viewer_linux
+            launched = viewer_linux.launch_viewer(url)
+
+        if not launched:
+             raise Exception("No suitable browser found for kiosk mode.")
+
+        await logger.emit("Info", f"Successfully launched fullscreen viewer at {url}", "RemoPlayerViewer")
+        return {"success": True, "url": url}
+
+    except Exception as e:
+        await logger.emit("Error", f"Failed to launch viewer: {str(e)}", "RemoPlayerViewer")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Shortcuts Endpoints ---
@@ -2718,6 +2777,10 @@ async def list_fonts():
         for f in fonts_dir.glob(ext):
             fonts.append(f.name)
     return sorted(fonts)
+
+@app.get("/viewer")
+async def read_viewer():
+    return FileResponse('web/viewer.html')
 
 @app.get("/")
 async def read_root():
