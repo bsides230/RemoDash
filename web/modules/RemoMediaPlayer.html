@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remo Media Player</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; margin: 0; padding: 12px; background: #0f1115; color: #e7eaf0; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #2a3242; background: #141a24; color: #e7eaf0; }
+    button { cursor: pointer; }
+    .card { background: #141a24; border: 1px solid #2a3242; border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+    #playlist { list-style: none; padding: 0; margin: 0; }
+    .item { border: 1px solid #2f3b50; border-radius: 10px; padding: 10px; margin-bottom: 8px; background: #0f1420; touch-action: none; }
+    .item.dragging { opacity: 0.5; border-color: #63a2ff; }
+    .mini { font-size: 12px; opacity: 0.8; }
+    .danger { border-color: #6d2a2a; }
+    @media (max-width: 768px) { input, select, button { width: 100%; } }
+  </style>
+</head>
+<body>
+  <h2>Remo Media Player</h2>
+
+  <div class="card">
+    <div class="row">
+      <input id="playlistName" placeholder="New playlist name" />
+      <button onclick="createPlaylist()">Create Playlist</button>
+      <select id="playlistSelect" onchange="setActivePlaylist()"></select>
+      <button onclick="refreshState()">Refresh</button>
+    </div>
+
+    <div class="row">
+      <select id="itemType">
+        <option value="audio">Audio</option>
+        <option value="video">Video</option>
+        <option value="image">Image</option>
+      </select>
+      <input id="itemTitle" placeholder="Title" />
+      <input id="itemSource" placeholder="Source path or URL" />
+      <input id="itemDuration" type="number" min="1" placeholder="Image duration (sec)" />
+      <button onclick="addItem()">Add Item</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button onclick="control('play')">Play</button>
+      <button onclick="control('pause')">Pause</button>
+      <button onclick="control('prev')">Prev</button>
+      <button onclick="control('next')">Next</button>
+      <button onclick="control('toggle_repeat')">Toggle Repeat</button>
+      <button onclick="control('toggle_shuffle')">Toggle Shuffle</button>
+    </div>
+    <div id="status" class="mini"></div>
+  </div>
+
+  <div class="card">
+    <h3>Playlist (drag to reorder)</h3>
+    <ul id="playlist"></ul>
+  </div>
+
+<script>
+  let state = null;
+  let draggingId = null;
+
+  function core() {
+    return localStorage.getItem('remodash_core_url') || window.location.origin;
+  }
+
+  function headers() {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('remodash_token') || ''}`
+    };
+  }
+
+  async function api(path, method='GET', body=null) {
+    const res = await fetch(`${core()}${path}`, { method, headers: headers(), body: body ? JSON.stringify(body) : null });
+    if (!res.ok) throw new Error(await res.text());
+    return await res.json();
+  }
+
+  function activePlaylist() {
+    if (!state) return null;
+    return (state.playlists || {})[state.active_playlist_id] || null;
+  }
+
+  function render() {
+    const sel = document.getElementById('playlistSelect');
+    sel.innerHTML = '';
+    Object.values(state.playlists || {}).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      if (p.id === state.active_playlist_id) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    const pb = state.playback || {};
+    document.getElementById('status').textContent = `Now Playing: ${pb.current_item_id || 'none'} | Playing: ${pb.is_playing} | Repeat: ${pb.repeat} | Shuffle: ${pb.shuffle}`;
+
+    const list = document.getElementById('playlist');
+    list.innerHTML = '';
+    const p = activePlaylist();
+    if (!p) return;
+    p.items.forEach((item, index) => {
+      const li = document.createElement('li');
+      li.className = 'item';
+      li.dataset.id = item.id;
+      li.innerHTML = `<div><strong>${index+1}. ${item.title || item.source}</strong></div>
+        <div class="mini">${item.type} · ${item.source} ${item.duration_sec ? `· ${item.duration_sec}s` : ''}</div>
+        <div class="row"><button class="danger" onclick="removeItem('${item.id}')">Remove</button></div>`;
+
+      li.addEventListener('pointerdown', () => { draggingId = item.id; li.classList.add('dragging'); });
+      li.addEventListener('pointerup', async (ev) => {
+        li.classList.remove('dragging');
+        if (!draggingId) return;
+        const target = ev.target.closest('.item');
+        if (!target) return;
+        const ids = [...document.querySelectorAll('.item')].map(x => x.dataset.id);
+        const toIndex = ids.indexOf(target.dataset.id);
+        const movedId = draggingId;
+        draggingId = null;
+        await api(`/api/remo-player/playlists/${p.id}/reorder`, 'POST', { item_id: movedId, to_index: toIndex });
+        await refreshState();
+      });
+
+      list.appendChild(li);
+    });
+  }
+
+  async function refreshState() {
+    state = await api('/api/remo-player/state');
+    render();
+  }
+
+  async function createPlaylist() {
+    const name = document.getElementById('playlistName').value.trim();
+    if (!name) return;
+    await api('/api/remo-player/playlists', 'POST', { name });
+    document.getElementById('playlistName').value = '';
+    await refreshState();
+  }
+
+  async function setActivePlaylist() {
+    const playlist_id = document.getElementById('playlistSelect').value;
+    if (!playlist_id) return;
+    await api('/api/remo-player/playlists/active', 'POST', { playlist_id });
+    await refreshState();
+  }
+
+  async function addItem() {
+    const p = activePlaylist();
+    if (!p) return;
+    const type = document.getElementById('itemType').value;
+    const title = document.getElementById('itemTitle').value.trim();
+    const source = document.getElementById('itemSource').value.trim();
+    const d = document.getElementById('itemDuration').value;
+    if (!source) return;
+    await api(`/api/remo-player/playlists/${p.id}/items`, 'POST', {
+      type, title, source,
+      duration_sec: d ? Number(d) : null,
+      media_key: source
+    });
+    document.getElementById('itemTitle').value = '';
+    document.getElementById('itemSource').value = '';
+    document.getElementById('itemDuration').value = '';
+    await refreshState();
+  }
+
+  async function removeItem(item_id) {
+    const p = activePlaylist();
+    if (!p) return;
+    await api(`/api/remo-player/playlists/${p.id}/items/delete`, 'POST', { item_id });
+    await refreshState();
+  }
+
+  async function control(action) {
+    await api('/api/remo-player/control', 'POST', { action });
+    await refreshState();
+  }
+
+  refreshState().catch(err => { document.getElementById('status').textContent = String(err); });
+</script>
+</body>
+</html>

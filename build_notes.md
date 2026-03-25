@@ -187,3 +187,56 @@
 - Verified that this update preserves existing lightweight logging approach in server runtime (no heavy logging framework added).
 - Kept branch/fetch features consistent with current simple-action pattern so existing console and server event logging behavior remains stable.
 - Test coverage now provides repeatable runtime verification for Git operations that previously depended on manual button checks.
+
+## Updates - 2026-03-25
+
+### Remo Media Player (VLC Replacement) Foundation
+- Added a new server-side `RemoMediaPlayerManager` in `server.py` with a playlist-authoritative state model stored in `data/remo_media_player.json`.
+- Implemented mixed-media playlist operations (audio/video/image): create playlist, set active playlist, add item, remove item, and reorder item.
+- Added playback control state machine APIs under `/api/remo-player/*` for play/pause/next/prev/repeat/shuffle.
+- Added shuffle preparation flow that precomputes playback order and prebuilds the next repeat loop order near the last 20% boundary.
+- Added cross-loop boundary guard (by `media_key`) to prevent overlap between previous-loop tail 20% and next-loop head 20% when possible.
+
+### RemoDash Module UI
+- Added `web/modules/RemoMediaPlayer.html` as an initial module UI focused on:
+  - playlist creation and selection
+  - mixed media item insertion
+  - mobile-friendly pointer-based drag-and-drop reordering
+  - item removal
+  - playback transport/repeat/shuffle controls
+  - now-playing status display from API state
+
+### Architecture Documentation
+- Added `docs/remo_media_player_design.md` to define:
+  - layered architecture (data/API/viewer)
+  - API contract
+  - playlist schema
+  - playback state model
+  - Linux/Windows viewer strategy
+  - phased implementation plan
+
+### Logging
+- Kept logging consistent with existing lightweight approach (no heavy framework changes).
+- New Remo Player endpoints and state transitions rely on existing server logging surface and error propagation patterns.
+- Design notes include explicit follow-up for viewer heartbeat/state telemetry integration so runtime events can be tracked cleanly without architecture bloat.
+
+## Updates - 2026-03-25 (Refactor + Session Prompts)
+
+### Remo Player Refactor (Reduce `server.py` Bloat)
+- Moved core Remo media player state machine logic from `server.py` into a dedicated module: `remo_media_player.py`.
+- Kept `server.py` focused on API routing/request models and manager wiring, while business logic now lives in the separate script.
+- Preserved existing `/api/remo-player/*` endpoint contract to avoid breaking module integration.
+
+### Multi-Phase Prompt Pack
+- Added dedicated phase prompt files under `docs/prompts/` so future sessions can execute scoped work by phase:
+  - Phase 01 (foundation/contract/data)
+  - Phase 02 (fullscreen viewer)
+  - Phase 03 (mixed media playback)
+  - Phase 04 (shuffle/repeat boundary logic)
+  - Phase 05 (hardening/tests/UX)
+- Added `docs/prompts/README.md` as an index for the phase prompt set.
+
+### Logging
+- Refactor intentionally preserved the existing lightweight logging approach.
+- No new heavyweight logging dependencies were introduced.
+- Phase prompt files explicitly require logging updates in each phase to keep observability consistent as viewer/playback features expand.
