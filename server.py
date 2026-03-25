@@ -34,6 +34,7 @@ import uvicorn
 
 from settings_manager import SettingsManager
 from module_manager import ModuleManager
+from remo_media_player import RemoMediaPlayerManager
 
 try:
     import pynvml
@@ -429,6 +430,7 @@ class VLCManager:
 
         return {"state": state, "title": title}
 
+
 # --- Shortcuts Manager ---
 class ShortcutsManager:
     def __init__(self, data_file="data/shortcuts.json"):
@@ -632,6 +634,7 @@ logger = DiskJournalLogger()
 settings_manager = SettingsManager()
 shortcuts_manager = ShortcutsManager()
 vlc_manager = VLCManager()
+remo_media_manager = RemoMediaPlayerManager()
 hw_report_manager = HardwareReportManager()
 git_cred_manager = GitCredentialsManager()
 module_manager = ModuleManager()
@@ -700,6 +703,30 @@ class VLCLaunchRequest(BaseModel):
 
 class VLCCommandRequest(BaseModel):
     command: str
+
+class RemoPlaylistCreateRequest(BaseModel):
+    name: str
+
+class RemoPlaylistItemRequest(BaseModel):
+    type: str
+    source: str
+    title: Optional[str] = None
+    duration_sec: Optional[int] = None
+    enabled: Optional[bool] = True
+    media_key: Optional[str] = None
+
+class RemoPlaylistReorderRequest(BaseModel):
+    item_id: str
+    to_index: int
+
+class RemoPlaylistItemDeleteRequest(BaseModel):
+    item_id: str
+
+class RemoSetActivePlaylistRequest(BaseModel):
+    playlist_id: str
+
+class RemoControlRequest(BaseModel):
+    action: str
 
 class HardwareReportSaveRequest(BaseModel):
     report_content: str
@@ -1160,6 +1187,76 @@ async def vlc_status():
 async def vlc_kill():
     vlc_manager.kill()
     return {"success": True}
+
+# --- Remo Media Player Endpoints ---
+@app.get("/api/remo-player/state", dependencies=[Depends(verify_token)])
+async def remo_player_state():
+    try:
+        return remo_media_manager.get_state()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/playlists", dependencies=[Depends(verify_token)])
+async def remo_create_playlist(req: RemoPlaylistCreateRequest):
+    try:
+        return remo_media_manager.create_playlist(req.name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/playlists/active", dependencies=[Depends(verify_token)])
+async def remo_set_active_playlist(req: RemoSetActivePlaylistRequest):
+    try:
+        remo_media_manager.set_active_playlist(req.playlist_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/playlists/{playlist_id}/items", dependencies=[Depends(verify_token)])
+async def remo_add_playlist_item(playlist_id: str, req: RemoPlaylistItemRequest):
+    try:
+        return remo_media_manager.add_item(playlist_id, req.dict())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/playlists/{playlist_id}/reorder", dependencies=[Depends(verify_token)])
+async def remo_reorder_playlist_item(playlist_id: str, req: RemoPlaylistReorderRequest):
+    try:
+        remo_media_manager.reorder_item(playlist_id, req.item_id, req.to_index)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/playlists/{playlist_id}/items/delete", dependencies=[Depends(verify_token)])
+async def remo_delete_playlist_item(playlist_id: str, req: RemoPlaylistItemDeleteRequest):
+    try:
+        remo_media_manager.remove_item(playlist_id, req.item_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/remo-player/control", dependencies=[Depends(verify_token)])
+async def remo_control(req: RemoControlRequest):
+    try:
+        action = req.action
+        if action == 'play':
+            remo_media_manager.start()
+        elif action == 'pause':
+            remo_media_manager.pause()
+        elif action == 'next':
+            remo_media_manager.step(1)
+        elif action == 'prev':
+            remo_media_manager.step(-1)
+        elif action == 'toggle_repeat':
+            remo_media_manager.toggle_repeat()
+        elif action == 'toggle_shuffle':
+            remo_media_manager.toggle_shuffle()
+        else:
+            raise HTTPException(status_code=400, detail='Invalid action')
+        return remo_media_manager.get_state()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Shortcuts Endpoints ---
 
