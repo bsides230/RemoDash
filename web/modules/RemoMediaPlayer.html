@@ -111,9 +111,24 @@
         <div class="mini">${item.type} · ${item.source} ${item.duration_sec ? `· ${item.duration_sec}s` : ''}</div>
         <div class="row"><button class="danger" onclick="removeItem('${item.id}')">Remove</button></div>`;
 
-      li.addEventListener('pointerdown', () => { draggingId = item.id; li.classList.add('dragging'); });
-      li.addEventListener('pointerup', async (ev) => {
+      li.draggable = true;
+      li.addEventListener('dragstart', (ev) => {
+        draggingId = item.id;
+        li.classList.add('dragging');
+        ev.dataTransfer.effectAllowed = 'move';
+        // Required for Firefox
+        ev.dataTransfer.setData('text/plain', item.id);
+      });
+      li.addEventListener('dragend', () => {
         li.classList.remove('dragging');
+        draggingId = null;
+      });
+      li.addEventListener('dragover', (ev) => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+      });
+      li.addEventListener('drop', async (ev) => {
+        ev.preventDefault();
         if (!draggingId) return;
         const target = ev.target.closest('.item');
         if (!target) return;
@@ -123,6 +138,43 @@
         draggingId = null;
         await api(`/api/remo-player/playlists/${p.id}/reorder`, 'POST', { item_id: movedId, to_index: toIndex });
         await refreshState();
+      });
+
+      // Touch fallbacks for mobile browsers that do not fully support HTML5 drag & drop
+      li.addEventListener('touchstart', (ev) => {
+        draggingId = item.id;
+        li.classList.add('dragging');
+      }, {passive: true});
+      li.addEventListener('touchmove', (ev) => {
+        if (!draggingId) return;
+        ev.preventDefault(); // Prevent scrolling while dragging
+        const touch = ev.changedTouches[0];
+        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+        const target = elem ? elem.closest('.item') : null;
+        document.querySelectorAll('.item').forEach(i => i.style.borderTop = '');
+        if (target && target !== li) {
+            target.style.borderTop = '2px solid #63a2ff';
+        }
+      }, {passive: false});
+      li.addEventListener('touchend', async (ev) => {
+        li.classList.remove('dragging');
+        document.querySelectorAll('.item').forEach(i => i.style.borderTop = '');
+        if (!draggingId) return;
+        const touch = ev.changedTouches[0];
+        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+        const target = elem ? elem.closest('.item') : null;
+        if (!target) {
+            draggingId = null;
+            return;
+        }
+        const ids = [...document.querySelectorAll('.item')].map(x => x.dataset.id);
+        const toIndex = ids.indexOf(target.dataset.id);
+        const movedId = draggingId;
+        draggingId = null;
+        if (toIndex !== -1 && ids.indexOf(movedId) !== toIndex) {
+            await api(`/api/remo-player/playlists/${p.id}/reorder`, 'POST', { item_id: movedId, to_index: toIndex });
+            await refreshState();
+        }
       });
 
       list.appendChild(li);

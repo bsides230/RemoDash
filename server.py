@@ -1269,7 +1269,10 @@ async def remo_control(req: RemoControlRequest):
             await logger.emit("Warning", f"Invalid control action: {action}", "RemoPlayer")
             raise HTTPException(status_code=400, detail='Invalid action')
 
-        await logger.emit("Info", f"Control action executed: {action}", "RemoPlayer")
+        pb = remo_media_manager.state["playback"]
+        status_msg = f"Action: {action}. Playing: {pb.get('is_playing')}, Current Item: {pb.get('current_item_id')}"
+        await logger.emit("Info", f"Playback state changed - {status_msg}", "RemoPlayer")
+
         return remo_media_manager.get_state()
     except HTTPException:
         raise
@@ -1279,6 +1282,7 @@ async def remo_control(req: RemoControlRequest):
 
 @app.post("/api/remo-player/viewer/launch")
 async def remo_launch_viewer(req: RemoViewerLaunchRequest, request: Request, token_val: str = Depends(verify_token)):
+    await logger.emit("Info", "Viewer launch requested", "RemoPlayerViewer")
     try:
         url = req.url
         if not url:
@@ -1306,11 +1310,11 @@ async def remo_launch_viewer(req: RemoViewerLaunchRequest, request: Request, tok
         if not launched:
              raise Exception("No suitable browser found for kiosk mode.")
 
-        await logger.emit("Info", f"Launched fullscreen viewer at {url}", "RemoPlayer")
+        await logger.emit("Info", f"Successfully launched fullscreen viewer at {url}", "RemoPlayerViewer")
         return {"success": True, "url": url}
 
     except Exception as e:
-        await logger.emit("Error", f"Failed to launch viewer: {str(e)}", "RemoPlayer")
+        await logger.emit("Error", f"Failed to launch viewer: {str(e)}", "RemoPlayerViewer")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Shortcuts Endpoints ---

@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "playlists": {
+    "f81d832c-a591-4f9d-a0b7-81c0ee63ac85": {
+      "id": "f81d832c-a591-4f9d-a0b7-81c0ee63ac85",
+      "name": "API Test Playlist",
+      "created_at": "2026-03-25T04:11:03Z",
+      "updated_at": "2026-03-25T04:11:03Z",
+      "items": [
+        {
+          "id": "b281c7b8-6439-4547-86e0-54bb196d7fd2",
+          "type": "audio",
+          "title": "Audio 1",
+          "source": "http://aud1",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "http://aud1"
+        },
+        {
+          "id": "9914eabd-2b95-46b1-b6c2-2ac2b95b5dcc",
+          "type": "video",
+          "title": "Vid 1",
+          "source": "http://vid1",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "http://vid1"
+        }
+      ]
+    },
+    "3f185150-61da-4dfd-ac44-0fc9395dc6aa": {
+      "id": "3f185150-61da-4dfd-ac44-0fc9395dc6aa",
+      "name": "API Test Playlist",
+      "created_at": "2026-03-25T04:13:08Z",
+      "updated_at": "2026-03-25T04:15:52Z",
+      "items": [
+        {
+          "id": "52ac33bc-d614-4ef4-9ab3-dcb51f20d1bc",
+          "type": "audio",
+          "title": "Audio 1",
+          "source": "http://aud1",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "http://aud1"
+        },
+        {
+          "id": "ef280d98-e942-4515-868d-996143bc6737",
+          "type": "video",
+          "title": "Vid 1",
+          "source": "http://vid1",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "http://vid1"
+        },
+        {
+          "id": "7dd45825-5879-4187-9b4b-bc0a72c41c05",
+          "type": "audio",
+          "title": "Item 1",
+          "source": "item1.mp4",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "item1.mp4"
+        },
+        {
+          "id": "5fd1db5e-459f-4a90-9364-f2ce3cb64132",
+          "type": "audio",
+          "title": "Item 2",
+          "source": "item2.mp4",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "item2.mp4"
+        },
+        {
+          "id": "565d01d3-a29e-4dbf-9bd1-515241d3c3aa",
+          "type": "audio",
+          "title": "Item 1",
+          "source": "item1.mp4",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "item1.mp4"
+        },
+        {
+          "id": "b8446647-5d52-4d14-ad81-e94d4d4d7dee",
+          "type": "audio",
+          "title": "Item 2",
+          "source": "item2.mp4",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "item2.mp4"
+        }
+      ]
+    },
+    "b51d7be2-ed34-4127-8449-efc0c607bdef": {
+      "id": "b51d7be2-ed34-4127-8449-efc0c607bdef",
+      "name": "Test Playlist",
+      "created_at": "2026-03-25T04:15:08Z",
+      "updated_at": "2026-03-25T04:15:08Z",
+      "items": []
+    },
+    "bad16f68-cb05-4110-b407-09d2a61e4a3b": {
+      "id": "bad16f68-cb05-4110-b407-09d2a61e4a3b",
+      "name": "Test Playlist",
+      "created_at": "2026-03-25T04:15:51Z",
+      "updated_at": "2026-03-25T04:15:51Z",
+      "items": []
+    }
+  },
+  "active_playlist_id": "3f185150-61da-4dfd-ac44-0fc9395dc6aa",
+  "playback": {
+    "is_playing": false,
+    "is_paused": false,
+    "repeat": false,
+    "shuffle": false,
+    "current_index": 1,
+    "current_item_id": "ef280d98-e942-4515-868d-996143bc6737",
+    "active_order": [
+      "52ac33bc-d614-4ef4-9ab3-dcb51f20d1bc",
+      "ef280d98-e942-4515-868d-996143bc6737",
+      "7dd45825-5879-4187-9b4b-bc0a72c41c05",
+      "5fd1db5e-459f-4a90-9364-f2ce3cb64132",
+      "565d01d3-a29e-4dbf-9bd1-515241d3c3aa",
+      "b8446647-5d52-4d14-ad81-e94d4d4d7dee"
+    ],
+    "next_order": [],
+    "loop_generation": 0,
+    "image_default_duration_sec": 8,
+    "viewer": {
+      "mode": "detached",
+      "status": "idle",
+      "impl": "webview"
+    }
+  }
+}

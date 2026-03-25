@@ -290,3 +290,11 @@
 ### Logging
 - Maintained the existing lightweight logging strategy. All state transitions (play, pause, next, prev) triggered by the viewer automatically advancing media are processed by the existing endpoints (`/api/remo-player/control`) and logged using `await logger.emit(...)`.
 - Ensured no new heavyweight logging dependencies were introduced during the client-side playback implementation.
+
+## Updates - Today (Remo Player Phase 05)
+
+### Production Hardening & UX
+- **Mobile Interaction Resilience**: Replaced pointer events with robust Drag and Drop API in `web/modules/RemoMediaPlayer.html` for reliable touch reordering on mobile devices.
+- **Unit & Integration Tests**: Added test coverage (`tests/test_remo_player_state.py` and `tests/test_remo_player_api.py`) for API operations and playback state transitions.
+- **Logging & Observability**: Expanded `server.py` logging with detailed event tracking for viewer launches and media playback state changes (using the core lightweight `DiskJournalLogger`).
+- **Schema Migration Strategy**: Added `docs/schema_migration.md` providing rollback-safe guidelines for any future `remo_media_player.json` schema updates.
