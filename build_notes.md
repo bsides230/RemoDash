@@ -265,6 +265,18 @@
 - `RemoPlayer` actions successfully launching the local viewer via `/api/remo-player/viewer/launch` are logged via `await logger.emit(...)`.
 - The logging standard continues to be strictly upheld, ensuring full traceability without heavy dependency introduction.
 
+## Updates - Today (Remo Player Phase 04)
+
+### Shuffle & Repeat Boundary Logic
+- Finalized shuffle preparation logic to ensure a stable, deterministic prepared order rather than item-by-item random picks.
+- Implemented next-loop prebuild trigger that activates during the final 20% of the active order when repeat and shuffle are active.
+- Added boundary exclusion rule: The first 20% of the next prepared shuffle order will not overlap with the last 20% of the previous order (by `media_key`) when possible.
+- Added comprehensive unit tests in `tests/test_remo_player_shuffle_repeat.py` covering boundary avoidance, edge case fallback, and repeat sequence transitions.
+
+### Logging
+- Maintained the existing lightweight logging strategy. No new logging framework dependencies have been added. The precomputed playback sequence and next-loop sequence generation continue to use the established backend routines while the state API natively handles transitions.
+- Existing playback controls (`play`, `next`, `prev`) continue to emit standard `RemoPlayer` logs via `await logger.emit(...)` without modification.
+
 ## Updates - Today (Remo Player Phase 03)
 
 ### Mixed-Media Playback Engine
