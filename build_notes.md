@@ -240,3 +240,13 @@
 - Refactor intentionally preserved the existing lightweight logging approach.
 - No new heavyweight logging dependencies were introduced.
 - Phase prompt files explicitly require logging updates in each phase to keep observability consistent as viewer/playback features expand.
+
+## Updates - 2026-03-26 (Remo Player Phase 01)
+
+### Remo Media Player Endpoint Logging
+- Implemented `await logger.emit(...)` for all `RemoPlayer` actions in `server.py` to preserve the lightweight observability standard.
+- Actions logged include:
+  - Playlist creation and setting active playlists.
+  - Adding, deleting, and reordering items within playlists.
+  - Core control actions (play, pause, next, prev, toggle repeat, toggle shuffle).
+  - Explicit warning logs for invalid control actions and error logs for uncaught exceptions in endpoint execution.

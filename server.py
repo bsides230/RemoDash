@@ -1199,39 +1199,51 @@ async def remo_player_state():
 @app.post("/api/remo-player/playlists", dependencies=[Depends(verify_token)])
 async def remo_create_playlist(req: RemoPlaylistCreateRequest):
     try:
-        return remo_media_manager.create_playlist(req.name)
+        result = remo_media_manager.create_playlist(req.name)
+        await logger.emit("Info", f"Created playlist: {req.name}", "RemoPlayer")
+        return result
     except Exception as e:
+        await logger.emit("Error", f"Failed to create playlist: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/active", dependencies=[Depends(verify_token)])
 async def remo_set_active_playlist(req: RemoSetActivePlaylistRequest):
     try:
         remo_media_manager.set_active_playlist(req.playlist_id)
+        await logger.emit("Info", f"Set active playlist: {req.playlist_id}", "RemoPlayer")
         return {"success": True}
     except Exception as e:
+        await logger.emit("Error", f"Failed to set active playlist: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/{playlist_id}/items", dependencies=[Depends(verify_token)])
 async def remo_add_playlist_item(playlist_id: str, req: RemoPlaylistItemRequest):
     try:
-        return remo_media_manager.add_item(playlist_id, req.dict())
+        result = remo_media_manager.add_item(playlist_id, req.dict())
+        await logger.emit("Info", f"Added item to playlist {playlist_id}: {req.title or req.source}", "RemoPlayer")
+        return result
     except Exception as e:
+        await logger.emit("Error", f"Failed to add item to playlist: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/{playlist_id}/reorder", dependencies=[Depends(verify_token)])
 async def remo_reorder_playlist_item(playlist_id: str, req: RemoPlaylistReorderRequest):
     try:
         remo_media_manager.reorder_item(playlist_id, req.item_id, req.to_index)
+        await logger.emit("Info", f"Reordered item {req.item_id} in playlist {playlist_id} to index {req.to_index}", "RemoPlayer")
         return {"success": True}
     except Exception as e:
+        await logger.emit("Error", f"Failed to reorder item: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/playlists/{playlist_id}/items/delete", dependencies=[Depends(verify_token)])
 async def remo_delete_playlist_item(playlist_id: str, req: RemoPlaylistItemDeleteRequest):
     try:
         remo_media_manager.remove_item(playlist_id, req.item_id)
+        await logger.emit("Info", f"Deleted item {req.item_id} from playlist {playlist_id}", "RemoPlayer")
         return {"success": True}
     except Exception as e:
+        await logger.emit("Error", f"Failed to delete item: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/remo-player/control", dependencies=[Depends(verify_token)])
@@ -1251,11 +1263,15 @@ async def remo_control(req: RemoControlRequest):
         elif action == 'toggle_shuffle':
             remo_media_manager.toggle_shuffle()
         else:
+            await logger.emit("Warning", f"Invalid control action: {action}", "RemoPlayer")
             raise HTTPException(status_code=400, detail='Invalid action')
+
+        await logger.emit("Info", f"Control action executed: {action}", "RemoPlayer")
         return remo_media_manager.get_state()
     except HTTPException:
         raise
     except Exception as e:
+        await logger.emit("Error", f"Control action failed: {str(e)}", "RemoPlayer")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Shortcuts Endpoints ---
