@@ -676,9 +676,8 @@
                 <span class="window-title">Power Options</span>
                 <button class="win-btn" onclick="closePowerModal()">✕</button>
             </div>
-            <button class="power-btn" onclick="confirmPower('restart')">↺ Restart Server</button>
-            <button class="power-btn" onclick="confirmPower('reboot')">⟲ Reboot System</button>
-            <button class="power-btn danger" onclick="confirmPower('shutdown')">⏻ Shutdown System</button>
+            <button class="power-btn" onclick="confirmPower(\'restart\')">↺ Restart</button>
+            <button class="power-btn danger" onclick="confirmPower(\'shutdown\')">⏻ Shutdown</button>
         </div>
     </div>
 
@@ -1000,14 +999,14 @@
             { id: "mod_net", file: "NetworkMonitor.html", name: "Network", icon: "wifi" },
             { id: "mod_logs", file: "LogViewer.html", name: "Logs", icon: "article" },
             { id: "mod_cron", file: "CronManager.html", name: "Cron Jobs", icon: "schedule" },
-            { id: "mod_vlc", file: "VLCControl.html", name: "VLC Player", icon: "play_circle" },
+            { id: "mod_remo_player", file: "RemoMediaPlayer.html", name: "Remo Player", icon: "play_circle" },
             { id: "mod_hw_report", file: "HardwareReport.html", name: "Hardware Report", icon: "hardware" },
         ];
 
         let MODULE_REGISTRY = [...CORE_MODULES];
 
         let appSettings = {
-            activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_vlc'],
+            activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_remo_player'],
             dockPinned: true,
             dockPos: null,
             theme: 'dark', // 'light' or 'dark' (base mode)

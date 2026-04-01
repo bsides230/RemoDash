@@ -1,0 +1,9 @@
+{
+  "id": "mod_services",
+  "name": "Services",
+  "version": "1.0.0",
+  "description": "Manage system services.",
+  "author": "RemoDash",
+  "icon": "settings_applications",
+  "entrypoint": "api:router"
+}

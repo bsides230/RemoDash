@@ -988,9 +988,17 @@ async def health_check():
 # --- Power Endpoints ---
 @app.post("/api/power/restart", dependencies=[Depends(verify_token)])
 async def restart_server():
-    """Restarts the RemoDash server process."""
+    """Restarts the RemoDash server process or system service."""
     try:
-        # We use sys.executable to restart the current script
+        if platform.system() == "Linux":
+            # Check if remodash service exists
+            res = subprocess.run(["systemctl", "is-active", "remodash.service"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # If it's a known service, try to restart it via systemctl
+            # We run it in background because it will kill this process
+            subprocess.Popen(["sudo", "systemctl", "restart", "remodash.service"])
+            return {"success": True, "message": "Service restart initiated"}
+
+        # Fallback for Windows or non-service Linux
         os.execv(sys.executable, [sys.executable] + sys.argv)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2258,7 +2266,17 @@ class TerminalSession:
                     print(f"[Terminal] Spawn failed for {cmd_list}: {e}")
                     return None
 
-            self.process = try_spawn([shell])
+            # On Linux, try sudo bash or sudo su - to get unrestricted root terminal by default
+            # if user does not configure terminal_shell explicitly
+            if not settings_manager.settings.get("terminal_shell"):
+                self.process = try_spawn(["sudo", "su", "-"])
+                if not self.process:
+                    self.process = try_spawn(["sudo", "-s"])
+                if not self.process:
+                    self.process = try_spawn(["sudo", shell])
+
+            if not getattr(self, "process", None) or not self.process:
+                self.process = try_spawn([shell])
 
             if not self.process:
                 # Fallback attempts
