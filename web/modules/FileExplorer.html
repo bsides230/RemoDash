@@ -271,6 +271,9 @@
             <button class="tool-btn" onclick="triggerUpload()">Upload</button>
             <button class="tool-btn" onclick="triggerDownload()">Download</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
+            <button class="tool-btn" id="btn-zip" onclick="triggerArchive()" style="display:none;">Zip</button>
+            <button class="tool-btn" id="btn-unzip" onclick="triggerExtract()" style="display:none;">Unzip</button>
+            <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="togglePinCurrent()">📌 Pin</button>
             <button class="tool-btn" onclick="addToGit()">+ Git</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
@@ -663,12 +666,22 @@
             const tab = tabs[activeTabIndex];
             const btnShortcut = document.getElementById('btn-create-shortcut');
             const btnRunScript = document.getElementById('btn-run-script');
+            const btnZip = document.getElementById('btn-zip');
+            const btnUnzip = document.getElementById('btn-unzip');
             const runnable = ['.py', '.js', '.bat', '.ps1', '.sh', '.exe', '.cmd', '.rb', '.php', '.pl'];
 
             let hasScript = false;
             let showShortcut = false;
+            let showUnzip = false;
+            let hasSelection = tab.selected.size > 0;
 
-            if(tab.selected.size > 0) {
+            if(hasSelection) {
+                if(tab.selected.size === 1) {
+                    const selectedPath = Array.from(tab.selected)[0];
+                    if(selectedPath.toLowerCase().endsWith('.zip')) {
+                        showUnzip = true;
+                    }
+                }
                 for(let path of tab.selected) {
                     const ext = '.' + path.split('.').pop().toLowerCase();
                     if(runnable.includes(ext)) {
@@ -682,6 +695,8 @@
             btnShortcut.style.display = showShortcut ? 'flex' : 'none';
             btnRunScript.disabled = !hasScript;
             btnRunScript.style.opacity = hasScript ? '1' : '0.5';
+            btnZip.style.display = hasSelection ? 'flex' : 'none';
+            btnUnzip.style.display = showUnzip ? 'flex' : 'none';
         }
 
         function runSelectedScripts() {
@@ -1034,6 +1049,79 @@
             xhr.onerror = () => { alert("Upload error"); ui.style.display = 'none'; document.getElementById('inp-upload').value = ''; };
             xhr.send(formData);
         }
+        async function triggerArchive() {
+            const tab = tabs[activeTabIndex];
+            if(tab.selected.size === 0) { alert("Please select items to archive."); return; }
+
+            const destName = prompt("Enter archive name (e.g. archive.zip):", "archive.zip");
+            if(!destName) return;
+
+            const sep = tab.path.includes('\\') ? '\\' : '/';
+            const destPath = tab.path.endsWith(sep) ? tab.path + destName : tab.path + sep + destName;
+
+            const items = Array.from(tab.selected);
+            const btn = document.getElementById('btn-zip');
+            const oldText = btn.innerText;
+            btn.innerText = "Zipping...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/files/archive`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ paths: items, destination: destPath })
+                });
+                if(!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Failed to zip");
+                }
+                reload();
+            } catch(e) {
+                alert(e.message);
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
+            }
+        }
+
+        async function triggerExtract() {
+            const tab = tabs[activeTabIndex];
+            if(tab.selected.size !== 1) return;
+
+            const zipPath = Array.from(tab.selected)[0];
+            if(!zipPath.toLowerCase().endsWith('.zip')) return;
+
+            const defaultFolderName = zipPath.split(/[/\\]/).pop().slice(0, -4);
+            const destName = prompt("Enter extraction folder name:", defaultFolderName);
+            if(!destName) return;
+
+            const sep = tab.path.includes('\\') ? '\\' : '/';
+            const destPath = tab.path.endsWith(sep) ? tab.path + destName : tab.path + sep + destName;
+
+            const btn = document.getElementById('btn-unzip');
+            const oldText = btn.innerText;
+            btn.innerText = "Extracting...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/files/extract`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
+                    body: JSON.stringify({ path: zipPath, destination: destPath })
+                });
+                if(!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Failed to extract");
+                }
+                reload();
+            } catch(e) {
+                alert(e.message);
+            } finally {
+                btn.innerText = oldText;
+                btn.disabled = false;
+            }
+        }
+
         async function triggerDownload() {
             const tab = tabs[activeTabIndex];
             if(tab.selected.size === 0) { alert("Please select files to download."); return; }

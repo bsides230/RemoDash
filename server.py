@@ -655,6 +655,14 @@ class FileOpRequest(BaseModel):
 class FilesListRequest(BaseModel):
     paths: List[str]
 
+class ArchiveRequest(BaseModel):
+    paths: List[str]
+    destination: str
+
+class ExtractRequest(BaseModel):
+    path: str
+    destination: str
+
 class GitRepoRequest(BaseModel):
     path: str
     message: Optional[str] = None
@@ -2699,6 +2707,75 @@ async def download_zip(req: FilesListRequest, background_tasks: BackgroundTasks)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/archive", dependencies=[Depends(verify_token)])
+async def archive_files(req: ArchiveRequest):
+    """Creates a zip archive from a list of files/folders and saves it to a destination path."""
+    if not req.paths:
+        raise HTTPException(status_code=400, detail="No paths provided")
+    if not req.destination:
+        raise HTTPException(status_code=400, detail="No destination provided")
+
+    # Validate all paths
+    valid_paths = []
+    for p in req.paths:
+        try:
+            valid_paths.append(check_path_access(p))
+        except HTTPException:
+            continue
+
+    if not valid_paths:
+        raise HTTPException(status_code=400, detail="No valid paths found")
+
+    try:
+        dest_path = check_path_access(req.destination)
+        # Ensure parent directory exists
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with zipfile.ZipFile(dest_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in valid_paths:
+                if p.is_file():
+                    zf.write(p, arcname=p.name)
+                elif p.is_dir():
+                    # Recursive add
+                    parent_len = len(str(p.parent))
+                    for root, dirs, files in os.walk(p):
+                        for file in files:
+                            abs_path = Path(root) / file
+                            # Relative path inside zip
+                            rel_path = str(abs_path)[parent_len:].strip(os.sep)
+                            zf.write(abs_path, arcname=rel_path)
+
+        return {"success": True, "path": str(dest_path)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/files/extract", dependencies=[Depends(verify_token)])
+async def extract_archive(req: ExtractRequest):
+    """Extracts a zip archive to a destination folder."""
+    try:
+        src = check_path_access(req.path)
+        if not src.is_file() or not src.name.endswith(".zip"):
+            raise HTTPException(status_code=400, detail="Invalid zip file")
+
+        dest = check_path_access(req.destination)
+
+        # Security: check zip entries against zip slip vulnerability
+        with zipfile.ZipFile(src, "r") as zf:
+            for member in zf.infolist():
+                member_path = dest / member.filename
+                # Ensure the resolved member path is under the destination path
+                if not os.path.commonpath([str(dest.resolve()), str(member_path.resolve())]).startswith(str(dest.resolve())):
+                     raise HTTPException(status_code=400, detail="Zip Slip attempt detected")
+
+            zf.extractall(dest)
+
+        return {"success": True}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Logging Endpoints
 @app.get("/api/logs", dependencies=[Depends(verify_token)])
