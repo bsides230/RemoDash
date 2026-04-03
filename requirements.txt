@@ -21,3 +21,4 @@ python-multipart
 sse-starlette
 uvicorn
 websockets
+Pillow
