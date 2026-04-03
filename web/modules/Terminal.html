@@ -181,7 +181,6 @@
             const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
             term.open(wrapper);
-            fitAddon.fit();
 
             // Connect WS
             const termObj = {
@@ -197,14 +196,18 @@
 
             // Handle resizing
             new ResizeObserver(() => {
-                if(wrapper.classList.contains('active')) {
-                     fitAddon.fit();
-                     if(termObj.socket && termObj.connected) {
-                         termObj.socket.send(JSON.stringify({
-                             type: 'resize',
-                             cols: term.cols,
-                             rows: term.rows
-                         }));
+                if(wrapper.classList.contains('active') && wrapper.offsetWidth > 0) {
+                     try {
+                         fitAddon.fit();
+                         if(termObj.socket && termObj.connected) {
+                             termObj.socket.send(JSON.stringify({
+                                 type: 'resize',
+                                 cols: term.cols,
+                                 rows: term.rows
+                             }));
+                         }
+                     } catch(e) {
+                         // DOM element might not be fully attached/visible yet
                      }
                 }
             }).observe(wrapper);
@@ -233,13 +236,17 @@
 
             socket.onopen = () => {
                 termObj.connected = true;
-                termObj.fitAddon.fit();
-                // Send initial resize
-                socket.send(JSON.stringify({
-                    type: 'resize',
-                    cols: termObj.term.cols,
-                    rows: termObj.term.rows
-                }));
+                const wrapper = document.getElementById('wrap_' + termObj.id);
+                if (wrapper && wrapper.classList.contains('active') && wrapper.offsetWidth > 0) {
+                    try {
+                        termObj.fitAddon.fit();
+                        socket.send(JSON.stringify({
+                            type: 'resize',
+                            cols: termObj.term.cols,
+                            rows: termObj.term.rows
+                        }));
+                    } catch(e) {}
+                }
             };
 
             socket.onmessage = (event) => {
@@ -293,7 +300,20 @@
             const t = tabs.find(x => x.id === tabId);
             if(t) {
                 t.term.focus();
-                setTimeout(() => t.fitAddon.fit(), 50);
+                setTimeout(() => {
+                    if (wrapEl && wrapEl.classList.contains('active') && wrapEl.offsetWidth > 0) {
+                        try {
+                            t.fitAddon.fit();
+                            if(t.socket && t.connected) {
+                                t.socket.send(JSON.stringify({
+                                    type: 'resize',
+                                    cols: t.term.cols,
+                                    rows: t.term.rows
+                                }));
+                            }
+                        } catch(e) {}
+                    }
+                }, 50);
             }
         }
 
@@ -328,6 +348,23 @@
                 }
             }
         }
+
+        // Use browser event listener for actual pasting to make copy/paste buttons unnecessary on some browsers, or handle keyboard events
+        window.addEventListener('paste', async (e) => {
+            const t = getActiveTerm();
+            if(!t || !t.connected) return;
+            // Xterm usually handles this internally if focused, but if not:
+            if (!t.term.hasSelection()) {
+               try {
+                   const text = e.clipboardData ? e.clipboardData.getData('text') : await navigator.clipboard.readText();
+                   if(text) {
+                       t.socket.send(JSON.stringify({ type: 'input', data: text }));
+                   }
+               } catch(err) {
+                   console.error("Paste event listener failed", err);
+               }
+            }
+        });
 
         function popOutTab(tabId, e) {
             if(e) e.stopPropagation();
@@ -372,7 +409,12 @@
         window.addEventListener('resize', () => {
             if(activeTabId) {
                 const t = tabs.find(x => x.id === activeTabId);
-                if(t) t.fitAddon.fit();
+                const wrapper = document.getElementById('wrap_' + activeTabId);
+                if(t && wrapper && wrapper.classList.contains('active') && wrapper.offsetWidth > 0) {
+                    try {
+                        t.fitAddon.fit();
+                    } catch(e) {}
+                }
             }
         });
 
@@ -416,8 +458,9 @@
                     t.socket.send(JSON.stringify({ type: 'input', data: text }));
                 }
             } catch(e) {
-                // Fallback: prompt user
-                const text = prompt("Paste text into terminal:");
+                console.error("Clipboard paste failed", e);
+                // Prompt user as last resort fallback if permissions fail
+                const text = prompt("Clipboard access denied. Please manually paste your text here:");
                 if(text) {
                     t.socket.send(JSON.stringify({ type: 'input', data: text }));
                 }

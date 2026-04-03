@@ -274,6 +274,8 @@
             <button class="tool-btn" onclick="togglePinCurrent()">📌 Pin</button>
             <button class="tool-btn" onclick="addToGit()">+ Git</button>
             <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
+            <button class="tool-btn" id="btn-run-script" onclick="runSelectedScripts()" disabled style="opacity: 0.5;">▶ Run Script</button>
+            <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
             <button class="tool-btn" onclick="copySelection()">Copy</button>
             <button class="tool-btn" onclick="cutSelection()">Cut</button>
             <button class="tool-btn" onclick="pasteSelection()">Paste</button>
@@ -659,18 +661,49 @@
 
         function updateToolbar() {
             const tab = tabs[activeTabIndex];
-            const btn = document.getElementById('btn-create-shortcut');
-            const runnable = ['.py', '.js', '.bat', '.ps1', '.sh', '.exe'];
+            const btnShortcut = document.getElementById('btn-create-shortcut');
+            const btnRunScript = document.getElementById('btn-run-script');
+            const runnable = ['.py', '.js', '.bat', '.ps1', '.sh', '.exe', '.cmd', '.rb', '.php', '.pl'];
 
-            if(tab.selected.size === 1) {
-                const path = Array.from(tab.selected)[0];
-                const ext = '.' + path.split('.').pop().toLowerCase();
-                if(runnable.includes(ext)) {
-                    btn.style.display = 'flex';
-                    return;
+            let hasScript = false;
+            let showShortcut = false;
+
+            if(tab.selected.size > 0) {
+                for(let path of tab.selected) {
+                    const ext = '.' + path.split('.').pop().toLowerCase();
+                    if(runnable.includes(ext)) {
+                        hasScript = true;
+                        if(tab.selected.size === 1) showShortcut = true;
+                        break;
+                    }
                 }
             }
-            btn.style.display = 'none';
+
+            btnShortcut.style.display = showShortcut ? 'flex' : 'none';
+            btnRunScript.disabled = !hasScript;
+            btnRunScript.style.opacity = hasScript ? '1' : '0.5';
+        }
+
+        function runSelectedScripts() {
+            const tab = tabs[activeTabIndex];
+            if(tab.selected.size === 0) return;
+
+            const runnable = ['.py', '.js', '.bat', '.ps1', '.sh', '.exe', '.cmd', '.rb', '.php', '.pl'];
+
+            for(let path of tab.selected) {
+                const ext = '.' + path.split('.').pop().toLowerCase();
+                if(runnable.includes(ext)) {
+                    // Send message to dashboard to open Terminal
+                    window.parent.postMessage({
+                        type: 'OPEN_MODULE',
+                        module: 'Terminal',
+                        data: {
+                            run_command: true,
+                            script_path: path
+                        }
+                    }, '*');
+                }
+            }
         }
 
         function navigate(path) {
@@ -722,8 +755,16 @@
             const images = ['png','jpg','jpeg','gif','webp','bmp','svg'];
             const media = ['mp4','mov','mkv','webm','mp3','wav','ogg','m4v'];
             const pdf = ['pdf'];
+            const scripts = ['sh', 'py', 'js', 'bash', 'cmd', 'bat', 'ps1', 'php', 'rb', 'pl'];
 
-            if(images.includes(ext) || media.includes(ext) || pdf.includes(ext)) {
+            if(scripts.includes(ext)) {
+                 // Open script in File Editor in a new tab
+                 window.parent.postMessage({
+                     type: 'OPEN_MODULE',
+                     module: 'FileEditor',
+                     data: { path: item.path }
+                 }, '*');
+            } else if(images.includes(ext) || media.includes(ext) || pdf.includes(ext)) {
                  // Use MediaViewer (generic viewer)
                  window.parent.postMessage({
                      type: 'OPEN_CHILD_WINDOW',

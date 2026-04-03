@@ -110,6 +110,8 @@
     <div id="toolbar">
         <button class="btn" onclick="createNewFile()">New</button>
         <button class="btn" onclick="saveCurrentFile()">Save</button>
+        <div style="width:1px; height:16px; background:var(--border-color); margin:0 4px;"></div>
+        <button class="btn" id="btn-run-script" onclick="runCurrentScript()" style="display:none; color:var(--brand-purple); border-color:var(--brand-purple);">▶ Run</button>
         <button class="btn" onclick="openSettings()">⚙️</button>
         <span class="status" id="status-bar">Ready</span>
     </div>
@@ -292,10 +294,12 @@
         }
 
         function setActiveFile(index) {
+            const btnRun = document.getElementById('btn-run-script');
             if(index < 0 || index >= files.length) {
                 activeFileIndex = -1;
                 cm.getWrapperElement().style.display = 'none';
                 document.getElementById('empty-state').style.display = 'flex';
+                btnRun.style.display = 'none';
                 renderTabs();
                 setStatus('No file');
                 return;
@@ -310,8 +314,36 @@
             cm.swapDoc(file.doc);
             cm.focus();
 
+            // Check if runnable script
+            const runnable = ['py', 'js', 'bat', 'ps1', 'sh', 'exe', 'cmd', 'rb', 'php', 'pl'];
+            const ext = file.name.split('.').pop().toLowerCase();
+            if(file.path && runnable.includes(ext)) {
+                btnRun.style.display = 'block';
+            } else {
+                btnRun.style.display = 'none';
+            }
+
             renderTabs();
             setStatus(file.path);
+        }
+
+        function runCurrentScript() {
+            if(activeFileIndex === -1) return;
+            const file = files[activeFileIndex];
+            if(file.unsaved) {
+                alert("Please save the file before running.");
+                return;
+            }
+            if(!file.path) return;
+
+            window.parent.postMessage({
+                type: 'OPEN_MODULE',
+                module: 'Terminal',
+                data: {
+                    run_command: true,
+                    script_path: file.path
+                }
+            }, '*');
         }
 
         async function closeFile(index, e) {
