@@ -100,6 +100,11 @@
             letter-spacing: 0.05em; cursor: help;
         }
         #sys-cpu { color: var(--brand-color); }
+        #sys-ram { color: var(--text-head); }
+        body.hide-cpu #sys-cpu { display: none; }
+        body.hide-ram #sys-ram { display: none; }
+        body.hide-date #sys-date { display: none; }
+        body.hide-clock #sys-clock { display: none; }
         .bar-btn {
             background: transparent; border: none; color: var(--text-dim);
             cursor: pointer; font-family: 'JetBrains Mono'; font-size: 14px;
@@ -648,6 +653,64 @@
         .power-btn.danger { color: #ff5555; border-color: rgba(255,85,85,0.3); }
         .power-btn.danger:hover { background: #ff5555; color: #fff; }
 
+        /* ICON PICKER OVERLAY */
+        #icon-picker-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); backdrop-filter: blur(10px);
+            z-index: 35000; display: none; flex-direction: column;
+            align-items: center; justify-content: flex-start; padding: 20px;
+            box-sizing: border-box;
+        }
+        #icon-picker-overlay.show { display: flex; }
+        .icon-picker-header {
+            width: 100%; max-width: 700px;
+            display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+        }
+        .icon-picker-header h3 { margin: 0; font-family: 'JetBrains Mono'; color: var(--text-head); font-size: 13px; text-transform: uppercase; flex: 1; }
+        #icon-search {
+            width: 100%; max-width: 700px;
+            padding: 8px 12px; background: var(--bg-panel); border: 1px solid var(--border-color);
+            color: var(--text-head); font-family: var(--font-family-base); border-radius: 6px;
+            margin-bottom: 12px; font-size: 13px; box-sizing: border-box;
+        }
+        #icon-grid {
+            width: 100%; max-width: 700px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+            gap: 6px; overflow-y: auto; flex: 1;
+        }
+        .icon-grid-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 3px; padding: 8px 4px; border-radius: 6px; cursor: pointer;
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            transition: all 0.15s;
+        }
+        .icon-grid-item:hover { background: var(--brand-color-dim); border-color: var(--brand-color); }
+        .icon-grid-item.selected { background: var(--brand-color); border-color: var(--brand-color); color: #fff; }
+        .icon-grid-item span.material-symbols-outlined { font-size: 22px; }
+        .icon-grid-item small { font-size: 7px; color: var(--text-dim); text-align: center; overflow: hidden; white-space: nowrap; max-width: 54px; text-overflow: ellipsis; }
+        .icon-picker-footer {
+            width: 100%; max-width: 700px;
+            display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px;
+        }
+
+        /* ICON SETTINGS PAGE */
+        .icon-row {
+            display: flex; align-items: center; gap: 10px; padding: 8px;
+            background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px;
+            cursor: pointer; transition: border-color 0.2s;
+        }
+        .icon-row:hover { border-color: var(--brand-color); }
+        .icon-row .material-symbols-outlined { font-size: 20px; color: var(--brand-color); flex-shrink: 0; }
+        .icon-row-name { flex: 1; font-size: 12px; }
+        .icon-row-current { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono'; }
+
+        /* MOBILE TOPBAR */
+        @media (max-width: 520px) {
+            #top-system-bar { padding: 0 8px; }
+            .bar-section { gap: 8px; }
+            .bar-btn { font-size: 13px; padding: 3px; }
+            .system-text { font-size: 10px; }
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -656,12 +719,13 @@
         <div class="bar-section">
             <div id="sys-status-server" class="status-light" title="Server Status: Disconnected" onclick="openConnectionPopup()"></div>
             <span class="system-text" id="sys-cpu"></span>
+            <span class="system-text" id="sys-ram"></span>
             <span class="system-text" id="sys-date">...</span>
             <span class="system-text" id="sys-clock">...</span>
             <span class="system-text" id="sys-battery"></span>
         </div>
         <div class="bar-section">
-            <button class="bar-btn" title="Power" onclick="openPowerModal()" ontouchstart="openPowerModal()">⏻</button>
+            <button class="bar-btn" title="Power" onclick="openPowerModal()"><span class="material-symbols-outlined" style="font-size:16px;">power_settings_new</span></button>
             <button class="bar-btn" title="Help" onclick="openWelcome()">?</button>
             <button class="bar-btn" title="Reset Dock" onclick="resetDock()">⚓</button>
             <button class="bar-btn" title="Reset Windows" onclick="resetWindowPositions()">✥</button>
@@ -908,22 +972,50 @@
                 <span>➔</span>
             </div>
 
-            <div class="settings-row" style="margin-top:10px;">
-                <span>Pin Open</span>
+            <div class="settings-row" onclick="openIconSettings()" style="cursor:pointer; background:var(--bg-input); padding:8px; border-radius:6px; margin-top:6px; border:1px solid var(--border-color);">
+                <span>🧩 Icon Pack</span>
+                <span>➔</span>
+            </div>
+
+            <div class="settings-header" style="margin-top:10px;">Top Bar Display</div>
+            <div class="settings-row">
+                <span>Show CPU</span>
                 <label class="toggle-switch">
-                    <input type="checkbox" id="setting-dock-pin" checked onchange="toggleDockPin(this.checked)">
+                    <input type="checkbox" id="setting-show-cpu" checked onchange="toggleBarItem('cpu', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <span>Show RAM</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-show-ram" checked onchange="toggleBarItem('ram', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <span>Show Date</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-show-date" checked onchange="toggleBarItem('date', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="settings-row">
+                <span>Show Clock</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-show-clock" checked onchange="toggleBarItem('clock', this.checked)">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
 
+            <div class="settings-header" style="margin-top:10px;">Font</div>
             <div class="settings-row">
-                <span>Font Size: <b id="font-size-display">12</b>px</span>
+                <span>Size: <b id="font-size-display">12</b>px</span>
                 <input type="range" id="setting-font-size" min="10" max="18" step="1" value="12" oninput="updateFontSize(this.value)">
             </div>
 
             <div class="settings-row">
-                <span>Font Family</span>
-                <select id="setting-font-family" onchange="updateFontFamily(this.value)" style="background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; font-family:var(--font-family-base); max-width: 120px;">
+                <span>Family</span>
+                <select id="setting-font-family" onchange="updateFontFamily(this.value)" style="background:var(--bg-input); color:var(--text-head); border:1px solid var(--border-color); border-radius:4px; font-family:var(--font-family-base); max-width: 140px;">
                     <option value="'Inter', system-ui, sans-serif">Inter (Default)</option>
                 </select>
             </div>
@@ -933,6 +1025,16 @@
 
             <div class="settings-header" style="margin-top:5px;">Modules</div>
             <div id="module-list-container"></div>
+        </div>
+
+        <div id="page-icons" class="settings-page hidden">
+            <div class="settings-nav-header">
+                <button class="settings-back-btn" onclick="showSettingsPage('main')">⬅</button>
+                <span>Icon Pack</span>
+            </div>
+            <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">Click any module icon to change it.</div>
+            <div id="icon-module-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+            <button class="btn-full-width" style="margin-top:10px; border-color:rgba(255,85,85,0.4); color:#ff8888;" onclick="resetAllIcons()">Reset All Icons</button>
         </div>
 
         <div id="page-theme" class="settings-page hidden">
@@ -976,6 +1078,19 @@
         </div>
     </div>
 
+    <div id="icon-picker-overlay">
+        <div class="icon-picker-header">
+            <h3 id="icon-picker-title">Select Icon</h3>
+            <span style="font-size:11px; color:var(--text-dim);" id="icon-picker-subtitle"></span>
+        </div>
+        <input type="text" id="icon-search" placeholder="Search icons..." oninput="filterIcons(this.value)">
+        <div id="icon-grid"></div>
+        <div class="icon-picker-footer">
+            <button class="cta-btn" style="background:transparent; border:1px solid var(--border-color);" onclick="cancelIconPicker()">Cancel</button>
+            <button class="cta-btn" id="icon-picker-confirm" onclick="confirmIconPick()">Apply Icon</button>
+        </div>
+    </div>
+
     <div id="floating-dock">
         <div id="dock-content"></div>
 
@@ -1009,12 +1124,17 @@
             activeModules: ['mod_server_status', 'mod_shortcuts', 'mod_file_explorer', 'mod_terminal', 'mod_file_editor', 'mod_tasks', 'mod_git', 'mod_remo_player'],
             dockPinned: true,
             dockPos: null,
-            theme: 'dark', // 'light' or 'dark' (base mode)
-            activeThemePreset: 'default', // ID of active preset
+            theme: 'dark',
+            activeThemePreset: 'default',
             fontSize: 12,
             brandColor: '#10B981',
             themeWindows: false,
-            customColors: ['#333333', '#333333', '#333333', '#333333']
+            customColors: ['#333333', '#333333', '#333333', '#333333'],
+            showCpu: true,
+            showRam: true,
+            showDate: true,
+            showClock: true,
+            customIcons: {}
         };
 
         const THEME_PRESETS = {
@@ -1066,6 +1186,76 @@
                     '--text-body': '#a0b0a0'
                 },
                 brand: '#4caf50'
+            },
+            'dracula': {
+                name: 'Dracula',
+                colors: {
+                    '--bg-core': '#0d0d1a',
+                    '--bg-panel': '#1a1a2e',
+                    '--border-color': '#44475a',
+                    '--text-body': '#b8bfe8'
+                },
+                brand: '#bd93f9'
+            },
+            'synthwave': {
+                name: 'Synthwave',
+                colors: {
+                    '--bg-core': '#0a0015',
+                    '--bg-panel': '#12002a',
+                    '--border-color': '#ff00ff44',
+                    '--text-body': '#c8a8ff'
+                },
+                brand: '#ff2dff'
+            },
+            'matrix': {
+                name: 'Matrix',
+                colors: {
+                    '--bg-core': '#000500',
+                    '--bg-panel': '#000d00',
+                    '--border-color': '#004400',
+                    '--text-body': '#00bb00'
+                },
+                brand: '#00ff41'
+            },
+            'arctic': {
+                name: 'Arctic',
+                colors: {
+                    '--bg-core': '#1a1f2e',
+                    '--bg-panel': '#232938',
+                    '--border-color': '#3b4a6b',
+                    '--text-body': '#9aa5c4'
+                },
+                brand: '#88c0d0'
+            },
+            'ember': {
+                name: 'Ember',
+                colors: {
+                    '--bg-core': '#120500',
+                    '--bg-panel': '#1e0a00',
+                    '--border-color': '#4a2200',
+                    '--text-body': '#c8a080'
+                },
+                brand: '#ff6a00'
+            },
+            'obsidian': {
+                name: 'Obsidian',
+                colors: {
+                    '--bg-core': '#080808',
+                    '--bg-panel': '#111111',
+                    '--border-color': '#2a2a2a',
+                    '--text-body': '#cccccc'
+                },
+                brand: '#e2e2e2'
+            },
+            'rose': {
+                name: 'Rose Pine',
+                colors: {
+                    '--bg-core': '#191724',
+                    '--bg-panel': '#1f1d2e',
+                    '--border-color': '#403d52',
+                    '--text-body': '#9893a5'
+                },
+                brand: '#eb6f92'
             }
         };
 
@@ -1096,9 +1286,15 @@
             initCustomSlots();
             initFonts();
 
-            document.getElementById('setting-dock-pin').checked = appSettings.dockPinned;
             document.getElementById('setting-theme').checked = (appSettings.theme === 'dark');
             document.getElementById('setting-theme-windows').checked = appSettings.themeWindows || false;
+
+            // Bar display toggles
+            document.getElementById('setting-show-cpu').checked = appSettings.showCpu !== false;
+            document.getElementById('setting-show-ram').checked = appSettings.showRam !== false;
+            document.getElementById('setting-show-date').checked = appSettings.showDate !== false;
+            document.getElementById('setting-show-clock').checked = appSettings.showClock !== false;
+            applyBarVisibility();
 
             // Initialize Font Size Slider
             document.getElementById('setting-font-size').value = appSettings.fontSize;
@@ -1229,7 +1425,8 @@
                 if(isEditMode) btn.classList.add('wiggle');
 
                 btn.id = 'btn_' + mod.id;
-                btn.innerHTML = `<span class="material-symbols-outlined">${mod.icon}</span><div class="active-dot"></div>`;
+                const iconName = (appSettings.customIcons && appSettings.customIcons[mod.id]) || mod.icon;
+                btn.innerHTML = `<span class="material-symbols-outlined">${iconName}</span><div class="active-dot"></div>`;
 
                 btn.onclick = (e) => {
                     e.stopPropagation();
@@ -1267,7 +1464,7 @@
 
                 const dockRect = document.getElementById('floating-dock').getBoundingClientRect();
                 // Estimate height or use fixed
-                const pHeight = 450;
+                const pHeight = Math.min(600, window.innerHeight * 0.8);
                 const pWidth = 260;
 
                 let leftPos = dockRect.left - pWidth - 15;
@@ -1780,13 +1977,11 @@
         }
 
         function resetDock() {
-            // Recalculate center
             const startLeft = (window.innerWidth / 2) - 25;
             const startTop = (window.innerHeight / 2) - 15;
 
             appSettings.dockPos = { left: startLeft, top: startTop };
             appSettings.dockPinned = true;
-            document.getElementById('setting-dock-pin').checked = true;
 
             const dock = document.getElementById('floating-dock');
             dock.style.bottom = 'auto';
@@ -1864,11 +2059,19 @@
             });
         }
 
-        function toggleDockPin(pinned) {
-            appSettings.dockPinned = pinned;
-            const dock = document.getElementById('floating-dock');
-            pinned ? dock.classList.remove('dock-collapsed') : dock.classList.add('dock-collapsed');
+        function toggleBarItem(item, show) {
+            const key = 'show' + item.charAt(0).toUpperCase() + item.slice(1);
+            appSettings[key] = show;
+            applyBarVisibility();
             saveSettings();
+        }
+
+        function applyBarVisibility() {
+            const b = document.body;
+            b.classList.toggle('hide-cpu', !appSettings.showCpu);
+            b.classList.toggle('hide-ram', !appSettings.showRam);
+            b.classList.toggle('hide-date', !appSettings.showDate);
+            b.classList.toggle('hide-clock', !appSettings.showClock);
         }
 
         function togglePin(instanceId, btn) {
@@ -1902,6 +2105,11 @@
             const s = localStorage.getItem('lyrn-settings');
             if(s) appSettings = { ...appSettings, ...JSON.parse(s) };
             if(!appSettings.customColors) appSettings.customColors = ['#333333', '#333333', '#333333', '#333333'];
+            if(!appSettings.customIcons) appSettings.customIcons = {};
+            if(appSettings.showCpu === undefined) appSettings.showCpu = true;
+            if(appSettings.showRam === undefined) appSettings.showRam = true;
+            if(appSettings.showDate === undefined) appSettings.showDate = true;
+            if(appSettings.showClock === undefined) appSettings.showClock = true;
             if(appSettings.theme) document.body.setAttribute('data-theme', appSettings.theme);
         }
 
@@ -2216,12 +2424,12 @@
                 // Trigger Auth Check if connected and not done yet
                 if(!hasCheckedAuth) checkAuth();
 
-                const cpuText = `CPU: ${data.cpu.percent}%`;
-                const ramText = `RAM: ${Math.round(data.ram.percent)}%`;
-                document.getElementById('sys-cpu').innerText = `${cpuText} | ${ramText}`;
+                document.getElementById('sys-cpu').innerText = `CPU: ${data.cpu.percent}%`;
+                document.getElementById('sys-ram').innerText = `| RAM: ${Math.round(data.ram.percent)}%`;
 
             } catch (e) {
                 document.getElementById('sys-cpu').innerText = "";
+                document.getElementById('sys-ram').innerText = "";
                 setLight(srvLight, 'red', 'Disconnected / Offline');
             }
         }
@@ -2509,6 +2717,9 @@
                     document.getElementById('setting-device-name').value = settings.device_name;
                 }
             } catch(e) { console.error(e); }
+
+            // Reload fonts now that we have auth (adds local fonts)
+            initFonts();
         }
 
         async function fetchModules() {
@@ -2630,44 +2841,215 @@
         }
 
         // Font Management
+        const WEB_FONTS = [
+            { name: 'Inter', value: "'Inter', system-ui, sans-serif", url: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap' },
+            { name: 'Roboto', value: "'Roboto', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap' },
+            { name: 'Roboto Mono', value: "'Roboto Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap' },
+            { name: 'JetBrains Mono', value: "'JetBrains Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap' },
+            { name: 'Fira Code', value: "'Fira Code', monospace", url: 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap' },
+            { name: 'Source Code Pro', value: "'Source Code Pro', monospace", url: 'https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap' },
+            { name: 'IBM Plex Mono', value: "'IBM Plex Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap' },
+            { name: 'IBM Plex Sans', value: "'IBM Plex Sans', sans-serif", url: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500&display=swap' },
+            { name: 'Space Grotesk', value: "'Space Grotesk', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap' },
+            { name: 'Space Mono', value: "'Space Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap' },
+            { name: 'DM Mono', value: "'DM Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap' },
+            { name: 'DM Sans', value: "'DM Sans', sans-serif", url: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap' },
+            { name: 'Nunito', value: "'Nunito', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600&display=swap' },
+            { name: 'Outfit', value: "'Outfit', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap' },
+            { name: 'Geist Mono', value: "'Geist Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap' },
+            { name: 'Azeret Mono', value: "'Azeret Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500&display=swap' },
+            { name: 'Syne Mono', value: "'Syne Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Syne+Mono&display=swap' },
+            { name: 'Inconsolata', value: "'Inconsolata', monospace", url: 'https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500&display=swap' },
+            { name: 'Ubuntu Mono', value: "'Ubuntu Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Ubuntu+Mono:wght@400;700&display=swap' },
+            { name: 'Courier Prime', value: "'Courier Prime', monospace", url: 'https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap' },
+            { name: 'Oxanium', value: "'Oxanium', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;600&display=swap' },
+            { name: 'Orbitron', value: "'Orbitron', sans-serif", url: 'https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&display=swap' },
+            { name: 'Share Tech Mono', value: "'Share Tech Mono', monospace", url: 'https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap' },
+            { name: 'VT323', value: "'VT323', monospace", url: 'https://fonts.googleapis.com/css2?family=VT323&display=swap' },
+        ];
+
         async function initFonts() {
-            if(!coreUrl || !authToken) return;
-            try {
-                const res = await fetch(coreUrl + '/api/fonts', { headers: { 'X-Token': authToken } });
-                const fonts = await res.json();
+            const select = document.getElementById('setting-font-family');
+            select.innerHTML = '';
 
-                const select = document.getElementById('setting-font-family');
-                // Keep default
-                select.innerHTML = `<option value="'Inter', system-ui, sans-serif">Inter (Default)</option>`;
+            // Load curated web fonts immediately (no auth needed)
+            WEB_FONTS.forEach(f => {
+                // Inject Google Fonts stylesheet if needed
+                if(f.url && !document.querySelector(`link[href*="${f.name.replace(/ /g, '+')}"]`)) {
+                    const link = document.createElement('link');
+                    link.rel = 'stylesheet';
+                    link.href = f.url;
+                    document.head.appendChild(link);
+                }
+                const opt = document.createElement('option');
+                opt.value = f.value;
+                opt.innerText = f.name;
+                select.appendChild(opt);
+            });
 
-                fonts.forEach(filename => {
-                    // Deduce name: MyFont-Regular.ttf -> MyFont-Regular
-                    const name = filename.split('.').slice(0, -1).join('.');
-                    // Create @font-face style
-                    const style = document.createElement('style');
-                    style.innerHTML = `
-                        @font-face {
-                            font-family: '${name}';
-                            src: url('assets/fonts/${filename}');
-                        }
-                    `;
-                    document.head.appendChild(style);
+            // Load local server fonts (after auth)
+            if(coreUrl && authToken) {
+                try {
+                    const res = await fetch(coreUrl + '/api/fonts', { headers: { 'X-Token': authToken } });
+                    const fonts = await res.json();
+                    fonts.forEach(filename => {
+                        const name = filename.split('.').slice(0, -1).join('.');
+                        // Skip if already listed
+                        if(WEB_FONTS.some(f => f.name === name)) return;
+                        const style = document.createElement('style');
+                        style.innerHTML = `@font-face { font-family: '${name}'; src: url('assets/fonts/${filename}'); }`;
+                        document.head.appendChild(style);
+                        const opt = document.createElement('option');
+                        opt.value = `'${name}', sans-serif`;
+                        opt.innerText = name + ' (Local)';
+                        select.appendChild(opt);
+                    });
+                } catch(e) { console.error("Failed to list local fonts", e); }
+            }
 
-                    const opt = document.createElement('option');
-                    opt.value = `'${name}', sans-serif`;
-                    opt.innerText = name;
-                    select.appendChild(opt);
-                });
-
-                if(appSettings.fontFamily) select.value = appSettings.fontFamily;
-
-            } catch(e) { console.error("Failed to list fonts", e); }
+            if(appSettings.fontFamily) select.value = appSettings.fontFamily;
         }
 
         function updateFontFamily(family, save = true) {
             document.documentElement.style.setProperty('--font-family-base', family);
             appSettings.fontFamily = family;
+
+            const sel = document.getElementById('setting-font-family');
+            if(sel && sel.value !== family) sel.value = family;
+
             if(save) saveSettings();
+
+            // Broadcast to iframes
+            document.querySelectorAll('iframe').forEach(f => {
+                try { f.contentWindow.postMessage({ type: 'FONT_FAMILY_CHANGE', fontFamily: family }, '*'); } catch(e) {}
+            });
+        }
+
+        /* =========================================
+           ICON SETTINGS & PICKER
+           ========================================= */
+        const ALL_ICONS = [
+            'folder','terminal','edit_document','analytics','rocket_launch','bolt','deployed_code',
+            'wifi','article','play_circle','hardware','settings','extension','memory',
+            'storage','cloud','database','security','lock','key','shield','vpn_key','fingerprint',
+            'person','group','admin_panel_settings','manage_accounts','badge','work',
+            'home','desktop_windows','laptop','phone_android','tablet','tv',
+            'code','bug_report','build','construction','engineering','handyman',
+            'search','find_in_page','manage_search','saved_search',
+            'notifications','warning','error','info','help','question_mark',
+            'check_circle','cancel','block','do_not_disturb',
+            'star','favorite','bookmark','label','flag','grade',
+            'download','upload','cloud_download','cloud_upload','sync','refresh',
+            'play_arrow','pause','stop','skip_next','skip_previous','fast_forward',
+            'volume_up','volume_off','mic','mic_off','headphones','speaker',
+            'camera','photo','image','movie','video_camera_front',
+            'map','location_on','place','navigation','explore',
+            'calendar_today','event','schedule','alarm','timer','watch_later',
+            'mail','inbox','send','drafts','chat','forum','message',
+            'link','attach_file','share','open_in_new','launch',
+            'bar_chart','pie_chart','trending_up','show_chart','leaderboard',
+            'inventory','package','archive','unarchive','delete','remove_circle',
+            'add_circle','edit','create','content_copy','content_paste',
+            'power_settings_new','power','electrical_services','battery_full',
+            'network_check','router','dns','hub','lan','cell_tower',
+            'vpn_lock','https','lock_open','encrypted','policy',
+            'auto_fix_high','auto_awesome','flash_on','lightbulb','experiment',
+            'science','biotech','psychology','smart_toy','robot_2',
+            'keyboard','mouse','gamepad','joystick','sports_esports',
+            'dark_mode','light_mode','contrast','palette','format_paint','brush',
+            'hexagon','pentagon','circle','square','diamond','change_history',
+            'blur_on','flare','lens_blur','looks','auto_stories',
+            'widgets','view_module','grid_view','dashboard','web',
+            'apps','app_registration','developer_mode','developer_board',
+            'monitor','monitor_heart','ecg','vital_signs',
+            'table_chart','pivot_table_chart','insert_chart','donut_small',
+            'account_tree','schema','device_hub','mediation','alt_route',
+            'rocket','satellite','antenna','signal_cellular_alt','network_wifi'
+        ];
+
+        let iconPickerTarget = null;
+        let iconPickerSelected = null;
+
+        function openIconSettings() {
+            showSettingsPage('icons');
+            renderIconModuleList();
+        }
+
+        function renderIconModuleList() {
+            const list = document.getElementById('icon-module-list');
+            list.innerHTML = '';
+            MODULE_REGISTRY.forEach(mod => {
+                const currentIcon = (appSettings.customIcons && appSettings.customIcons[mod.id]) || mod.icon;
+                const row = document.createElement('div');
+                row.className = 'icon-row';
+                row.innerHTML = `
+                    <span class="material-symbols-outlined">${currentIcon}</span>
+                    <span class="icon-row-name">${mod.name}</span>
+                    <span class="icon-row-current">${currentIcon}</span>
+                    <span class="material-symbols-outlined" style="font-size:14px; color:var(--text-dim);">chevron_right</span>
+                `;
+                row.onclick = () => openIconPicker(mod);
+                list.appendChild(row);
+            });
+        }
+
+        function openIconPicker(mod) {
+            iconPickerTarget = mod;
+            iconPickerSelected = (appSettings.customIcons && appSettings.customIcons[mod.id]) || mod.icon;
+
+            document.getElementById('icon-picker-title').textContent = 'Choose Icon';
+            document.getElementById('icon-picker-subtitle').textContent = mod.name;
+            document.getElementById('icon-search').value = '';
+
+            renderIconGrid(ALL_ICONS);
+            document.getElementById('icon-picker-overlay').classList.add('show');
+        }
+
+        function renderIconGrid(icons) {
+            const grid = document.getElementById('icon-grid');
+            grid.innerHTML = '';
+            icons.forEach(icon => {
+                const item = document.createElement('div');
+                item.className = 'icon-grid-item' + (icon === iconPickerSelected ? ' selected' : '');
+                item.innerHTML = `<span class="material-symbols-outlined">${icon}</span><small>${icon}</small>`;
+                item.onclick = () => {
+                    document.querySelectorAll('.icon-grid-item.selected').forEach(el => el.classList.remove('selected'));
+                    item.classList.add('selected');
+                    iconPickerSelected = icon;
+                };
+                grid.appendChild(item);
+            });
+        }
+
+        function filterIcons(query) {
+            const q = query.toLowerCase().trim();
+            const filtered = q ? ALL_ICONS.filter(i => i.includes(q)) : ALL_ICONS;
+            renderIconGrid(filtered);
+        }
+
+        function confirmIconPick() {
+            if(!iconPickerTarget || !iconPickerSelected) return;
+            if(!appSettings.customIcons) appSettings.customIcons = {};
+            appSettings.customIcons[iconPickerTarget.id] = iconPickerSelected;
+            saveSettings();
+            renderDock();
+            renderIconModuleList();
+            cancelIconPicker();
+        }
+
+        function cancelIconPicker() {
+            document.getElementById('icon-picker-overlay').classList.remove('show');
+            iconPickerTarget = null;
+            iconPickerSelected = null;
+        }
+
+        function resetAllIcons() {
+            if(confirm('Reset all icons to their defaults?')) {
+                appSettings.customIcons = {};
+                saveSettings();
+                renderDock();
+                renderIconModuleList();
+            }
         }
 
         async function saveFsSecurity() {
