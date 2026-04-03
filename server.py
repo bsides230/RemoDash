@@ -996,20 +996,17 @@ async def health_check():
 # --- Power Endpoints ---
 @app.post("/api/power/restart", dependencies=[Depends(verify_token)])
 async def restart_server():
-    """Restarts the RemoDash server process or system service."""
-    try:
-        if platform.system() == "Linux":
-            # Check if remodash service exists
-            res = subprocess.run(["systemctl", "is-active", "remodash.service"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            # If it's a known service, try to restart it via systemctl
-            # We run it in background because it will kill this process
-            subprocess.Popen(["sudo", "systemctl", "restart", "remodash.service"])
-            return {"success": True, "message": "Service restart initiated"}
-
-        # Fallback for Windows or non-service Linux
-        os.execv(sys.executable, [sys.executable] + sys.argv)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Restarts the RemoDash server process."""
+    import threading
+    def restart():
+        time.sleep(1)
+        if platform.system() == "Windows":
+            subprocess.Popen(["start", "cmd", "/c", f"{sys.executable} server.py"], shell=True)
+        else:
+            subprocess.Popen(["bash", "-c", f"sleep 1 && {sys.executable} server.py &"])
+        os._exit(0)
+    threading.Thread(target=restart).start()
+    return {"success": True}
 
 @app.post("/api/power/reboot", dependencies=[Depends(verify_token)])
 async def reboot_system():
@@ -1097,15 +1094,13 @@ async def git_discard(req: GitRepoRequest):
 
 @app.post("/api/power/shutdown", dependencies=[Depends(verify_token)])
 async def shutdown_system():
-    """Shuts down the host machine."""
-    try:
-        if platform.system() == "Windows":
-            subprocess.run(["shutdown", "/s", "/t", "0"])
-        else:
-            subprocess.run(["sudo", "shutdown", "now"])
-        return {"success": True}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """Shuts down the RemoDash server process."""
+    import threading
+    def shutdown():
+        time.sleep(1)
+        os._exit(0)
+    threading.Thread(target=shutdown).start()
+    return {"success": True}
 
 # --- Task Manager Endpoints ---
 @app.get("/api/tasks", dependencies=[Depends(verify_token)])
