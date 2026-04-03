@@ -102,10 +102,35 @@
             if (e.data.type === 'TOKEN_UPDATE') {
                 authToken = e.data.token;
             }
-            if (e.data.type === 'THEME_CHANGE') {
-                currentTheme = e.data.theme;
-                document.body.setAttribute('data-theme', e.data.theme);
+            if (e.data.type === 'THEME_UPDATE') {
+                if(e.data.theme) {
+                    currentTheme = e.data.theme;
+                    document.body.setAttribute('data-theme', e.data.theme);
+                }
+                if(e.data.brandColor) document.documentElement.style.setProperty('--brand-color', e.data.brandColor);
+                if(e.data.fontSize) document.documentElement.style.setProperty('--font-size-base', e.data.fontSize + 'px');
+                if(e.data.fontFamily) document.body.style.fontFamily = e.data.fontFamily;
+
+                let styleEl = document.getElementById('theme-preset-style');
+                if(e.data.themeCssUrl) {
+                    if(!styleEl) {
+                        styleEl = document.createElement('link');
+                        styleEl.id = 'theme-preset-style';
+                        styleEl.rel = 'stylesheet';
+                        document.head.appendChild(styleEl);
+                    }
+                    if(styleEl.href !== e.data.themeCssUrl) {
+                        styleEl.href = e.data.themeCssUrl;
+                    }
+                } else if(styleEl) {
+                    styleEl.remove();
+                }
+
                 updateAllTerminalsTheme();
+                tabs.forEach(t => {
+                    if(e.data.fontFamily) t.term.options.fontFamily = e.data.fontFamily;
+                    if(e.data.fontSize) t.term.options.fontSize = e.data.fontSize;
+                });
             }
             if (e.data.type === 'ADD_TAB') {
                 // External request to add tab (e.g. from Shortcut)

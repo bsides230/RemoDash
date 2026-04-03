@@ -100,9 +100,13 @@
             letter-spacing: 0.05em; cursor: help;
         }
         #sys-cpu { color: var(--brand-color); }
-        #sys-ram { color: var(--text-head); }
+        #sys-ram { color: var(--brand-color); }
         body.hide-cpu #sys-cpu { display: none; }
         body.hide-ram #sys-ram { display: none; }
+        body:not(.hide-cpu):not(.hide-ram) #sys-ram::before {
+            content: "| ";
+            color: var(--text-dim);
+        }
         body.hide-date #sys-date { display: none; }
         body.hide-clock #sys-clock { display: none; }
         .bar-btn {
@@ -1803,8 +1807,15 @@
             const iframe = win.querySelector('iframe');
             // Inject Font Size on Load
             iframe.onload = () => {
-                iframe.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: appSettings.theme }, '*');
-                iframe.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: appSettings.fontSize }, '*');
+                iframe.contentWindow.postMessage({
+                    type: 'THEME_UPDATE',
+                    theme: appSettings.theme,
+                    brandColor: appSettings.brandColor,
+                    fontSize: appSettings.fontSize,
+                    fontFamily: appSettings.fontFamily,
+                    themePreset: appSettings.themePreset,
+                    themeCssUrl: appSettings.themeCssUrl
+                }, '*');
                 iframe.contentWindow.postMessage({ type: 'CORE_URL_CHANGE', url: coreUrl }, '*');
                 if(authToken) iframe.contentWindow.postMessage({ type: 'TOKEN_UPDATE', token: authToken }, '*');
 
@@ -2034,16 +2045,30 @@
             updateDockIndicators();
         }
 
+        function broadcastThemeUpdate() {
+            const payload = {
+                type: 'THEME_UPDATE',
+                theme: appSettings.theme,
+                brandColor: appSettings.brandColor,
+                fontSize: appSettings.fontSize,
+                fontFamily: appSettings.fontFamily,
+                themePreset: appSettings.themePreset,
+                themeCssUrl: appSettings.themeCssUrl
+            };
+            document.querySelectorAll('iframe').forEach(f => {
+                try {
+                    f.contentWindow.postMessage(payload, '*');
+                } catch(e) {}
+            });
+        }
+
         function toggleTheme(isDark) {
             const theme = isDark ? 'dark' : 'light';
             document.body.setAttribute('data-theme', theme);
             appSettings.theme = theme;
             saveSettings();
 
-            // Broadcast
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'THEME_CHANGE', theme: theme }, '*');
-            });
+            broadcastThemeUpdate();
         }
 
         function updateFontSize(size, save = true) {
@@ -2053,10 +2078,7 @@
             appSettings.fontSize = parseInt(size);
             if(save) saveSettings();
 
-            // Broadcast to all active windows
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'FONT_CHANGE', fontSize: size }, '*');
-            });
+            broadcastThemeUpdate();
         }
 
         function toggleBarItem(item, show) {
@@ -2187,9 +2209,7 @@
             initCustomSlots(); // Update border colors potentially?
 
             // Broadcast
-            document.querySelectorAll('iframe').forEach(f => {
-                f.contentWindow.postMessage({ type: 'COLOR_CHANGE', color: color }, '*');
-            });
+            broadcastThemeUpdate();
         }
 
         function startClock() {
@@ -2425,7 +2445,7 @@
                 if(!hasCheckedAuth) checkAuth();
 
                 document.getElementById('sys-cpu').innerText = `CPU: ${data.cpu.percent}%`;
-                document.getElementById('sys-ram').innerText = `| RAM: ${Math.round(data.ram.percent)}%`;
+                document.getElementById('sys-ram').innerText = `RAM: ${Math.round(data.ram.percent)}%`;
 
             } catch (e) {
                 document.getElementById('sys-cpu').innerText = "";
@@ -2920,9 +2940,7 @@
             if(save) saveSettings();
 
             // Broadcast to iframes
-            document.querySelectorAll('iframe').forEach(f => {
-                try { f.contentWindow.postMessage({ type: 'FONT_FAMILY_CHANGE', fontFamily: family }, '*'); } catch(e) {}
-            });
+            broadcastThemeUpdate();
         }
 
         /* =========================================

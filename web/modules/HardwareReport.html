@@ -150,9 +150,28 @@
                 authToken = data.token;
                 checkDeps();
             }
-            if (data.type === 'THEME_CHANGE') document.body.setAttribute('data-theme', data.theme);
-            if (data.type === 'COLOR_CHANGE') document.documentElement.style.setProperty('--brand-color', data.color);
-            if (data.type === 'FONT_CHANGE') document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
+            if (data.type === 'THEME_UPDATE') {
+                if(data.theme) document.body.setAttribute('data-theme', data.theme);
+                if(data.brandColor) document.documentElement.style.setProperty('--brand-color', data.brandColor);
+                if(data.fontSize) document.documentElement.style.setProperty('--font-size-base', data.fontSize + 'px');
+                if(data.fontFamily) document.body.style.fontFamily = data.fontFamily;
+
+                // NEW: Handle theme presets/CSS injection for module theming
+                let styleEl = document.getElementById('theme-preset-style');
+                if(data.themeCssUrl) {
+                    if(!styleEl) {
+                        styleEl = document.createElement('link');
+                        styleEl.id = 'theme-preset-style';
+                        styleEl.rel = 'stylesheet';
+                        document.head.appendChild(styleEl);
+                    }
+                    if(styleEl.href !== data.themeCssUrl) {
+                        styleEl.href = data.themeCssUrl;
+                    }
+                } else if(styleEl) {
+                    styleEl.remove();
+                }
+            }
         });
 
         async function checkDeps() {
