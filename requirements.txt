@@ -10,3 +10,14 @@ python-crontab
 sse-starlette
 python-multipart
 pytest
+aiofiles
+aiohttp
+fastapi
+GitPython
+psutil
+pydantic
+python-crontab
+python-multipart
+sse-starlette
+uvicorn
+websockets
