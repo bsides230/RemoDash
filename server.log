@@ -1,0 +1,101 @@
+INFO:     Started server process [86796]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8050 (Press CTRL+C to quit)
+[System] Logging to session: logs/session_20260403_033820
+Settings loaded successfully
+[System] Auto-detected terminal shell: /bin/bash
+Settings saved successfully
+[ModuleManager] Loading modules...
+[System] Allowed Origins: ['http://localhost:8050', 'http://127.0.0.1:8050']
+Starting RemoDash server on port 8050...
+[System] Git safe.directory set to '*'
+[Info] System: RemoDash Server started.
+INFO:     127.0.0.1:49612 - "GET /modules/FileExplorer.html?path=/app HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39984 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39984 - "GET /assets/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39984 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39984 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39984 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39988 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40000 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40012 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40014 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40014 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40014 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40012 - "GET /api/modules HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40012 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /assets/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39226 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39226 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39242 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39242 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39242 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39242 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /api/modules HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /modules/FileExplorer.html?path=/app HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39222 - "GET /sw.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:40644 - "GET /modules/FileExplorer.html?path=/app HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56536 - "GET /modules/FileExplorer.html?path=/app HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56536 - "GET /modules/FileExplorer.html?path=/app HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:53248 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /assets/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53250 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53250 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53256 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53250 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /api/modules HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53248 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57230 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57230 - "GET /assets/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57230 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57230 - "GET /manifest.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57246 - "GET /assets/fonts/JetBrainsMono-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57246 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57230 - "GET /api/auth/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "GET /assets/fonts/Inter-Regular.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57246 - "GET /assets/fonts/MaterialSymbolsOutlined.woff2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57246 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "GET /api/modules HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "GET /modules/FileExplorer.html?path=/app HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "GET /api/files/list?path=%2Fapp&sort_by=name&order=asc HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57240 - "GET /sw.js HTTP/1.1" 304 Not Modified
