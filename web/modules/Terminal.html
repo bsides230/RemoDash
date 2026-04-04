@@ -24,6 +24,13 @@
             height: 28px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color);
             display: flex; align-items: center; padding: 0 8px; gap: 4px;
         }
+
+        .mode-selector {
+            margin-left: 8px; background: transparent; border: 1px solid var(--border-color);
+            color: var(--text-dim); padding: 2px 5px; border-radius: 3px;
+            font-size: 11px; cursor: pointer; outline: none;
+        }
+        .mode-selector:hover { border-color: var(--brand-purple); color: #fff; }
         .clip-btn {
             background: transparent; border: 1px solid var(--border-color);
             color: var(--text-dim); padding: 2px 10px; border-radius: 3px;
@@ -72,6 +79,10 @@
 
     <div id="tabs-bar">
         <div class="new-tab-btn" onclick="requestNewSession()">+</div>
+        <select id="new-tab-mode" class="mode-selector">
+            <option value="web">Web Session</option>
+            <option value="pty">Local PTY</option>
+        </select>
     </div>
 
     <div id="clipboard-bar">
@@ -166,10 +177,11 @@
         function requestNewSession(cwd=null, command=null) {
             // Local ID generation
             const id = 'local_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            createTabUI(id, cwd, command);
+            const mode = document.getElementById('new-tab-mode').value;
+            createTabUI(id, cwd, command, mode);
         }
 
-        function createTabUI(sessionId, cwd, command) {
+        function createTabUI(sessionId, cwd, command, mode='web') {
             // Check existence
             if (tabs.find(t => t.id === sessionId)) return;
 
@@ -179,8 +191,9 @@
             const tabEl = document.createElement('div');
             tabEl.className = 'tab';
             tabEl.id = 'tab_' + sessionId;
+            const label = mode === 'pty' ? `Terminal ${tabCounter} (PTY)` : `Terminal ${tabCounter}`;
             tabEl.innerHTML = `
-                <span>Terminal ${tabCounter}</span>
+                <span>${label}</span>
                 <div class="tab-popout" title="Pop Out" onclick="popOutTab('${sessionId}', event)">⇱</div>
                 <div class="tab-close" onclick="requestCloseTab('${sessionId}', event)">✕</div>
             `;
@@ -213,7 +226,8 @@
                 term: term,
                 fitAddon: fitAddon,
                 socket: null,
-                connected: false
+                connected: false,
+                mode: mode
             };
             tabs.push(termObj);
 
@@ -253,6 +267,7 @@
 
             if(cwd) query.push(`cwd=${encodeURIComponent(cwd)}`);
             if(command) query.push(`command=${encodeURIComponent(command)}`);
+            if(termObj.mode) query.push(`mode=${encodeURIComponent(termObj.mode)}`);
 
             if(query.length > 0) wsUrl += `?${query.join('&')}`;
 
