@@ -286,6 +286,7 @@
             <button class="tool-btn" onclick="showCreateModal('file')">+ File</button>
             <button class="tool-btn" onclick="showCreateModal('folder')">+ Folder</button>
             <button class="tool-btn" id="btn-create-shortcut" onclick="showShortcutModal()" style="display:none;">Create Shortcut</button>
+            <button class="tool-btn" onclick="renameSelection()">Rename</button>
             <button class="tool-btn" onclick="deleteSelection()" style="color:#ff5555;">Delete</button>
         </div>
 
@@ -897,6 +898,44 @@
             if(clip.action === 'cut') localStorage.removeItem('lyrn_clipboard');
             if(errors.length > 0) alert("Some operations failed:\n" + errors.join("\n"));
             reload();
+        }
+
+        async function renameSelection() {
+            const tab = tabs[activeTabIndex];
+            if (tab.selected.size !== 1) {
+                alert("Please select exactly one item to rename.");
+                return;
+            }
+
+            const oldPath = Array.from(tab.selected)[0];
+            const parts = oldPath.split(/[/\\]/);
+            const oldName = parts.pop();
+            const parentPath = parts.join(oldPath.includes('\\') ? '\\' : '/');
+
+            const newName = prompt(`Rename '${oldName}' to:`, oldName);
+            if (!newName || newName === oldName) return;
+
+            const sep = oldPath.includes('\\') ? '\\' : '/';
+            const prefix = parentPath === '' ? sep : parentPath + sep;
+            const newPath = prefix + newName;
+
+            try {
+                const res = await fetch(`${coreUrl}/api/files/rename`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Token': authToken},
+                    body: JSON.stringify({ path: oldPath, new_path: newPath })
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    alert(`Rename failed: ${error.detail || res.statusText}`);
+                } else {
+                    tab.selected.clear();
+                    reload();
+                }
+            } catch (e) {
+                alert(`Rename failed: ${e.message}`);
+            }
         }
 
         async function deleteSelection() {
