@@ -2199,7 +2199,7 @@ async def get_sysinfo():
 
 # --- Terminal Logic ---
 
-class TerminalSession:
+class WebTerminalSession:
     def __init__(self, session_id: str, cwd: Optional[str] = None):
         self.id = session_id
         self.created_at = time.time()
@@ -2392,8 +2392,145 @@ class TerminalSession:
         # Cancel reader?
         # if self.reader_task: self.reader_task.cancel()
 
+class LocalPTYSession:
+    def __init__(self, session_id: str, cwd: Optional[str] = None):
+        self.id = session_id
+        self.created_at = time.time()
+        self.cwd = cwd
+        self.cols = 80
+        self.rows = 24
+
+        self.pid = None
+        self.master_fd = None
+        self.os_type = platform.system()
+        self.loop = asyncio.get_running_loop()
+
+        self.history = [] # List of strings
+        self.subscribers: set[WebSocket] = set()
+        self.reader_task = None
+        self.closed = False
+
+        self._start()
+
+    def _start(self):
+        if self.cwd:
+            try:
+                check_path_access(self.cwd)
+            except:
+                self.cwd = None
+
+        if self.os_type == "Windows":
+            # Fallback to subprocess on Windows as PTY fork isn't supported natively
+            self.closed = True
+            self.history.append("Local PTY mode is not supported on Windows. Please use Web Session.\r\n")
+            return
+
+        shell = settings_manager.settings.get("terminal_shell")
+        if not shell:
+            shell = os.environ.get("SHELL", "/bin/bash")
+
+        env = os.environ.copy()
+        env["TERM"] = "xterm-256color"
+
+        print(f"[Terminal] Forking true PTY shell: {shell}")
+
+        try:
+            pid, master_fd = pty.fork()
+            if pid == 0:
+                # Child process
+                if self.cwd:
+                    try:
+                        os.chdir(self.cwd)
+                    except: pass
+                # Replace child process with shell
+                try:
+                    os.execve(shell, [shell], env)
+                except Exception as e:
+                    print(f"Child process failed to execv {shell}: {e}")
+                    os._exit(1)
+            else:
+                # Parent process
+                self.pid = pid
+                self.master_fd = master_fd
+                self.reader_task = asyncio.create_task(self._read_loop())
+        except Exception as e:
+            print(f"[Terminal] PTY fork failed: {e}")
+            self.history.append(f"Error: Failed to start PTY. {str(e)}\r\n")
+            self.close()
+
+    async def _read_loop(self):
+        while not self.closed:
+            data = await self.loop.run_in_executor(None, self._read_linux)
+            if not data:
+                break
+
+            try:
+                text = data.decode(errors="replace")
+                self.history.append(text)
+                if len(self.history) > 1000:
+                    self.history = self.history[-1000:]
+                await self._broadcast(text)
+            except Exception as e:
+                print(f"PTY Read Error: {e}")
+                break
+
+        if not self.closed:
+             msg = "\r\n\x1b[1;31m[Process terminated]\x1b[0m\r\n"
+             self.history.append(msg)
+             await self._broadcast(msg)
+
+        self.close()
+
+    def _read_linux(self):
+        if self.master_fd:
+            try:
+                return os.read(self.master_fd, 1024)
+            except OSError:
+                return b""
+        return b""
+
+    async def _broadcast(self, text: str):
+        msg = json.dumps({"type": "output", "data": text})
+        to_remove = []
+        for ws in self.subscribers:
+            try:
+                await ws.send_text(msg)
+            except:
+                to_remove.append(ws)
+        for ws in to_remove:
+            self.subscribers.discard(ws)
+
+    def write_input(self, data: str):
+        if self.closed: return
+        if self.master_fd:
+            try:
+                os.write(self.master_fd, data.encode())
+            except: pass
+
+    def resize(self, cols, rows):
+        self.cols = cols
+        self.rows = rows
+        if self.os_type != "Windows" and self.master_fd is not None:
+            try:
+                winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+            except: pass
+
+    def close(self):
+        self.closed = True
+        if self.pid:
+            try:
+                os.kill(self.pid, 9)
+            except: pass
+            try:
+                os.waitpid(self.pid, os.WNOHANG)
+            except: pass
+        if self.master_fd:
+            try: os.close(self.master_fd)
+            except: pass
+
 @app.websocket("/api/terminal/{sid}")
-async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None, cwd: Optional[str] = None, command: Optional[str] = None):
+async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str] = None, key: Optional[str] = None, cwd: Optional[str] = None, command: Optional[str] = None, mode: Optional[str] = "web"):
     # Verify Auth
     if not Path("global_flags/no_auth").exists():
         if key:
@@ -2409,7 +2546,10 @@ async def terminal_stream_ws(sid: str, websocket: WebSocket, token: Optional[str
     await websocket.accept()
 
     # Create Local Session
-    session = TerminalSession(sid, cwd=cwd)
+    if mode == "pty":
+        session = LocalPTYSession(sid, cwd=cwd)
+    else:
+        session = WebTerminalSession(sid, cwd=cwd)
     session.subscribers.add(websocket)
 
     # Optional Command Injection
