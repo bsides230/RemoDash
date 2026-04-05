@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RemoDash">
     <title>RemoDash</title>
+    <script src="assets/modals.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" /> -->
@@ -1397,7 +1398,7 @@
             if(/^#[0-9A-F]{6}$/i.test(val)) {
                 updateBrandColor(val);
             } else {
-                alert("Invalid Hex Code (Format: #RRGGBB)");
+                await window.CustomModals.alert("Invalid Hex Code (Format: #RRGGBB)");
             }
         }
 
@@ -1692,8 +1693,8 @@
             }
         }
 
-        function confirmRemoveApp(modId) {
-            if(confirm('Are you sure you want to remove this app from the dock?')) {
+        async function confirmRemoveApp(modId) {
+            if(await window.CustomModals.confirm('Are you sure you want to remove this app from the dock?')) {
                 toggleModuleActive(modId, false);
                 document.querySelectorAll('.edit-popup').forEach(p => p.remove());
             }
@@ -2139,19 +2140,19 @@
         function openPowerModal() { document.getElementById('power-modal').style.display = 'flex'; }
         function closePowerModal() { document.getElementById('power-modal').style.display = 'none'; }
         async function confirmPower(action) {
-            if(confirm("Are you sure you want to " + action + "?")) {
+            if(await window.CustomModals.confirm("Are you sure you want to " + action + "?")) {
                 try {
                     const res = await fetch(coreUrl + '/api/power/' + action, {
                         method: 'POST',
                         headers: { 'X-Token': authToken }
                     });
                     if(res.ok) {
-                        alert("Command sent: " + action);
+                        await window.CustomModals.alert("Command sent: " + action);
                         closePowerModal();
                     } else {
-                        alert("Failed: " + await res.text());
+                        await window.CustomModals.alert("Failed: " + await res.text());
                     }
-                } catch(e) { alert("Error: " + e.message); }
+                } catch(e) { await window.CustomModals.alert("Error: " + e.message); }
             }
         }
 
@@ -2377,7 +2378,7 @@
             if(valid) {
                 authToken = token;
                 if(save.checked) {
-                    if(confirm("Are you sure you want to save this token? Only do this on a trusted device.")) {
+                    if(await window.CustomModals.confirm("Are you sure you want to save this token? Only do this on a trusted device.")) {
                         localStorage.setItem('lyrn_admin_token', token);
                     }
                 }
@@ -2706,7 +2707,7 @@
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify(payload)
                 });
-                alert("Saved. Restart server to apply port changes.");
+                await window.CustomModals.alert("Saved. Restart server to apply port changes.");
                 closeServerConfig();
 
                 // Update local device name if changed
@@ -2715,7 +2716,7 @@
                     document.getElementById('setting-device-name').value = payload.settings.device_name;
                 }
 
-            } catch(e) { alert("Error: " + e.message); }
+            } catch(e) { await window.CustomModals.alert("Error: " + e.message); }
         }
 
         // Service Worker Registration
@@ -2817,7 +2818,7 @@
                 renderExtraRoots();
 
             } catch(e) {
-                alert("Failed to load config: " + e.message);
+                await window.CustomModals.alert("Failed to load config: " + e.message);
                 closeFsSecurity();
             }
         }
@@ -3061,8 +3062,8 @@
             iconPickerSelected = null;
         }
 
-        function resetAllIcons() {
-            if(confirm('Reset all icons to their defaults?')) {
+        async function resetAllIcons() {
+            if(await window.CustomModals.confirm('Reset all icons to their defaults?')) {
                 appSettings.customIcons = {};
                 saveSettings();
                 renderDock();
@@ -3076,9 +3077,9 @@
 
             if (mode === 'open') {
                  const confirmMsg = "I UNDERSTAND THIS GIVES FULL SYSTEM ACCESS";
-                 const input = prompt("WARNING: FULL SYSTEM ACCESS\n\nThis allows RemoDash to modify any file on this system.\n\nType EXACTLY:\n" + confirmMsg);
+                 const input = await window.CustomModals.prompt("WARNING: FULL SYSTEM ACCESS\n\nThis allows RemoDash to modify any file on this system.\n\nType EXACTLY:\n" + confirmMsg);
                  if (input !== confirmMsg) {
-                     alert("Confirmation failed. Mode not changed.");
+                     await window.CustomModals.alert("Confirmation failed. Mode not changed.");
                      return;
                  }
             }
@@ -3086,7 +3087,7 @@
             const root = document.getElementById('inp-fs-root').value.trim();
 
             if (mode === 'jailed' && !root) {
-                alert("Jail Root Directory is required for Jailed mode.");
+                await window.CustomModals.alert("Jail Root Directory is required for Jailed mode.");
                 return;
             }
 
@@ -3104,10 +3105,10 @@
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify({ settings: newSettings })
                 });
-                alert("Security settings saved.");
+                await window.CustomModals.alert("Security settings saved.");
                 closeFsSecurity();
             } catch(e) {
-                alert("Error saving settings: " + e.message);
+                await window.CustomModals.alert("Error saving settings: " + e.message);
             }
         }
     </script>

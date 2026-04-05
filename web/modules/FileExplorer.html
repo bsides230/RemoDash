@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>File Explorer</title>
+    <script src="../assets/modals.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -833,7 +834,7 @@
                  pathsToAdd.push(tab.path);
              }
 
-             if(!confirm(`Add ${pathsToAdd.length} repositories to Git Manager?`)) return;
+             if(!await window.CustomModals.confirm(`Add ${pathsToAdd.length} repositories to Git Manager?`)) return;
 
              for(const p of pathsToAdd) {
                   await fetch(`${coreUrl}/api/git/repos`, {
@@ -842,33 +843,33 @@
                         body: JSON.stringify({ path: p })
                   });
              }
-             alert("Repositories added.");
+             await window.CustomModals.alert("Repositories added.");
              window.parent.postMessage({ type: 'GIT_REPOS_UPDATED' }, '*');
         }
 
         // --- Clipboard (Copy/Cut/Paste/Delete) ---
-        function copySelection() {
+        async function copySelection() {
             const tab = tabs[activeTabIndex];
             if(tab.selected.size === 0) return;
             const items = Array.from(tab.selected);
             localStorage.setItem('lyrn_clipboard', JSON.stringify({ action: 'copy', items: items }));
-            alert(`Copied ${items.length} items.`);
+            await window.CustomModals.alert(`Copied ${items.length} items.`);
         }
 
-        function cutSelection() {
+        async function cutSelection() {
             const tab = tabs[activeTabIndex];
             if(tab.selected.size === 0) return;
             const items = Array.from(tab.selected);
             localStorage.setItem('lyrn_clipboard', JSON.stringify({ action: 'cut', items: items }));
-            alert(`Cut ${items.length} items.`);
+            await window.CustomModals.alert(`Cut ${items.length} items.`);
         }
 
-        async function pasteSelection() {
+        async async function pasteSelection() {
             const clipRaw = localStorage.getItem('lyrn_clipboard');
-            if(!clipRaw) { alert("Nothing in clipboard."); return; }
+            if(!clipRaw) { await window.CustomModals.alert("Nothing in clipboard."); return; }
             const clip = JSON.parse(clipRaw);
             const dest = tabs[activeTabIndex].path;
-            if(!confirm(`${clip.action === 'cut' ? 'Move' : 'Copy'} ${clip.items.length} items to ${dest}?`)) return;
+            if(!await window.CustomModals.confirm(`${clip.action === 'cut' ? 'Move' : 'Copy'} ${clip.items.length} items to ${dest}?`)) return;
 
             let errors = [];
             for (const srcPath of clip.items) {
@@ -896,14 +897,14 @@
                 } catch(e) { errors.push(`${name}: ${e.message}`); }
             }
             if(clip.action === 'cut') localStorage.removeItem('lyrn_clipboard');
-            if(errors.length > 0) alert("Some operations failed:\n" + errors.join("\n"));
+            if(errors.length > 0) await window.CustomModals.alert("Some operations failed:\n" + errors.join("\n"));
             reload();
         }
 
-        async function renameSelection() {
+        async async function renameSelection() {
             const tab = tabs[activeTabIndex];
             if (tab.selected.size !== 1) {
-                alert("Please select exactly one item to rename.");
+                await window.CustomModals.alert("Please select exactly one item to rename.");
                 return;
             }
 
@@ -912,7 +913,7 @@
             const oldName = parts.pop();
             const parentPath = parts.join(oldPath.includes('\\') ? '\\' : '/');
 
-            const newName = prompt(`Rename '${oldName}' to:`, oldName);
+            const newName = await window.CustomModals.prompt(`Rename '${oldName}' to:`, oldName);
             if (!newName || newName === oldName) return;
 
             const sep = oldPath.includes('\\') ? '\\' : '/';
@@ -928,20 +929,20 @@
 
                 if (!res.ok) {
                     const error = await res.json();
-                    alert(`Rename failed: ${error.detail || res.statusText}`);
+                    await window.CustomModals.alert(`Rename failed: ${error.detail || res.statusText}`);
                 } else {
                     tab.selected.clear();
                     reload();
                 }
             } catch (e) {
-                alert(`Rename failed: ${e.message}`);
+                await window.CustomModals.alert(`Rename failed: ${e.message}`);
             }
         }
 
-        async function deleteSelection() {
+        async async function deleteSelection() {
              const tab = tabs[activeTabIndex];
              if(tab.selected.size === 0) return;
-             if(!confirm(`Delete ${tab.selected.size} items?`)) return;
+             if(!await window.CustomModals.confirm(`Delete ${tab.selected.size} items?`)) return;
              for(const path of tab.selected) {
                  await fetch(`${coreUrl}/api/files/delete`, {
                     method: 'POST',
@@ -976,8 +977,8 @@
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify(body)
                 });
-                if(res.ok) { closeModal('modal-create'); reload(); } else alert("Failed to create");
-             } catch(e) { alert(e); }
+                if(res.ok) { closeModal('modal-create'); reload(); } else await window.CustomModals.alert("Failed to create");
+             } catch(e) { await window.CustomModals.alert(e); }
         };
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         function reload() { refreshTab(); }
@@ -1018,11 +1019,11 @@
                     headers: { 'Content-Type': 'application/json', 'X-Token': authToken },
                     body: JSON.stringify(payload)
                 });
-                if(res.ok) { closeModal('modal-shortcut'); alert("Shortcut created!"); } else alert("Error: " + await res.text());
-            } catch(e) { alert("Error: " + e.message); }
+                if(res.ok) { closeModal('modal-shortcut'); await window.CustomModals.alert("Shortcut created!"); } else await window.CustomModals.alert("Error: " + await res.text());
+            } catch(e) { await window.CustomModals.alert("Error: " + e.message); }
         }
 
-        function togglePinCurrent() {
+        async function togglePinCurrent() {
              const tab = tabs[activeTabIndex];
              const path = tab.path;
              const name = path.split(/[/\\]/).pop() || path;
@@ -1035,7 +1036,7 @@
 
              // Check if exists
              if(userFavs.find(f => f.path === path)) {
-                 alert("Already pinned.");
+                 await window.CustomModals.alert("Already pinned.");
                  return;
              }
 
@@ -1099,17 +1100,17 @@
             };
             xhr.onload = () => {
                 if(xhr.status === 200) { bar.style.width = '100%'; txt.innerText = '100%'; setTimeout(() => { ui.style.display = 'none'; reload(); }, 1000); }
-                else { alert("Upload failed"); ui.style.display = 'none'; }
+                else { await window.CustomModals.alert("Upload failed"); ui.style.display = 'none'; }
                 document.getElementById('inp-upload').value = '';
             };
-            xhr.onerror = () => { alert("Upload error"); ui.style.display = 'none'; document.getElementById('inp-upload').value = ''; };
+            xhr.onerror = () => { await window.CustomModals.alert("Upload error"); ui.style.display = 'none'; document.getElementById('inp-upload').value = ''; };
             xhr.send(formData);
         }
         async function triggerArchive() {
             const tab = tabs[activeTabIndex];
-            if(tab.selected.size === 0) { alert("Please select items to archive."); return; }
+            if(tab.selected.size === 0) { await window.CustomModals.alert("Please select items to archive."); return; }
 
-            const destName = prompt("Enter archive name (e.g. archive.zip):", "archive.zip");
+            const destName = await window.CustomModals.prompt("Enter archive name (e.g. archive.zip):", "archive.zip");
             if(!destName) return;
 
             const sep = tab.path.includes('\\') ? '\\' : '/';
@@ -1133,7 +1134,7 @@
                 }
                 reload();
             } catch(e) {
-                alert(e.message);
+                await window.CustomModals.alert(e.message);
             } finally {
                 btn.innerText = oldText;
                 btn.disabled = false;
@@ -1148,7 +1149,7 @@
             if(!zipPath.toLowerCase().endsWith('.zip')) return;
 
             const defaultFolderName = zipPath.split(/[/\\]/).pop().slice(0, -4);
-            const destName = prompt("Enter extraction folder name:", defaultFolderName);
+            const destName = await window.CustomModals.prompt("Enter extraction folder name:", defaultFolderName);
             if(!destName) return;
 
             const sep = tab.path.includes('\\') ? '\\' : '/';
@@ -1171,7 +1172,7 @@
                 }
                 reload();
             } catch(e) {
-                alert(e.message);
+                await window.CustomModals.alert(e.message);
             } finally {
                 btn.innerText = oldText;
                 btn.disabled = false;
@@ -1180,7 +1181,7 @@
 
         async function triggerDownload() {
             const tab = tabs[activeTabIndex];
-            if(tab.selected.size === 0) { alert("Please select files to download."); return; }
+            if(tab.selected.size === 0) { await window.CustomModals.alert("Please select files to download."); return; }
             const items = Array.from(tab.selected);
             if(items.length === 1) {
                 const path = items[0];
@@ -1200,7 +1201,7 @@
                         a.download = item?.name || path.split(/[/\\]/).pop() || 'download';
                         document.body.appendChild(a); a.click(); a.remove();
                         window.URL.revokeObjectURL(url);
-                    } catch(e) { alert("Download failed: " + e.message); }
+                    } catch(e) { await window.CustomModals.alert("Download failed: " + e.message); }
                     return;
                 }
             }
@@ -1216,7 +1217,7 @@
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.href = url; a.download = "archive.zip";
                 document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
-            } catch(e) { alert("Download failed: " + e.message); } finally { btn.innerText = oldText; btn.disabled = false; }
+            } catch(e) { await window.CustomModals.alert("Download failed: " + e.message); } finally { btn.innerText = oldText; btn.disabled = false; }
         }
     </script>
 </body>
