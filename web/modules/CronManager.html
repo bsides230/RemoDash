@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Cron Manager</title>
+    <script src="../assets/modals.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -128,7 +129,7 @@
 
         async function saveCron() {
             if(!coreUrl || !authToken) return;
-            if(!confirm("Overwrite crontab with these contents?")) return;
+            if(!await window.CustomModals.confirm("Overwrite crontab with these contents?")) return;
             const lines = document.getElementById('cron-editor').value;
 
             try {
@@ -142,15 +143,15 @@
                 });
 
                 if(res.ok) {
-                    alert("Crontab saved successfully.");
+                    await window.CustomModals.alert("Crontab saved successfully.");
                 } else if(res.status === 501) {
-                    alert("Crontab is not available on this system.");
+                    await window.CustomModals.alert("Crontab is not available on this system.");
                 } else {
                     const txt = await res.text();
-                    alert("Error saving: " + txt);
+                    await window.CustomModals.alert("Error saving: " + txt);
                 }
             } catch(e) {
-                alert("Connection Error: " + e.message);
+                await window.CustomModals.alert("Connection Error: " + e.message);
             }
         }
 

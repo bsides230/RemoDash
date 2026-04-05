@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Hardware Report</title>
+    <script src="../assets/modals.js"></script>
     <link rel="stylesheet" href="../assets/style.css">
     <style>
         :root {
@@ -244,7 +245,7 @@
             const content = document.getElementById('report-output').value;
             if (!content) return;
 
-            if(!confirm("Save report to server's ~/Documents folder?")) return;
+            if(!await window.CustomModals.confirm("Save report to server's ~/Documents folder?")) return;
 
             try {
                 const res = await fetch(`${coreUrl}/api/hw_report/save`, {
@@ -257,12 +258,12 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert("Report saved to: " + data.path);
+                    await window.CustomModals.alert("Report saved to: " + data.path);
                 } else {
-                    alert("Failed to save report.");
+                    await window.CustomModals.alert("Failed to save report.");
                 }
             } catch (e) {
-                alert("Error: " + e.message);
+                await window.CustomModals.alert("Error: " + e.message);
             }
         }
     </script>

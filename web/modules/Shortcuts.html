@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Shortcuts</title>
+    <script src="../assets/modals.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -370,7 +371,7 @@
             };
 
             if(!data.name || !data.path) {
-                alert("Name and Path are required.");
+                await window.CustomModals.alert("Name and Path are required.");
                 return;
             }
 
@@ -395,20 +396,20 @@
                     closeModal('modal-edit');
                     loadShortcuts();
                 } else {
-                    alert("Error saving: " + await res.text());
+                    await window.CustomModals.alert("Error saving: " + await res.text());
                 }
-            } catch(e) { alert(e.message); }
+            } catch(e) { await window.CustomModals.alert(e.message); }
         }
 
-        async function deleteShortcut(id) {
-            if(!confirm("Delete this shortcut?")) return;
+        async async function deleteShortcut(id) {
+            if(!await window.CustomModals.confirm("Delete this shortcut?")) return;
             try {
                 await fetch(`${coreUrl}/api/shortcuts/${id}`, {
                     method: 'DELETE',
                     headers: { 'X-Token': authToken }
                 });
                 loadShortcuts();
-            } catch(e) { alert(e); }
+            } catch(e) { await window.CustomModals.alert(e); }
         }
 
         function closeModal(id) {
@@ -417,10 +418,10 @@
 
         // --- Execution ---
 
-        function confirmRun(id) {
+        async function confirmRun(id) {
             const s = shortcuts.find(x => x.id === id);
             if(!s) return;
-            if(confirm(`Run shortcut "${s.name}"?`)) {
+            if(await window.CustomModals.confirm(`Run shortcut "${s.name}"?`)) {
                 runShortcut(id);
             }
         }
@@ -448,9 +449,9 @@
                             command: data.command
                         }, '*');
                     } else {
-                        alert("Unexpected response: " + JSON.stringify(data));
+                        await window.CustomModals.alert("Unexpected response: " + JSON.stringify(data));
                     }
-                } catch(e) { alert("Failed to initiate terminal run: " + e.message); }
+                } catch(e) { await window.CustomModals.alert("Failed to initiate terminal run: " + e.message); }
                 return;
             }
 

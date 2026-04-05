@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Terminal</title>
+    <script src="../assets/modals.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <style>
         :root {
@@ -500,7 +501,7 @@
             } catch(e) {
                 console.error("Clipboard paste failed", e);
                 // Prompt user as last resort fallback if permissions fail
-                const text = prompt("Clipboard access denied. Please manually paste your text here:");
+                const text = await window.CustomModals.prompt("Clipboard access denied. Please manually paste your text here:");
                 if(text) {
                     t.socket.send(JSON.stringify({ type: 'input', data: text }));
                 }
