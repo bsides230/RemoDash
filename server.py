@@ -2766,11 +2766,11 @@ async def copy_item(data: FileOpRequest):
         check_path_access(str(dst))
 
         if src.is_dir():
-            await asyncio.to_thread(shutil.copytree, src, dst)
+            shutil.copytree(src, dst)
         else:
             # Ensure parent directory exists
             dst.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread(shutil.copy2, src, dst)
+            shutil.copy2(src, dst)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -2823,22 +2823,19 @@ async def download_zip(req: FilesListRequest, background_tasks: BackgroundTasks)
         fd, temp_path = tempfile.mkstemp(suffix=".zip")
         os.close(fd)
 
-        def _create_zip():
-            with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                for p in valid_paths:
-                    if p.is_file():
-                        zf.write(p, arcname=p.name)
-                    elif p.is_dir():
-                        # Recursive add
-                        parent_len = len(str(p.parent))
-                        for root, dirs, files in os.walk(p):
-                            for file in files:
-                                abs_path = Path(root) / file
-                                # Relative path inside zip
-                                rel_path = str(abs_path)[parent_len:].strip(os.sep)
-                                zf.write(abs_path, arcname=rel_path)
-
-        await asyncio.to_thread(_create_zip)
+        with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in valid_paths:
+                if p.is_file():
+                    zf.write(p, arcname=p.name)
+                elif p.is_dir():
+                    # Recursive add
+                    parent_len = len(str(p.parent))
+                    for root, dirs, files in os.walk(p):
+                        for file in files:
+                            abs_path = Path(root) / file
+                            # Relative path inside zip
+                            rel_path = str(abs_path)[parent_len:].strip(os.sep)
+                            zf.write(abs_path, arcname=rel_path)
 
         background_tasks.add_task(os.unlink, temp_path)
         return FileResponse(temp_path, filename="archive.zip", media_type="application/zip")
@@ -2870,22 +2867,20 @@ async def archive_files(req: ArchiveRequest):
         # Ensure parent directory exists
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        def _archive():
-            with zipfile.ZipFile(dest_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                for p in valid_paths:
-                    if p.is_file():
-                        zf.write(p, arcname=p.name)
-                    elif p.is_dir():
-                        # Recursive add
-                        parent_len = len(str(p.parent))
-                        for root, dirs, files in os.walk(p):
-                            for file in files:
-                                abs_path = Path(root) / file
-                                # Relative path inside zip
-                                rel_path = str(abs_path)[parent_len:].strip(os.sep)
-                                zf.write(abs_path, arcname=rel_path)
+        with zipfile.ZipFile(dest_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in valid_paths:
+                if p.is_file():
+                    zf.write(p, arcname=p.name)
+                elif p.is_dir():
+                    # Recursive add
+                    parent_len = len(str(p.parent))
+                    for root, dirs, files in os.walk(p):
+                        for file in files:
+                            abs_path = Path(root) / file
+                            # Relative path inside zip
+                            rel_path = str(abs_path)[parent_len:].strip(os.sep)
+                            zf.write(abs_path, arcname=rel_path)
 
-        await asyncio.to_thread(_archive)
         return {"success": True, "path": str(dest_path)}
 
     except Exception as e:
@@ -2901,18 +2896,16 @@ async def extract_archive(req: ExtractRequest):
 
         dest = check_path_access(req.destination)
 
-        def _extract():
-            # Security: check zip entries against zip slip vulnerability
-            with zipfile.ZipFile(src, "r") as zf:
-                for member in zf.infolist():
-                    member_path = dest / member.filename
-                    # Ensure the resolved member path is under the destination path
-                    if not os.path.commonpath([str(dest.resolve()), str(member_path.resolve())]).startswith(str(dest.resolve())):
-                         raise ValueError("Zip Slip attempt detected")
+        # Security: check zip entries against zip slip vulnerability
+        with zipfile.ZipFile(src, "r") as zf:
+            for member in zf.infolist():
+                member_path = dest / member.filename
+                # Ensure the resolved member path is under the destination path
+                if not os.path.commonpath([str(dest.resolve()), str(member_path.resolve())]).startswith(str(dest.resolve())):
+                     raise HTTPException(status_code=400, detail="Zip Slip attempt detected")
 
-                zf.extractall(dest)
+            zf.extractall(dest)
 
-        await asyncio.to_thread(_extract)
         return {"success": True}
 
     except Exception as e:
