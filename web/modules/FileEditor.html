@@ -280,7 +280,7 @@
             if(cm) cm.refresh();
         }
 
-        async async function openFile(path, name) {
+        async function openFile(path, name) {
             // Check if open
             const existingIdx = files.findIndex(f => f.path === path);
             if(existingIdx > -1) {
@@ -315,7 +315,7 @@
 
             } catch(e) {
                 setStatus('Error: ' + e.message);
-                await window.CustomModals.alert("Could not open file: " + e.message);
+                alert("Could not open file: " + e.message);
             }
         }
 
@@ -357,7 +357,7 @@
             if(activeFileIndex === -1) return;
             const file = files[activeFileIndex];
             if(file.unsaved) {
-                await window.CustomModals.alert("Please save the file before running.");
+                alert("Please save the file before running.");
                 return;
             }
             if(!file.path) return;
@@ -372,17 +372,17 @@
             }, '*');
         }
 
-        async async function closeFile(index, e) {
+        async function closeFile(index, e) {
             if(e) e.stopPropagation();
             if(files[index].unsaved) {
-                if(await window.CustomModals.confirm(`Save changes to ${files[index].name} before closing?`)) {
+                if(confirm(`Save changes to ${files[index].name} before closing?`)) {
                     // User wants to save first
                     const prev = activeFileIndex;
                     activeFileIndex = index;
                     await saveCurrentFile();
                     activeFileIndex = prev;
                 } else {
-                    if(!await window.CustomModals.confirm("Discard unsaved changes?")) return;
+                    if(!confirm("Discard unsaved changes?")) return;
                 }
             }
 
@@ -416,13 +416,13 @@
                 } else {
                     // Default path exists and not always asking -> ask for filename
                     const base = editorSettings.defaultPath.endsWith('/') ? editorSettings.defaultPath : editorSettings.defaultPath + '/';
-                    const filename = await window.CustomModals.prompt("Enter filename:", file.name);
+                    const filename = prompt("Enter filename:", file.name);
                     if(!filename) return; // Cancelled
                     targetPath = base + filename;
                 }
 
                 if (!targetPath) {
-                    const userPath = await window.CustomModals.prompt(promptMsg, initialPath);
+                    const userPath = prompt(promptMsg, initialPath);
                     if (!userPath) return; // Cancelled
                     targetPath = userPath;
                 }
@@ -450,11 +450,11 @@
                 } else {
                     const errText = await res.text();
                     setStatus('Save Failed');
-                    await window.CustomModals.alert("Save failed: " + errText);
+                    alert("Save failed: " + errText);
                 }
             } catch(e) {
                 setStatus('Error: ' + e.message);
-                await window.CustomModals.alert("Error saving: " + e.message);
+                alert("Error saving: " + e.message);
             }
         }
 

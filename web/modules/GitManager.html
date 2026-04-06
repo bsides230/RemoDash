@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Git Manager</title>
-    <script src="../assets/modals.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -686,7 +685,7 @@
             if(res && res.success) {
                 await loadRepoDetails();
             } else {
-                await window.CustomModals.alert("Branch checkout failed: " + (res.error || "Unknown Error"));
+                alert("Branch checkout failed: " + (res.error || "Unknown Error"));
             }
         }
 
@@ -694,10 +693,10 @@
             if(!currentRepoPath) return;
             const res = await fetchAPI('/api/git/fetch', 'POST', { path: currentRepoPath });
             if(res && res.success) {
-                await window.CustomModals.alert("Fetch successful.");
+                alert("Fetch successful.");
                 await loadRepoDetails();
             } else {
-                await window.CustomModals.alert("Fetch failed: " + (res.error || "Unknown Error"));
+                alert("Fetch failed: " + (res.error || "Unknown Error"));
             }
         }
 
@@ -773,10 +772,10 @@
 
         async function doCommit() {
             const msg = document.getElementById('commit-msg').value;
-            if(!msg) { await window.CustomModals.alert("Please enter a commit message."); return; }
+            if(!msg) { alert("Please enter a commit message."); return; }
 
             const checkboxes = document.querySelectorAll('.file-chk:checked');
-            if(checkboxes.length === 0) { await window.CustomModals.alert("No files selected."); return; }
+            if(checkboxes.length === 0) { alert("No files selected."); return; }
 
             const filesToCommit = Array.from(checkboxes).map(cb => cb.dataset.file);
 
@@ -795,7 +794,7 @@
                 loadRepoDetails();
                 document.getElementById('diff-content').innerHTML = '';
             } else {
-                await window.CustomModals.alert("Commit Failed: " + (res.error || "Unknown Error"));
+                alert("Commit Failed: " + (res.error || "Unknown Error"));
             }
 
             btn.innerText = "Commit to " + document.getElementById('current-branch').innerText;
@@ -803,19 +802,19 @@
         }
 
         async function doPush() {
-            if(!await window.CustomModals.confirm("Push to origin?")) return;
+            if(!confirm("Push to origin?")) return;
             const res = await fetchAPI('/api/git/push', 'POST', { path: currentRepoPath });
-            if(res && res.success) await window.CustomModals.alert("Push Successful");
-            else await window.CustomModals.alert("Push Failed: " + (res.error || "Unknown Error"));
+            if(res && res.success) alert("Push Successful");
+            else alert("Push Failed: " + (res.error || "Unknown Error"));
             loadRepoDetails();
         }
 
         async function doPull() {
              const res = await fetchAPI('/api/git/pull', 'POST', { path: currentRepoPath });
              if(res && res.success) {
-                 await window.CustomModals.alert("Pull Successful");
+                 alert("Pull Successful");
                  loadRepoDetails();
-             } else await window.CustomModals.alert("Pull Failed: " + (res.error || "Unknown Error"));
+             } else alert("Pull Failed: " + (res.error || "Unknown Error"));
         }
 
         async function showBranchManager() {
@@ -828,7 +827,7 @@
             if(!currentRepoPath) return;
             const data = await fetchAPI('/api/git/branches?path=' + encodeURIComponent(currentRepoPath));
             if(!data || data.error) {
-                await window.CustomModals.alert("Failed to load branches: " + (data?.error || "Unknown Error"));
+                alert("Failed to load branches: " + (data?.error || "Unknown Error"));
                 return;
             }
             branchState = data;
@@ -885,14 +884,14 @@
                 await loadRepoDetails();
                 await refreshBranchData();
             } else {
-                await window.CustomModals.alert("Switch failed: " + (res.error || "Unknown Error"));
+                alert("Switch failed: " + (res.error || "Unknown Error"));
             }
         }
 
         async function createBranch() {
             const branch = document.getElementById('inp-new-branch').value.trim();
             const start = document.getElementById('inp-new-branch-start').value.trim();
-            if(!branch) { await window.CustomModals.alert("Branch name is required."); return; }
+            if(!branch) { alert("Branch name is required."); return; }
             const res = await fetchAPI('/api/git/branches/create', 'POST', {
                 path: currentRepoPath,
                 branch,
@@ -905,7 +904,7 @@
                 await loadRepoDetails();
                 await refreshBranchData();
             } else {
-                await window.CustomModals.alert("Create branch failed: " + (res.error || "Unknown Error"));
+                alert("Create branch failed: " + (res.error || "Unknown Error"));
             }
         }
 
@@ -921,12 +920,12 @@
                 await loadRepoDetails();
                 await refreshBranchData();
             } else {
-                await window.CustomModals.alert("Remote checkout failed: " + (res.error || "Unknown Error"));
+                alert("Remote checkout failed: " + (res.error || "Unknown Error"));
             }
         }
 
         async function deleteBranch(branchName) {
-            if(!await window.CustomModals.confirm(`Delete local branch '${branchName}'?`)) return;
+            if(!confirm(`Delete local branch '${branchName}'?`)) return;
             const res = await fetchAPI('/api/git/branches/delete', 'POST', {
                 path: currentRepoPath,
                 branch: branchName
@@ -935,26 +934,26 @@
                 await refreshBranchData();
                 await loadRepoDetails();
             } else {
-                await window.CustomModals.alert("Delete failed: " + (res.error || "Unknown Error"));
+                alert("Delete failed: " + (res.error || "Unknown Error"));
             }
         }
 
         async function doStash() {
-             const msg = await window.CustomModals.prompt("Stash Message (Optional):");
+             const msg = prompt("Stash Message (Optional):");
              if(msg === null) return;
              const res = await fetchAPI('/api/git/stash', 'POST', { path: currentRepoPath, message: msg });
              if(res && res.success) {
-                 await window.CustomModals.alert("Stashed.");
+                 alert("Stashed.");
                  loadRepoDetails();
-             } else await window.CustomModals.alert("Stash Failed: " + (res.error || "Unknown Error"));
+             } else alert("Stash Failed: " + (res.error || "Unknown Error"));
         }
 
         async function doStashPop() {
              const res = await fetchAPI('/api/git/stash/pop', 'POST', { path: currentRepoPath });
              if(res && res.success) {
-                 await window.CustomModals.alert("Popped Stash.");
+                 alert("Popped Stash.");
                  loadRepoDetails();
-             } else await window.CustomModals.alert("Pop Failed: " + (res.error || "Unknown Error"));
+             } else alert("Pop Failed: " + (res.error || "Unknown Error"));
         }
 
         async function openInExplorer() {
@@ -987,10 +986,10 @@
             });
             if(res && res.success) {
                 closeGitIgnoreModal();
-                await window.CustomModals.alert(".gitignore saved.");
+                alert(".gitignore saved.");
                 await loadRepoDetails();
             } else {
-                await window.CustomModals.alert("Failed to save .gitignore: " + (res.error || "Unknown Error"));
+                alert("Failed to save .gitignore: " + (res.error || "Unknown Error"));
             }
         }
 
@@ -998,7 +997,7 @@
             event.stopPropagation();
             if(!currentRepoPath || !file) return;
 
-            if(!await window.CustomModals.confirm(`Add '${file}' to .gitignore?`)) return;
+            if(!confirm(`Add '${file}' to .gitignore?`)) return;
 
             // Fetch current .gitignore
             const res = await fetchAPI('/api/fs/read?path=' + encodeURIComponent(currentRepoPath + '/.gitignore'));
@@ -1015,10 +1014,10 @@
             });
 
             if(writeRes && writeRes.success) {
-                await window.CustomModals.alert(`Added ${file} to .gitignore`);
+                alert(`Added ${file} to .gitignore`);
                 await loadRepoDetails();
             } else {
-                await window.CustomModals.alert("Failed to update .gitignore: " + (writeRes.error || "Unknown Error"));
+                alert("Failed to update .gitignore: " + (writeRes.error || "Unknown Error"));
             }
         }
 
@@ -1029,19 +1028,19 @@
 
              if(checkboxes.length > 0) {
                  files = Array.from(checkboxes).map(cb => cb.dataset.file);
-                 if(!await window.CustomModals.confirm(`Discard changes for ${files.length} selected files?`)) return;
+                 if(!confirm(`Discard changes for ${files.length} selected files?`)) return;
              } else {
-                 if(!await window.CustomModals.confirm("Discard ALL changes in repository? This cannot be undone.")) return;
+                 if(!confirm("Discard ALL changes in repository? This cannot be undone.")) return;
              }
 
              const res = await fetchAPI('/api/git/discard', 'POST', { path: currentRepoPath, files: files });
              if(res && res.success) {
                  loadRepoDetails();
-             } else await window.CustomModals.alert("Discard Failed: " + (res.error || "Unknown Error"));
+             } else alert("Discard Failed: " + (res.error || "Unknown Error"));
         }
 
         async function promptAddRepo() {
-            const path = await window.CustomModals.prompt("Enter absolute path to local repository:");
+            const path = prompt("Enter absolute path to local repository:");
             if(path) {
                 await fetchAPI('/api/git/repos', 'POST', { path });
                 loadRepos();
@@ -1123,11 +1122,11 @@
 
                 await fetchAPI('/api/git/credentials', 'POST', credsPayload);
 
-                await window.CustomModals.alert("Settings Saved");
+                alert("Settings Saved");
                 document.getElementById('modal-settings').style.display = 'none';
                 loadSettings();
             } catch(e) {
-                await window.CustomModals.alert("Error saving settings: " + e.message);
+                alert("Error saving settings: " + e.message);
             } finally {
                 btn.innerText = "Save Changes";
                 btn.disabled = false;
@@ -1165,8 +1164,8 @@
             const val = document.getElementById('inp-clone-path').value.trim(); // Name or Path depending on mode
             const mode = currentSettings.git_root_mode || 'manual';
 
-            if(!url) { await window.CustomModals.alert("URL is required."); return; }
-            if(mode === 'manual' && !val) { await window.CustomModals.alert("Path is required."); return; }
+            if(!url) { alert("URL is required."); return; }
+            if(mode === 'manual' && !val) { alert("Path is required."); return; }
 
             const btn = event.target;
             const oldText = btn.innerText;
@@ -1181,14 +1180,14 @@
             try {
                 const res = await fetchAPI('/api/git/clone', 'POST', payload);
                 if(res.success) {
-                    await window.CustomModals.alert("Clone Successful!");
+                    alert("Clone Successful!");
                     document.getElementById('modal-clone').style.display = 'none';
                     loadRepos();
                 } else {
-                    await window.CustomModals.alert("Clone Failed: " + (res.error || "Unknown error"));
+                    alert("Clone Failed: " + (res.error || "Unknown error"));
                 }
             } catch(e) {
-                await window.CustomModals.alert("Error: " + e.message);
+                alert("Error: " + e.message);
             } finally {
                 btn.innerText = oldText;
                 btn.disabled = false;
@@ -1219,7 +1218,7 @@
                 document.getElementById('empty-state').style.display = 'flex';
                 loadRepos();
             } catch (e) {
-                await window.CustomModals.alert("Error removing repo: " + e.message);
+                alert("Error removing repo: " + e.message);
             } finally {
                 btn.innerText = "Remove";
                 btn.disabled = false;
@@ -1258,10 +1257,10 @@
                 if (res && res.success) {
                     checkSSHStatus(); // Reload
                 } else {
-                    await window.CustomModals.alert("Generation Failed: " + (res.error || "Unknown"));
+                    alert("Generation Failed: " + (res.error || "Unknown"));
                 }
             } catch(e) {
-                await window.CustomModals.alert("Error: " + e.message);
+                alert("Error: " + e.message);
             } finally {
                 btn.innerText = "Generate SSH Key";
                 btn.disabled = false;
@@ -1272,7 +1271,7 @@
             const el = document.getElementById('ssh-pub-key');
             el.select();
             document.execCommand('copy');
-            await window.CustomModals.alert("Public Key copied to clipboard.");
+            alert("Public Key copied to clipboard.");
         }
 
         function toggleSidebar() {
