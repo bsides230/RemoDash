@@ -1,0 +1,126 @@
+import { contextBridge, ipcRenderer } from "electron";
+
+import { IPC_CHANNELS } from "@shared/ipc";
+import type {
+  AuthLoginRequest,
+  AuthSessionRequest,
+  GamesFetchRequest,
+  ResolveLaunchIdRequest,
+  RegionsFetchRequest,
+  MainToRendererSignalingEvent,
+  OpenNowApi,
+  SessionCreateRequest,
+  SessionPollRequest,
+  SessionStopRequest,
+  SessionClaimRequest,
+  SignalingConnectRequest,
+  SendAnswerRequest,
+  IceCandidatePayload,
+  KeyframeRequest,
+  Settings,
+  SubscriptionFetchRequest,
+  StreamRegion,
+  ScreenshotSaveRequest,
+  ScreenshotDeleteRequest,
+  ScreenshotSaveAsRequest,
+  RecordingBeginRequest,
+  RecordingBeginResult,
+  RecordingChunkRequest,
+  RecordingFinishRequest,
+  RecordingAbortRequest,
+  RecordingEntry,
+  RecordingDeleteRequest,
+  MediaListingResult,
+} from "@shared/gfn";
+
+const api: OpenNowApi = {
+  getAuthSession: (input: AuthSessionRequest = {}) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_SESSION, input),
+  getLoginProviders: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_PROVIDERS),
+  getRegions: (input: RegionsFetchRequest = {}) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_GET_REGIONS, input),
+  login: (input: AuthLoginRequest) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN, input),
+  logout: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
+  fetchSubscription: (input: SubscriptionFetchRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SUBSCRIPTION_FETCH, input),
+  fetchMainGames: (input: GamesFetchRequest) => ipcRenderer.invoke(IPC_CHANNELS.GAMES_FETCH_MAIN, input),
+  fetchLibraryGames: (input: GamesFetchRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GAMES_FETCH_LIBRARY, input),
+  fetchPublicGames: () => ipcRenderer.invoke(IPC_CHANNELS.GAMES_FETCH_PUBLIC),
+  resolveLaunchAppId: (input: ResolveLaunchIdRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GAMES_RESOLVE_LAUNCH_ID, input),
+  createSession: (input: SessionCreateRequest) => ipcRenderer.invoke(IPC_CHANNELS.CREATE_SESSION, input),
+  pollSession: (input: SessionPollRequest) => ipcRenderer.invoke(IPC_CHANNELS.POLL_SESSION, input),
+  stopSession: (input: SessionStopRequest) => ipcRenderer.invoke(IPC_CHANNELS.STOP_SESSION, input),
+  getActiveSessions: (token?: string, streamingBaseUrl?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_ACTIVE_SESSIONS, token, streamingBaseUrl),
+  claimSession: (input: SessionClaimRequest) => ipcRenderer.invoke(IPC_CHANNELS.CLAIM_SESSION, input),
+  showSessionConflictDialog: () => ipcRenderer.invoke(IPC_CHANNELS.SESSION_CONFLICT_DIALOG),
+  connectSignaling: (input: SignalingConnectRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CONNECT_SIGNALING, input),
+  disconnectSignaling: () => ipcRenderer.invoke(IPC_CHANNELS.DISCONNECT_SIGNALING),
+  sendAnswer: (input: SendAnswerRequest) => ipcRenderer.invoke(IPC_CHANNELS.SEND_ANSWER, input),
+  sendIceCandidate: (input: IceCandidatePayload) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SEND_ICE_CANDIDATE, input),
+  requestKeyframe: (input: KeyframeRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.REQUEST_KEYFRAME, input),
+  onSignalingEvent: (listener: (event: MainToRendererSignalingEvent) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: MainToRendererSignalingEvent) => {
+      listener(payload);
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.SIGNALING_EVENT, wrapped);
+    return () => {
+      ipcRenderer.off(IPC_CHANNELS.SIGNALING_EVENT, wrapped);
+    };
+  },
+  onToggleFullscreen: (listener: () => void) => {
+    const wrapped = () => listener();
+    ipcRenderer.on("app:toggle-fullscreen", wrapped);
+    return () => {
+      ipcRenderer.off("app:toggle-fullscreen", wrapped);
+    };
+  },
+  quitApp: () => ipcRenderer.invoke(IPC_CHANNELS.QUIT_APP),
+  toggleFullscreen: () => ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_FULLSCREEN),
+  setFullscreen: (v: boolean) => ipcRenderer.invoke(IPC_CHANNELS.SET_FULLSCREEN, v),
+  togglePointerLock: () => ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_POINTER_LOCK),
+  getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
+  setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SET, key, value),
+  resetSettings: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_RESET),
+  exportLogs: (format?: "text" | "json") => ipcRenderer.invoke(IPC_CHANNELS.LOGS_EXPORT, format),
+  pingRegions: (regions: StreamRegion[]) => ipcRenderer.invoke(IPC_CHANNELS.PING_REGIONS, regions),
+  saveScreenshot: (input: ScreenshotSaveRequest) => ipcRenderer.invoke(IPC_CHANNELS.SCREENSHOT_SAVE, input),
+  listScreenshots: () => ipcRenderer.invoke(IPC_CHANNELS.SCREENSHOT_LIST),
+  deleteScreenshot: (input: ScreenshotDeleteRequest) => ipcRenderer.invoke(IPC_CHANNELS.SCREENSHOT_DELETE, input),
+  saveScreenshotAs: (input: ScreenshotSaveAsRequest) => ipcRenderer.invoke(IPC_CHANNELS.SCREENSHOT_SAVE_AS, input),
+  onTriggerScreenshot: (listener: () => void) => {
+    const wrapped = () => listener();
+    ipcRenderer.on("app:trigger-screenshot", wrapped);
+    return () => {
+      ipcRenderer.off("app:trigger-screenshot", wrapped);
+    };
+  },
+  beginRecording: (input: RecordingBeginRequest): Promise<RecordingBeginResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_BEGIN, input),
+  sendRecordingChunk: (input: RecordingChunkRequest): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_CHUNK, input),
+  finishRecording: (input: RecordingFinishRequest): Promise<RecordingEntry> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_FINISH, input),
+  abortRecording: (input: RecordingAbortRequest): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_ABORT, input),
+  listRecordings: (): Promise<RecordingEntry[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_LIST),
+  deleteRecording: (input: RecordingDeleteRequest): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_DELETE, input),
+  showRecordingInFolder: (id: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RECORDING_SHOW_IN_FOLDER, id),
+  listMediaByGame: (input: { gameTitle?: string } = {}): Promise<MediaListingResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_LIST_BY_GAME, input),
+  getMediaThumbnail: (input: { filePath: string }) => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_THUMBNAIL, input),
+  showMediaInFolder: (input: { filePath: string }): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SHOW_IN_FOLDER, input),
+  deleteCache: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CACHE_DELETE_ALL),
+};
+
+contextBridge.exposeInMainWorld("openNow", api);

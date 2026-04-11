@@ -31,63 +31,8 @@
       "id": "3f185150-61da-4dfd-ac44-0fc9395dc6aa",
       "name": "API Test Playlist",
       "created_at": "2026-03-25T04:13:08Z",
-      "updated_at": "2026-03-25T04:15:52Z",
-      "items": [
-        {
-          "id": "52ac33bc-d614-4ef4-9ab3-dcb51f20d1bc",
-          "type": "audio",
-          "title": "Audio 1",
-          "source": "http://aud1",
-          "duration_sec": null,
-          "enabled": true,
-          "media_key": "http://aud1"
-        },
-        {
-          "id": "ef280d98-e942-4515-868d-996143bc6737",
-          "type": "video",
-          "title": "Vid 1",
-          "source": "http://vid1",
-          "duration_sec": null,
-          "enabled": true,
-          "media_key": "http://vid1"
-        },
-        {
-          "id": "7dd45825-5879-4187-9b4b-bc0a72c41c05",
-          "type": "audio",
-          "title": "Item 1",
-          "source": "item1.mp4",
-          "duration_sec": null,
-          "enabled": true,
-          "media_key": "item1.mp4"
-        },
-        {
-          "id": "5fd1db5e-459f-4a90-9364-f2ce3cb64132",
-          "type": "audio",
-          "title": "Item 2",
-          "source": "item2.mp4",
-          "duration_sec": null,
-          "enabled": true,
-          "media_key": "item2.mp4"
-        },
-        {
-          "id": "565d01d3-a29e-4dbf-9bd1-515241d3c3aa",
-          "type": "audio",
-          "title": "Item 1",
-          "source": "item1.mp4",
-          "duration_sec": null,
-          "enabled": true,
-          "media_key": "item1.mp4"
-        },
-        {
-          "id": "b8446647-5d52-4d14-ad81-e94d4d4d7dee",
-          "type": "audio",
-          "title": "Item 2",
-          "source": "item2.mp4",
-          "duration_sec": null,
-          "enabled": true,
-          "media_key": "item2.mp4"
-        }
-      ]
+      "updated_at": "2026-04-08T03:14:32Z",
+      "items": []
     },
     "b51d7be2-ed34-4127-8449-efc0c607bdef": {
       "id": "b51d7be2-ed34-4127-8449-efc0c607bdef",
@@ -102,23 +47,35 @@
       "created_at": "2026-03-25T04:15:51Z",
       "updated_at": "2026-03-25T04:15:51Z",
       "items": []
+    },
+    "d8484f5d-3718-4a10-ae91-5f5d6af1a06d": {
+      "id": "d8484f5d-3718-4a10-ae91-5f5d6af1a06d",
+      "name": "Music Videos",
+      "created_at": "2026-04-08T03:16:06Z",
+      "updated_at": "2026-04-08T03:17:15Z",
+      "items": [
+        {
+          "id": "0a43fc00-af96-4d31-a9e8-2118ca199218",
+          "type": "video",
+          "title": "Cold Little Heart",
+          "source": "\"C:\\Users\\matta\\Music\\Michael Kiwanuka - Cold Little Heart (Official Video).mp4\"",
+          "duration_sec": null,
+          "enabled": true,
+          "media_key": "\"C:\\Users\\matta\\Music\\Michael Kiwanuka - Cold Little Heart (Official Video).mp4\""
+        }
+      ]
     }
   },
-  "active_playlist_id": "3f185150-61da-4dfd-ac44-0fc9395dc6aa",
+  "active_playlist_id": "d8484f5d-3718-4a10-ae91-5f5d6af1a06d",
   "playback": {
     "is_playing": false,
-    "is_paused": false,
+    "is_paused": true,
     "repeat": false,
     "shuffle": false,
-    "current_index": 1,
-    "current_item_id": "ef280d98-e942-4515-868d-996143bc6737",
+    "current_index": 0,
+    "current_item_id": "0a43fc00-af96-4d31-a9e8-2118ca199218",
     "active_order": [
-      "52ac33bc-d614-4ef4-9ab3-dcb51f20d1bc",
-      "ef280d98-e942-4515-868d-996143bc6737",
-      "7dd45825-5879-4187-9b4b-bc0a72c41c05",
-      "5fd1db5e-459f-4a90-9364-f2ce3cb64132",
-      "565d01d3-a29e-4dbf-9bd1-515241d3c3aa",
-      "b8446647-5d52-4d14-ad81-e94d4d4d7dee"
+      "0a43fc00-af96-4d31-a9e8-2118ca199218"
     ],
     "next_order": [],
     "loop_generation": 0,
